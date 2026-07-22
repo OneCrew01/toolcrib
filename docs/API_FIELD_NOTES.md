@@ -57,7 +57,58 @@ minimal repro, suggested fix.
   completed in ~5 s.
 - **Actual:** a fastening-feature prompt (50×50×2 mm plate, four corner holes at fixed
   edge distance, 100° countersinks for flush flat-head screws) sat `queued` →
-  `in_progress` for **minutes**, not seconds (see CURRENT_STATE for final timing).
+  `in_progress` for **8 min 10 s** — and then failed (see FN-006).
 - **Impact:** any UI that blocks on generation is unusable for real fastening features;
   async background execution with notify is a requirement, not a nicety.
 - **Repro:** POST the prompt above; poll `GET /user/text-to-cad/{id}`.
+
+## FN-006 · Fastening-feature prompt fails after 8 min and leaks an internal cluster URL
+- **API:** Agent/ML · `POST /ai/text-to-cad/step?kcl=true`
+- **Date:** 2026-07-22 (id `5f98c1c2-c670-4f5d-83c8-c56a4b308ba7`)
+- **Type:** bug (two bugs, really)
+- **Expected:** either generated geometry or a domain error ("couldn't satisfy the
+  countersink constraint").
+- **Actual:** after 8 m 10 s in `in_progress`, status flips to `failed` with:
+  `Text-to-CAD server: Communication Error: error sending request for url
+  (http://text-to-kcl.text-to-kcl.svc.cluster.local:8080/text-to-cad)`
+- **Bug 1 — reliability:** a moderately-constrained fastening prompt (four positioned
+  countersunk holes) appears to time out an internal hop rather than degrade gracefully.
+  This is the exact feature class where text-to-CAD needs to win to be a shop tool.
+- **Bug 2 — hygiene:** the error string leaks internal Kubernetes service DNS
+  (`*.svc.cluster.local:8080`) to the end user. Should be a request id + a clean message.
+- **Repro:** CONFIRMED 2/2. Same prompt, two independent runs, same failure + same
+  leaked URL: ids `5f98c1c2-c670-4f5d-83c8-c56a4b308ba7` and
+  `74f6f311-a782-436a-98ac-c14cd17707bc` (both 2026-07-22, ~8 min each).
+- **Suggested fix:** map internal transport errors to an opaque error code; surface
+  partial/best-effort KCL when the model produced code before the hop failed.
+
+## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
+- **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
+- **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)
+- **Type:** doc-gap / API asymmetry
+- **Expected:** the completed text-to-cad record returns the exported files you asked
+  for (`output_format=step`).
+- **Actual:** `GET /user/text-to-cad/{id}` returns `code` but **no `outputs` field at
+  all**. The same id via `GET /async/operations/{id}` returns full `outputs`
+  (`source.step`, `source.gltf`). Nothing in the response hints the files live on the
+  other surface.
+- **Also:** output values are **unpadded** base64 (length ≢ 0 mod 4). Node's lenient
+  `Buffer.from(b64, "base64")` accepts it; strict decoders (.NET, some Python paths)
+  throw "invalid length" until you re-pad.
+- **Impact:** a developer polling the documented user record concludes exports are
+  broken; we did, for about ten minutes.
+- **Suggested fix:** include `outputs` on the user record (or document the split), and
+  pad the base64 (or document that it's unpadded).
+- **Nice find en route:** requesting `step` also returned `source.gltf` free — a ready
+  in-browser preview asset.
+
+## FN-008 · Engine REST validation closes the loop with 0.02% agreement
+- **API:** Engine (REST) · `POST /file/mass?...&src_format=step`
+- **Date:** 2026-07-22
+- **Type:** pleasant-surprise
+- **Actual:** uploaded the generated STEP with aluminum density (2700 kg/m³):
+  API mass = **13.0786 g**; first-principles hand calc for a 50×50×2 plate minus four
+  Ø5 mm through-holes = **13.077 g**. Agreement to ~0.02% — i.e., the four holes truly
+  exist in the exported geometry, provable from a single number, no websocket needed.
+- **Impact:** REST-only validation (`/file/mass`, `/file/volume`,
+  `/file/center-of-mass`) is enough for a meaningful trust gate on day 1.

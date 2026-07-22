@@ -36,7 +36,9 @@ async function textToCad(prompt, format = "step") {
   });
   console.log(`queued ${job.id}`);
   for (;;) {
-    const r = await api(`/user/text-to-cad/${job.id}`);
+    // NB: poll /async/operations, NOT /user/text-to-cad — only the former
+    // includes the `outputs` files on completion (see FN-007).
+    const r = await api(`/async/operations/${job.id}`);
     if (r.status === "completed") {
       console.log(`completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
       return r;
@@ -61,7 +63,7 @@ const prompt =
   process.argv.slice(2).join(" ") ||
   "A 50mm x 50mm x 2mm aluminum plate with four 5mm diameter holes, one near each corner, each hole center 10mm from both adjacent edges, each hole countersunk at 100 degrees to sit a flush flat-head screw";
 
-const slug = "flush-plate";
+const slug = process.env.TOOLCRIB_SLUG || "flush-plate";
 const outDir = join("samples", slug);
 mkdirSync(outDir, { recursive: true });
 

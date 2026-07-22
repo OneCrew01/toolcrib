@@ -35,9 +35,9 @@ The demo part is small on purpose. The pattern is the product.
 | Capability | Status | Notes |
 |---|---|---|
 | Bearer-token auth (`GET /user`) | ✅ verified 2026-07-22 | `Authorization: Bearer <token>` |
-| Text-to-CAD (`POST /ai/text-to-cad/{format}?kcl=true`) | ✅ verified 2026-07-22 | async; returns editable KCL + exported files |
-| STEP export | ✅ in `FileExportFormat` | `fbx, glb, gltf, obj, ply, step, stl` |
-| Engine mass/volume validation (`/file/mass`, `/file/volume`) | 🔜 next | REST, no websocket needed |
+| Text-to-CAD (`POST /ai/text-to-cad/{format}?kcl=true`) | ✅ verified 2026-07-22 | async; returns constraint-based, parametric KCL 2.0 — genuinely editable |
+| STEP export | ✅ verified 2026-07-22 | via `/async/operations/{id}` outputs (see FN-007); glTF preview comes free |
+| Engine mass/volume validation (`/file/mass`) | ✅ verified 2026-07-22 | API mass matched hand calc to 0.02% (FN-008) |
 | Agent copilot session (`/ws/ml/copilot`) | 🔜 planned | websocket |
 | Engine modeling commands (`/ws/modeling/commands`) | 🔜 planned | websocket; DXF lives here (`OutputFormat2d`) |
 
