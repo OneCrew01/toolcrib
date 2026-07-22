@@ -36,6 +36,12 @@ minimal repro, suggested fix.
   stable-credit balance, so building continues; the mapping of minutes→credits is the
   open question.)
 - **Suggested fix:** balance response (or the contest FAQ) should name grants explicitly.
+- **Update (same day):** the contest page says eligible registrants "will receive 10,000
+  minutes of API access" *automatically*, and to email makeathon@zoo.dev for top-offs.
+  So the grant likely IS the stable-credit balance — but nothing in
+  `GET /user/payment/balance` identifies it as such, which is the gap: an entrant cannot
+  programmatically confirm their grant landed or meter their remaining contest budget in
+  the contest's own vocabulary (minutes).
 
 ## FN-004 · STEP is a first-class export; DXF lives on a different path
 - **API:** File Format · schema `FileExportFormat`, `OutputFormat2d`
