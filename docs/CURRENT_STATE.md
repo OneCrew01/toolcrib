@@ -2,34 +2,40 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
-## 2026-07-22 · Day 1 — thin thread GREEN
+## 2026-07-22 · Day 1 (late night) — harness live, campaign C001 complete
 
-**Works (all reproduced live today)**
-- Auth (`GET /user` 200) and credits confirmed (FN-001, FN-003).
-- Full OpenAPI spec pulled from the API root; export formats mapped (FN-002, FN-004).
-- **Full chain proven:** intent → `POST /ai/text-to-cad/step?kcl=true` → constraint-based
-  parametric KCL 2.0 → STEP (25 KB) + glTF (111 KB) via `/async/operations/{id}` →
-  `POST /file/mass` validation: **13.0786 g vs 13.077 g hand calc (0.02%)**.
-  Artifacts in `samples/plain-plate/`.
-- `npm run demo` runs the chain headless, zero dependencies (Day-1 gate: PASSED).
+**Works**
+- Full thin thread (see morning entry below): intent → KCL → STEP/STL/glTF → mass gate.
+- **Reliability harness shipped and battle-tested:** modular campaigns
+  (`server/harness/campaigns/`), worker pool, budget cap, JSONL ledger, per-run KCL
+  capture, auto-summary — plus `recover-run.mjs`, which salvaged an interrupted run
+  from ledger ids alone.
+- **Campaign C001 (30 generations, $5.10):** all 30 completed server-side; 6 fully
+  mass-validated (analytic agreement ~0.02% on every strict case); 24 hit FN-011
+  (outputs stranded) with KCL recovered for all.
 
-**Found (the day's bug harvest — see API_FIELD_NOTES)**
-- FN-005/006: countersink flush-mount prompt fails after ~8 min, 2/2 repro, leaking an
-  internal cluster URL. This is the founding bug report AND the product thesis: plain
-  hole patterns generate beautifully; add flush-mount countersinks and the pipeline
-  itself falls over. The gap ToolCRIB exists to close, measured on day 1.
-- FN-007: `outputs` only on the async-operations surface; unpadded base64.
-- FN-008: REST-only validation is a real trust gate.
+**The day's findings ledger (12 field notes, 3 GitHub-issue-grade)**
+1. FN-006 — fastening prompts fail non-deterministically under load + internal URL leak.
+2. FN-011 — burst-dispatched jobs complete but outputs become permanently unreachable.
+3. FN-007 — outputs only on the async-operations surface, unpadded base64.
+Plus: cost $0.17/generation (FN-012), near-deterministic codegen, 6× latency jitter.
 
 **Blocked / open**
-- Makeathon minutes grant not identifiable in balance payload (FN-003) — ask Zoo.
-- Websockets (`/ws/ml/copilot`, `/ws/modeling/commands`) unexercised; DXF lives there.
-- Concurrent Agent session limits unknown.
-- GitHub remote not yet created (operator action).
+- Orphaned-outputs re-export path unknown — office-hours Q10 (also: `/file/execute/kcl`
+  semantics as a possible server-side KCL→file route).
+- Websocket protocol post-upgrade still unexercised (FN-009 = handshake only).
+- GitHub issues for FN-006/FN-011 drafted in the field notes; filing needs operator go.
 
-**Next action (Day 2 per build pack)**
-- State machine + `StateStore` interface + LocalStore; job walks DRAFT→…→PDF_GENERATION
-  with an append-only transition ledger.
-- Start the fastening-reference schema (rule + citation shape) — first table: hole
-  edge-distance rules (the thing the failed prompt needed).
-- File the FN-006 bug as a GitHub issue on Zoo's repo (operator approves posting).
+**Next action (Day 2)**
+- State machine + StateStore/LocalStore + transition ledger (build pack Day 2).
+- First fastening-reference table: hole edge-distance rules.
+- Design C002 with phrasing variation per feature class (FN-012 method implication).
+- Pre-office-hours: exercise `/ws/modeling/commands` post-upgrade (KCL execute + DXF).
+
+---
+
+## 2026-07-22 · Day 1 (morning) — thin thread GREEN
+
+Auth, credits, spec mapped; chain proven end-to-end with 0.02% mass agreement;
+`npm run demo` headless with zero dependencies; artifacts in `samples/`.
+See ledger above for the full findings list.

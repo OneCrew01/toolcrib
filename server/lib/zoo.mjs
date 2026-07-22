@@ -45,16 +45,48 @@ export function zooClient(token = loadToken()) {
       return api(`/async/operations/${id}`);
     },
 
+    /** Text-to-cad record on the user surface: reliable status + code, never outputs. */
+    getTextToCad(id) {
+      return api(`/user/text-to-cad/${id}`);
+    },
+
+    /**
+     * Fetch a completed job's output files from the async surface, tolerating 404s.
+     * Returns the outputs object or null if unreachable (FN-011: burst-dispatched
+     * jobs can complete with their outputs permanently missing from this surface).
+     */
+    async fetchOutputs(id, { tries = 6, delayS = 5 } = {}) {
+      for (let i = 0; i < tries; i++) {
+        try {
+          const r = await this.getAsyncOp(id);
+          if (r.outputs) return r.outputs;
+        } catch (e) {
+          if (!String(e.message).includes("404")) throw e;
+        }
+        await new Promise((r) => setTimeout(r, delayS * 1000));
+      }
+      return null;
+    },
+
     /**
      * Poll a text-to-cad job to a terminal state.
      * Resolves { status, record, latencyS }; status ∈ completed|failed|timeout.
+     * Polls the USER surface (/user/text-to-cad/{id}) — under burst dispatch the
+     * async-operations surface 404s, sometimes permanently (FN-011). Outputs are
+     * fetched separately via fetchOutputs().
      */
     async waitTextToCad(id, { timeoutMin = 20, pollS = 6 } = {}) {
       const t0 = Date.now();
       for (;;) {
-        const r = await this.getAsyncOp(id);
         const latencyS = (Date.now() - t0) / 1000;
-        if (r.status === "completed" || r.status === "failed")
+        let r = null;
+        try {
+          r = await this.getTextToCad(id);
+        } catch (e) {
+          // brief 404 grace right after dispatch, in case this surface lags too
+          if (!String(e.message).includes("404") || latencyS > 120) throw e;
+        }
+        if (r && (r.status === "completed" || r.status === "failed"))
           return { status: r.status, record: r, latencyS };
         if (latencyS > timeoutMin * 60) return { status: "timeout", record: r, latencyS };
         await new Promise((res) => setTimeout(res, pollS * 1000));

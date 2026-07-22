@@ -83,17 +83,21 @@ async function runOne({ c, runIdx }) {
     expectedMaxG: c.expected.maxG,
     strict: c.strict !== false,
   };
+  let jobId = null;
   try {
     const job = await zoo.startTextToCad(c.prompt, c.format ?? "step");
+    jobId = job.id;
     const { status, record, latencyS } = await zoo.waitTextToCad(job.id, { timeoutMin: settings.timeoutMin });
-    const entry = { ...base, t2cId: job.id, latencyS: Math.round(latencyS * 10) / 10, kclChars: record.code?.length ?? 0 };
+    const entry = { ...base, t2cId: job.id, latencyS: Math.round(latencyS * 10) / 10, kclChars: record?.code?.length ?? 0 };
 
-    if (record.code) writeFileSync(join(outDir, "kcl", `${c.id}-r${runIdx}.kcl`), record.code);
+    if (record?.code) writeFileSync(join(outDir, "kcl", `${c.id}-r${runIdx}.kcl`), record.code);
 
-    if (status === "failed") return { ...entry, verdict: "generation_failed", error: record.error ?? null };
+    if (status === "failed") return { ...entry, verdict: "generation_failed", error: record?.error ?? null };
     if (status === "timeout") return { ...entry, verdict: "timeout_client" };
 
-    const stepB64 = record.outputs?.["source.step"];
+    const outputs = await zoo.fetchOutputs(job.id);
+    if (!outputs) return { ...entry, verdict: "completed_outputs_unreachable" }; // FN-011
+    const stepB64 = outputs["source.step"];
     if (!stepB64) return { ...entry, verdict: "completed_no_outputs" };
 
     try {
@@ -106,7 +110,7 @@ async function runOne({ c, runIdx }) {
       return { ...entry, verdict: "validation_error", error: String(e.message ?? e) };
     }
   } catch (e) {
-    return { ...base, verdict: "validation_error", error: String(e.message ?? e) };
+    return { ...base, t2cId: jobId, verdict: jobId ? "poll_error" : "dispatch_error", error: String(e.message ?? e) };
   } finally {
     console.log(`done: ${label}`);
   }

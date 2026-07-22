@@ -108,6 +108,48 @@ minimal repro, suggested fix.
 - **Why this is the thesis:** a `completed` status is not trustworthy and a `failed`
   status is not reproducible — you cannot tell from Zoo's response alone whether you got a
   correct part. That gap is exactly what a validation layer closes (FN-010).
+- **Update (campaign c001, same day):** the same countersink prompt went **6/6
+  completed** in the overnight campaign window. Combined with the morning's 2/3
+  failures, the failure mode is load/time-dependent infrastructure, not the prompt —
+  which makes single-shot trust *worse*: the same request can fail, succeed, or
+  succeed-without-retrievable-outputs (FN-011) depending on when and how it's sent.
+
+## FN-011 · Burst-dispatched jobs complete — but their outputs are permanently unreachable
+- **API:** Agent/ML · `POST /ai/text-to-cad/*` + `GET /async/operations/{id}`
+- **Date:** 2026-07-22, campaign c001 (24 of 30 runs affected; ids in
+  `server/harness/results/c001-fastening-reliability/2026-07-22-09-50/ledger.jsonl`)
+- **Type:** bug (severe — data loss from the caller's perspective)
+- **Expected:** dispatch returns an id; that id resolves on the async-operations
+  surface, which is the only surface carrying `outputs` (FN-007).
+- **Actual:** when jobs are dispatched in rapid succession (2 workers, ~1–2 s between
+  dispatches), `/async/operations/{id}` returns **404 — and keeps returning 404 an hour
+  later** — while `/user/text-to-cad/{id}` shows the same id `completed` with full KCL.
+  Since the user surface never carries `outputs` (FN-007), the exported STEP/glTF of a
+  completed, billed generation is unreachable through any surface we can find. Jobs
+  dispatched immediately after a *completed* generation (rather than after another
+  dispatch) resolved normally — 6 of 6 such runs polled fine. Pattern held across all
+  5 prompt classes.
+- **Impact:** any client doing concurrent generation loses every output file; the only
+  recovery is the KCL from the user record. Combined with FN-007 this means the outputs
+  contract is: *sometimes on one undocumented surface, sometimes nowhere*.
+- **Suggested fix:** carry `outputs` (or output URLs) on `/user/text-to-cad/{id}`, or
+  guarantee the async-operations record exists for every accepted job, or provide a
+  re-export endpoint for a completed job id.
+
+## FN-012 · Economics + determinism: $0.17/generation avg; identical prompts → near-identical programs
+- **API:** Agent/ML + billing · campaign c001 (30 generations, 6 mass checks, ~40 polls)
+- **Date:** 2026-07-22
+- **Type:** pleasant-surprise / metering data
+- **Cost:** balance delta **$5.10 for the whole campaign** → ~**$0.170/generation**
+  average (mass checks and polling appear ~free). At this rate the ~$5k grant funds
+  ~29,000 generations — budget is not a constraint; API reliability is.
+- **Determinism:** cases a and b produced **byte-count-identical KCL across all 6
+  runs** (2436 and 4804 chars); cases c/d/e produced exactly **two codegen variants
+  each** across 6 runs, and where we could measure, variants converged to identical
+  mass (12.6033 g / 10.1679 g / 16.4266 g — matching analytic values to ~0.02%).
+- **Method implication:** repeating an *identical* prompt mostly measures Zoo's
+  infrastructure, not the model. Future campaigns should vary *phrasing* within a
+  feature class to measure model robustness (planned for c002).
 
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
