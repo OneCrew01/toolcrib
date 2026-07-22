@@ -1,0 +1,6 @@
+{
+  "title": "Plate with no material stated",
+  "prompt": "A 50mm x 50mm x 2mm plate with four 5mm diameter holes, one near each corner",
+  "units": "mm",
+  "requester": "shop-floor@example.com"
+}

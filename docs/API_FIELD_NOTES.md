@@ -151,6 +151,55 @@ minimal repro, suggested fix.
   infrastructure, not the model. Future campaigns should vary *phrasing* within a
   feature class to measure model robustness (planned for c002).
 
+## FN-013 · Websocket auth: `?token=` is silently ignored — auth is a post-upgrade JSON frame
+- **API:** Engine · `wss://api.zoo.dev/ws/modeling/commands`
+- **Date:** 2026-07-22 · repro: `server/spikes/ws-modeling-spike.mjs --rung=1`
+- **Type:** doc-gap (client-breaking for non-browser clients)
+- **Actual:** the 101 upgrade succeeds with any or no auth (FN-009), and `?token=<tok>`
+  changes nothing: the server nags `auth_token_missing` once per second — the nag text
+  itself documents the real protocol — then hard-drops the socket (1006, no close
+  frame) at ~4–5 s. Authentication is the `headers` variant of `WebSocketRequest`:
+  send `{"type":"headers","headers":{"Authorization":"Bearer <tok>"}}` immediately
+  after open; success is `modeling_session_data` (with a traceable `api_call_id`)
+  ~290 ms later. One nag always races in before the auth frame processes — clients
+  must not treat it as fatal.
+- **Why it matters:** the standard browser/Node `WebSocket` API cannot send an
+  `Authorization` header, so the query param is the natural first guess — and nothing
+  in the docs says it's a no-op.
+- **Suggested doc edit:** state the post-upgrade auth frame explicitly in the
+  websocket docs; consider rejecting unknown auth query params loudly.
+
+## FN-014 · Modeling protocol: uuid-correlated JSON frames, ~50 ms round-trips
+- **API:** Engine websocket · **Date:** 2026-07-22 · repro: spike `--rung=2`
+- **Type:** pleasant-surprise / protocol notes
+- Envelope: `{"type":"modeling_cmd_req","cmd":{...},"cmd_id":"<uuid>"}` →
+  `{"success":true,"request_id":"<same uuid>","resp":{"type":"modeling","data":
+  {"modeling_response":{...}}}}`. Every command acked in 47–75 ms — four orders of
+  magnitude faster than text-to-cad (FN-005). Unsolicited `metrics_request` arrives
+  every ~10 s (ignorable; empty metrics response is schema-valid). No keepalive needed
+  ≤ 25 s idle. Quirk: client `close(1000)` is always reported back as 1006 — the server
+  aborts TCP rather than completing the close handshake; don't alarm on it.
+
+## FN-015 · Engine bounding box verified: 7 commands → exact cube dimensions
+- **API:** Engine websocket · **Date:** 2026-07-22 · repro: spike `--rung=3` (×3 sessions)
+- **Type:** capability verified
+- `start_path` → `move_path_pen` → 3× `extend_path` → `close_path` → `extrude(10)` →
+  `bounding_box` (`entity_ids: []` = whole scene) returns center (5,5,5), dimensions
+  (10,10,10) mm — exact, in ~450 ms total. Raw coordinates default to mm. Notes:
+  `close_path` takes `path_id` (not `path`) and returns a `face_id`. This closes the
+  printer-envelope-check capability row: a live sub-second geometry oracle.
+
+## FN-016 · The buried DXF path works: `export2d` → real AC1014 DXF in 54 ms
+- **API:** Engine websocket · **Date:** 2026-07-22 · repro: spike `--rung=4`
+- **Type:** capability verified + doc-gap
+- `export2d` with `format:{type:"dxf",storage:"ascii"}` on a closed sketch returns
+  `output.dxf`: 4,644 bytes of valid ASCII DXF (AC1014, one LINE entity per segment,
+  correct coordinates). The spec says exported RawFiles come back "as binary/bson";
+  observed reality is base64 strings inside ordinary JSON text frames (cf. FN-007's
+  base64 habit). Export does not terminate the session.
+- **Suggested doc edit:** document `export2d` from the file-conversion/DXF angle —
+  nothing today routes a "how do I get DXF?" reader to this command.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)

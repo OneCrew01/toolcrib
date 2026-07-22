@@ -33,6 +33,17 @@ Measured text-to-CAD latency spread (~5 s trivial solid → minutes for fastenin
 features, FN-005) makes background execution + notify a hard requirement. No UI blocks
 on generation.
 
+## D-007 · 2026-07-22 · Sourcing the fastening reference: verify, don't invent
+The FAA's canonical AC 43.13-1B PDF refuses automated fetch (403); Ch. 4 Sec. 4 text
+was recovered from a mirror of the official section PDF. Read verbatim and encoded
+with exact citations: para 4-57c(1) (edge distance ≥ 2D, spacing ≥ 3D) and 4-57g(3)
+(rivet dia ≈ 3 × thicker sheet). Figure 4-5 (multi-row minimums) is a scanned image —
+values unreadable, deliberately NOT encoded. Flush-head 2.5D, preferred values, and
+typical pitch practice are AMT-handbook material, encoded citing FAA-H-8083-31A with
+paragraph "UNCONFIRMED" rather than an invented AC paragraph. Every rule ships
+PENDING_OPERATOR regardless of source until checked against the printed text
+(docs/VERIFICATION_LOG.md).
+
 ## D-006 · 2026-07-22 · License MIT
 Maximum remixability; matches the contest's remix-and-expand theme. (Revisit before the
 repo goes public if a different open license is preferred.)

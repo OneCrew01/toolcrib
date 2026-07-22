@@ -39,7 +39,9 @@ The demo part is small on purpose. The pattern is the product.
 | STEP export | ✅ verified 2026-07-22 | via `/async/operations/{id}` outputs (see FN-007); glTF preview comes free |
 | Engine mass/volume validation (`/file/mass`) | ✅ verified 2026-07-22 | API mass matched hand calc to 0.02% (FN-008) |
 | Agent copilot session (`/ws/ml/copilot`) | 🔜 planned | websocket |
-| Engine modeling commands (`/ws/modeling/commands`) | 🔜 planned | websocket; DXF lives here (`OutputFormat2d`) |
+| Engine modeling commands (websocket) | ✅ verified 2026-07-22 | post-upgrade `headers` auth (FN-013); ~50 ms round-trips (FN-014) |
+| Engine bounding box | ✅ verified 2026-07-22 | cube → exact dims via `bounding_box` (FN-015) |
+| DXF export (`export2d`) | ✅ verified 2026-07-22 | real AC1014 ASCII DXF in ~54 ms (FN-016) |
 
 Running findings, bugs, and doc gaps are logged in
 [`docs/API_FIELD_NOTES.md`](docs/API_FIELD_NOTES.md).

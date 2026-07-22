@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "demo": "node server/day1-thinthread.mjs",
-    "campaign": "node server/harness/run-campaign.mjs"
+    "campaign": "node server/harness/run-campaign.mjs",
+    "test": "node --test \"server/state/*.test.mjs\" \"server/reference/*.test.mjs\"",
+    "test:state": "node --test \"server/state/*.test.mjs\"",
+    "test:reference": "node --test \"server/reference/*.test.mjs\""
   },
   "engines": {
     "node": ">=18"
