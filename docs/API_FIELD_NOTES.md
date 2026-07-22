@@ -67,6 +67,13 @@ minimal repro, suggested fix.
 - **Impact:** any UI that blocks on generation is unusable for real fastening features;
   async background execution with notify is a requirement, not a nicety.
 - **Repro:** POST the prompt above; poll `GET /user/text-to-cad/{id}`.
+- **Update (same day):** variance is not only prompt complexity — the *identical*
+  plain-holes prompt completed in **113.9 s** and then **716.3 s** on a second run
+  (ids `86102d0e…`, `550e91fc…`). Same input, ~6× spread; plan for queue/load jitter.
+- **Bonus observations:** requesting `stl` returned STEP + STL + glTF together (the
+  bundle appears format-agnostic), and both generations — despite different KCL text
+  (2436 vs 2469 chars) — measured mass-identical to 15 decimals via `/file/mass`,
+  suggesting deterministic geometry for equivalent prompts.
 
 ## FN-006 · Fastening-feature prompt fails after 8 min and leaks an internal cluster URL
 - **API:** Agent/ML · `POST /ai/text-to-cad/step?kcl=true`
@@ -118,3 +125,42 @@ minimal repro, suggested fix.
   exist in the exported geometry, provable from a single number, no websocket needed.
 - **Impact:** REST-only validation (`/file/mass`, `/file/volume`,
   `/file/center-of-mass`) is enough for a meaningful trust gate on day 1.
+
+## FN-009 · Modeling websocket upgrade succeeds with NO auth — 101 ≠ authenticated
+- **API:** Engine · `GET /ws/modeling/commands?webrtc=false` (upgrade handshake)
+- **Date:** 2026-07-22 · repro: `server/probe-ws-engine.mjs`
+- **Type:** rough-edge / doc-gap (client-safety relevant)
+- **Expected:** unauthenticated upgrade rejected with 401 at the handshake.
+- **Actual:** the upgrade returns **101 Switching Protocols for all three variants** —
+  `Authorization: Bearer` header, `?token=` query param, and **no credentials at all**.
+  Auth is evidently enforced after the upgrade (first message / server-side close).
+- **Impact:** a client cannot treat a successful upgrade as proof its token is valid;
+  health checks and connection pools built on "did we get 101" will lie. Also relevant:
+  Node's standard `WebSocket` API cannot send an `Authorization` header, so knowing the
+  post-upgrade auth contract (and whether `?token=` is officially supported) matters for
+  zero-dependency clients. Follow-up queued for office hours (kit Q7 area).
+- **Suggested doc edit:** state where auth is enforced for websocket surfaces and which
+  credential carriers are supported.
+
+---
+
+## Day-1 capability matrix (per the pre-window checklist)
+
+| Capability | Verified? | How | Notes / fallback |
+|---|---|---|---|
+| Auth works | ✅ | `GET /user` → 200 | FN-001 |
+| Contest grant active | ◐ | `GET /user/payment/balance` | ~$5k stable credits live; grant unlabeled (FN-003), confirm at office hours |
+| Text-to-CAD → editable KCL | ✅ | `POST /ai/text-to-cad/step?kcl=true` | constraint-based KCL 2.0, parametric (samples/plain-plate) |
+| Fastening-feature prompts | ❌ **fails** | countersink prompt | 2/2 failures + internal URL leak (FN-006) — the product thesis |
+| Streaming / iteration | ☐ | — | `/ml/text-to-cad/iteration` + `/ws/ml/copilot` unexercised |
+| Concurrent Agent sessions | ☐ | — | office-hours Q3 |
+| Engine execute KCL (websocket) | ◐ | handshake only | 101 for all auth variants (FN-009); protocol spike = Day 2–3 |
+| Engine mass/volume/CoM | ✅ | `POST /file/mass` (REST) | 0.02% agreement vs hand calc (FN-008) |
+| Engine bounding box | ☐ | — | no REST endpoint found; office-hours Q6; fallback = compute from mesh |
+| Render/preview | ◐ | free glTF in outputs | client-side render viable (FN-007); API-side render unexercised |
+| Export STL | ✅ | `TOOLCRIB_FORMAT=stl npm run demo` | samples/plain-plate-stl |
+| Export STEP | ✅ | via `/async/operations/{id}` | FN-007 (surface split, unpadded base64) |
+| Export DXF | ☐ | — | `OutputFormat2d` on modeling websocket only (FN-004) |
+| TS SDK auth | ➖ skipped by design | — | zero-dependency client (D-003); raw REST verified instead |
+
+Legend: ✅ verified · ◐ partial · ☐ not yet run · ➖ deliberately skipped · ❌ verified failure

@@ -67,7 +67,7 @@ const slug = process.env.TOOLCRIB_SLUG || "flush-plate";
 const outDir = join("samples", slug);
 mkdirSync(outDir, { recursive: true });
 
-const result = await textToCad(prompt, "step");
+const result = await textToCad(prompt, process.env.TOOLCRIB_FORMAT || "step");
 writeFileSync(join(outDir, "part.kcl"), result.code ?? "");
 console.log(`KCL: ${(result.code ?? "").length} chars → ${join(outDir, "part.kcl")}`);
 

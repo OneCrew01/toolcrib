@@ -1,0 +1,14 @@
+{
+  "id": "d0d2cc57-810a-49a9-8b5b-b0c80cebd458",
+  "created_at": "2026-07-22T08:40:40.657530469Z",
+  "started_at": "2026-07-22T08:40:40.724615796Z",
+  "completed_at": "2026-07-22T08:40:42.127389301Z",
+  "user_id": "e185bb67-1112-496d-9fcc-dd9db136186d",
+  "status": "completed",
+  "updated_at": "2026-07-22T08:40:40.657530469Z",
+  "src_format": "step",
+  "material_density": 2700,
+  "material_density_unit": "kg:m3",
+  "mass": 13.078606393829295,
+  "output_unit": "g"
+}
