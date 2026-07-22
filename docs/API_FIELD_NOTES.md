@@ -81,6 +81,7 @@ minimal repro, suggested fix.
   ~490 s (fail-timeout) for near-identical prompts. Variance is the rule — async-first confirmed.
 
 ## FN-006 · Fastening-feature generation is non-deterministic — same prompt fails ~2/3, and the failed hop leaks internal cluster DNS
+> **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1291
 - **API:** Agent/ML · `POST /ai/text-to-cad/step?kcl=true`
 - **Date:** 2026-07-22 · **3 runs total: 2 failed, 1 passed** (ids below)
 - **Type:** bug (reliability) + bug (error hygiene)
@@ -115,6 +116,7 @@ minimal repro, suggested fix.
   succeed-without-retrievable-outputs (FN-011) depending on when and how it's sent.
 
 ## FN-011 · Burst-dispatched jobs complete — but their outputs are permanently unreachable
+> **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1292 (with the dedupe root cause below)
 - **API:** Agent/ML · `POST /ai/text-to-cad/*` + `GET /async/operations/{id}`
 - **Date:** 2026-07-22, campaign c001 (24 of 30 runs affected; ids in
   `server/harness/results/c001-fastening-reliability/2026-07-22-09-50/ledger.jsonl`)
@@ -163,6 +165,7 @@ minimal repro, suggested fix.
   feature class to measure model robustness (planned for c002).
 
 ## FN-013 · Websocket auth: `?token=` is silently ignored — auth is a post-upgrade JSON frame
+> **Filed upstream:** https://github.com/KittyCAD/documentation/issues/957 (docs PR offered)
 - **API:** Engine · `wss://api.zoo.dev/ws/modeling/commands`
 - **Date:** 2026-07-22 · repro: `server/spikes/ws-modeling-spike.mjs --rung=1`
 - **Type:** doc-gap (client-breaking for non-browser clients)

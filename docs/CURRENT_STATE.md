@@ -21,8 +21,10 @@
 **Operator queue**
 - VERIFICATION_LOG red-pen session against the printed AC 43.13-1B (10 rules PENDING;
   Figure 4-5 values additionally need the printed figure — unencoded until then).
-- Go-ahead to file GitHub issues: FN-006 (reliability+URL leak), FN-011 (dedupe
-  orphans outputs), FN-013 (auth doc gap). All drafted in the field notes.
+- ~~GitHub issues~~ **FILED 2026-07-22 (operator-approved):**
+  [modeling-api#1291](https://github.com/KittyCAD/modeling-api/issues/1291) (FN-006) ·
+  [modeling-api#1292](https://github.com/KittyCAD/modeling-api/issues/1292) (FN-011) ·
+  [documentation#957](https://github.com/KittyCAD/documentation/issues/957) (FN-013).
 
 **Next action (Day 3, pre-office-hours)**
 - Harness: tag dedupe hits explicitly (latency < 2 s ⇒ `completed_dedupe_hit`); nonce
