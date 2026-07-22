@@ -44,6 +44,25 @@ The demo part is small on purpose. The pattern is the product.
 Running findings, bugs, and doc gaps are logged in
 [`docs/API_FIELD_NOTES.md`](docs/API_FIELD_NOTES.md).
 
+## The reliability harness (the night shift)
+
+Because a `completed` status is not proof of correct geometry (FN-006: the same
+fastening prompt failed 2 of 3 runs), this repo measures instead of assumes. A
+**campaign** is a designed grid of prompts — one question, N identical repeats per
+case, every completed output pushed through the mass-validation gate:
+
+```bash
+npm run campaign -- c001-fastening-reliability --dry   # show the plan (free)
+npm run campaign -- c001-fastening-reliability         # run it (backgroundable)
+```
+
+Each run writes a `ledger.jsonl` (one line per generation), per-run KCL, and a
+`summary.md` with pass rates, latency spread, and spend — including the category the
+status field cannot see: **completed_invalid**, where Zoo said done but the geometry
+is wrong. Add your own experiment by copying
+[`server/harness/campaigns/_template.mjs`](server/harness/campaigns/_template.mjs);
+the runner, budget cap, and stats come free.
+
 ## Status
 
 Day 1 of the build window. This repository was initialized inside the contest window and
