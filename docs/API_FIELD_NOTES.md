@@ -135,6 +135,17 @@ minimal repro, suggested fix.
 - **Suggested fix:** carry `outputs` (or output URLs) on `/user/text-to-cad/{id}`, or
   guarantee the async-operations record exists for every accepted job, or provide a
   re-export endpoint for a completed job id.
+- **ROOT CAUSE REFRAMED (2026-07-22, campaign c002):** the trigger is not burst
+  dispatch — it's **prompt-level deduplication**. Evidence: re-dispatching an
+  already-generated prompt returns `completed` **instantly** (first status poll,
+  latency ~0 s) with the cached KCL; every such instant-complete has no
+  async-operations record and therefore no reachable outputs. Novel prompts run real
+  (150–270 s) and their outputs resolve; identical prompts running *concurrently*
+  (dispatched before either completes) both run real. C001's pattern re-reads
+  perfectly under this lens: reused prompts deduped 6/6, novel prompts ran exactly
+  2 real (one per worker) then deduped the rest — matching the observed KCL variant
+  counts. Dedupe itself is a sensible optimization; the bug is that **dedupe hits are
+  completed jobs whose outputs are unreachable through any documented surface**.
 
 ## FN-012 · Economics + determinism: $0.17/generation avg; identical prompts → near-identical programs
 - **API:** Agent/ML + billing · campaign c001 (30 generations, 6 mass checks, ~40 polls)
@@ -199,6 +210,38 @@ minimal repro, suggested fix.
   base64 habit). Export does not terminate the session.
 - **Suggested doc edit:** document `export2d` from the file-conversion/DXF angle —
   nothing today routes a "how do I get DXF?" reader to this command.
+
+## FN-017 · Metering cracked by arithmetic: 1 credit ≈ 1 API-second; the "$5k balance" IS the 10,000-minute grant
+- **API:** billing · **Date:** 2026-07-22, campaigns c001+c002 as instrument
+- **Type:** doc-gap resolved (answers FN-003)
+- **The math:** subscription reports `pay_as_you_go_api_credit_price: $0.0083`;
+  granted balance was 602,214 credits = $4,998.38. 602,214 credits ÷ 60 ≈ **10,036
+  minutes** — the contest's "10,000 minutes," delivered as credits. Real generations
+  (150–270 s each) bill ≈ their runtime: C002 spent $14.23 across 9 real generations
+  (~2,000 API-seconds ≈ $16 predicted; dedupe hits appear ~free). The earlier "$0.17/
+  run average" (FN-012) was distorted by unbilled dedupe hits, and the post-C001
+  balance drift was the 716 s run settling.
+- **Practical rate:** ~$0.50 per generation-minute. Grant ≈ 165 hours of generation.
+- **Suggested fix:** the balance endpoint labeling the grant (FN-003) would have made
+  this arithmetic unnecessary.
+
+## FN-018 · Phrasing changes the part: 3.6% mass spread across five ways of saying the same geometry
+- **API:** Agent/ML · **Date:** 2026-07-22, campaign c002 (20 runs, 9 real generations)
+- **Type:** model-robustness measurement (the trust-layer case, quantified)
+- **Setup:** one target geometry — 50×50×2 plate, four Ø5 corner holes at 10 mm edge
+  distance, 100° flush countersinks — phrased five human ways (formal spec, drawing
+  callout, shop vernacular, fastener-first, underspecified).
+- **Results (aluminum mass, analytic no-countersink ceiling 13.076 g):**
+  drawing-callout 12.6097 ×2 · shop-vernacular **12.6097 and 12.7174** (same words,
+  two different parts) · fastener-first 12.3934 ×2 (derives a larger flat-head
+  countersink from "M5", systematically more material removed) · underspecified
+  **12.6482 and 12.8477** (model picks its own countersink twice, differently).
+- **Read:** every one of these is `completed`, plausible, and silently different —
+  up to **3.6% mass spread** on nominally identical intent, plus within-phrasing
+  nondeterminism on 2 of 4 novel phrasings. Nothing in the API response distinguishes
+  them; only downstream validation (mass gate here; edge-distance rules next) can.
+- **This is the entry's thesis measured end-to-end:** fastening intent needs a
+  deterministic rule layer in front of generation, and a validation gate behind it.
 
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`

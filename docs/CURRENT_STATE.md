@@ -2,6 +2,37 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
+## 2026-07-22 · Day 2 — trunk built, protocol cracked, thesis quantified
+
+**Works (all tested: 21/21 across two suites, `npm test`)**
+- **State machine** (`server/state/`): SYS/HUMAN actor model with a provable human
+  gate, hash-chained transition ledger with tamper detection, LocalStore,
+  OUTPUTS_UNREACHABLE and GEOMETRY_INVALID as first-class states.
+- **Fastening reference** (`server/reference/`): 10 rules (HED-001..010) with
+  citations, fail-closed `UnverifiedRuleError`, DRAFT watermarks;
+  `docs/VERIFICATION_LOG.md` awaits operator sign-off against the printed AC.
+- **Websocket protocol solved** (`server/spikes/ws-modeling-spike.mjs`): headers-frame
+  auth, ~50 ms command round-trips, exact bounding box, real DXF via `export2d`
+  (FN-013..016). Three capability rows closed by measurement.
+- **C002 phrasing campaign**: 3.6% mass spread across phrasings of one geometry,
+  within-phrasing nondeterminism, dedupe discovery (FN-018, FN-011 root cause).
+- **Metering cracked** (FN-017): 1 credit ≈ 1 API-second; grant ≈ 10,036 minutes.
+
+**Operator queue**
+- VERIFICATION_LOG red-pen session against the printed AC 43.13-1B (10 rules PENDING;
+  Figure 4-5 values additionally need the printed figure — unencoded until then).
+- Go-ahead to file GitHub issues: FN-006 (reliability+URL leak), FN-011 (dedupe
+  orphans outputs), FN-013 (auth doc gap). All drafted in the field notes.
+
+**Next action (Day 3, pre-office-hours)**
+- Harness: tag dedupe hits explicitly (latency < 2 s ⇒ `completed_dedupe_hit`); nonce
+  campaign prompts that need real generations.
+- Wire the trunk end-to-end: job intake → reference (allowDraft) → generation →
+  mass gate → package stub, driven by the state machine (build pack Day 3 territory).
+- 6:45 AM Thursday: office hours with the kit + field notes open.
+
+---
+
 ## 2026-07-22 · Day 1 (late night) — harness live, campaign C001 complete
 
 **Works**
