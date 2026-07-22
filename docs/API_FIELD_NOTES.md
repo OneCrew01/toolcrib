@@ -74,26 +74,40 @@ minimal repro, suggested fix.
   bundle appears format-agnostic), and both generations — despite different KCL text
   (2436 vs 2469 chars) — measured mass-identical to 15 decimals via `/file/mass`,
   suggesting deterministic geometry for equivalent prompts.
+- **Update 2 (2026-07-22, independent re-verify):** the FN-006 countersink prompt —
+  previously only observed failing — **completed in 155.8 s** on a fresh run
+  (id `289cec14-f654-4afe-92dc-734c63e52896`, `server/verify-countersink.mjs`). Third
+  data point on the same fastening feature class; latency now spans ~156 s (pass) to
+  ~490 s (fail-timeout) for near-identical prompts. Variance is the rule — async-first confirmed.
 
-## FN-006 · Fastening-feature prompt fails after 8 min and leaks an internal cluster URL
+## FN-006 · Fastening-feature generation is non-deterministic — same prompt fails ~2/3, and the failed hop leaks internal cluster DNS
 - **API:** Agent/ML · `POST /ai/text-to-cad/step?kcl=true`
-- **Date:** 2026-07-22 (id `5f98c1c2-c670-4f5d-83c8-c56a4b308ba7`)
-- **Type:** bug (two bugs, really)
-- **Expected:** either generated geometry or a domain error ("couldn't satisfy the
-  countersink constraint").
-- **Actual:** after 8 m 10 s in `in_progress`, status flips to `failed` with:
+- **Date:** 2026-07-22 · **3 runs total: 2 failed, 1 passed** (ids below)
+- **Type:** bug (reliability) + bug (error hygiene)
+- **Expected:** a moderately-constrained fastening prompt (four positioned 100°
+  countersunk holes) either generates geometry or returns a domain error —
+  *deterministically*.
+- **Actual:** the *identical* prompt is non-deterministic across runs:
+  - `5f98c1c2-c670-4f5d-83c8-c56a4b308ba7` — **failed** after 8 m 10 s in `in_progress`
+  - `74f6f311-a782-436a-98ac-c14cd17707bc` — **failed** after ~8 min, same error
+  - `289cec14-f654-4afe-92dc-734c63e52896` — **completed in 155.8 s**, geometry correct (FN-010)
+  On both failures, status flips to `failed` with:
   `Text-to-CAD server: Communication Error: error sending request for url
   (http://text-to-kcl.text-to-kcl.svc.cluster.local:8080/text-to-cad)`
-- **Bug 1 — reliability:** a moderately-constrained fastening prompt (four positioned
-  countersunk holes) appears to time out an internal hop rather than degrade gracefully.
-  This is the exact feature class where text-to-CAD needs to win to be a shop tool.
+- **Bug 1 — reliability (recharacterized):** *not* a deterministic failure. The same
+  fastening prompt fails roughly 2 of 3 times on an ~8-min internal-hop timeout and
+  succeeds the rest. For the exact feature class text-to-CAD must win to be a shop tool,
+  a single generation cannot be trusted — retries and, more importantly, output
+  verification are mandatory.
 - **Bug 2 — hygiene:** the error string leaks internal Kubernetes service DNS
   (`*.svc.cluster.local:8080`) to the end user. Should be a request id + a clean message.
-- **Repro:** CONFIRMED 2/2. Same prompt, two independent runs, same failure + same
-  leaked URL: ids `5f98c1c2-c670-4f5d-83c8-c56a4b308ba7` and
-  `74f6f311-a782-436a-98ac-c14cd17707bc` (both 2026-07-22, ~8 min each).
-- **Suggested fix:** map internal transport errors to an opaque error code; surface
-  partial/best-effort KCL when the model produced code before the hop failed.
+- **Repro:** failure 2/2 on the first two ids; success on independent re-run id 3
+  (`server/verify-countersink.mjs`). Net **2/3 fail** — non-deterministic.
+- **Suggested fix:** map internal transport errors to an opaque code; retry the internal
+  hop server-side; surface best-effort KCL when the model produced code before the hop failed.
+- **Why this is the thesis:** a `completed` status is not trustworthy and a `failed`
+  status is not reproducible — you cannot tell from Zoo's response alone whether you got a
+  correct part. That gap is exactly what a validation layer closes (FN-010).
 
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
@@ -164,3 +178,23 @@ minimal repro, suggested fix.
 | TS SDK auth | ➖ skipped by design | — | zero-dependency client (D-003); raw REST verified instead |
 
 Legend: ✅ verified · ◐ partial · ☐ not yet run · ➖ deliberately skipped · ❌ verified failure
+
+
+## FN-010 · A "completed" text-to-CAD result is not trustworthy on its own — mass validation proves feature presence
+- **API:** Agent/ML `GET /async/operations/{id}` + Engine `POST /file/mass` · repro `server/verify-mass.mjs`
+- **Date:** 2026-07-22 · id `289cec14-f654-4afe-92dc-734c63e52896`
+- **Type:** pleasant-surprise / thesis-defining
+- **Context:** the one countersink run that succeeded (FN-006) returned `status: completed`
+  with a STEP export. "Completed" says nothing about whether the four 100° countersinks
+  the prompt asked for actually exist in the geometry.
+- **Verification — two independent signals:**
+  1. KCL grew to **3,878 chars** (vs 2,469 for the plain-holes plate) and carries explicit
+     `countersink` / `cone` / `revolve` feature code.
+  2. `/file/mass` on the STEP (aluminum, 2700 kg/m³) = **12.717 g** vs the plain-holes
+     baseline **13.0786 g** (FN-008). The **0.362 g (2.8%)** deficit is quantitatively
+     consistent with four 100° countersinks removing material — the feature is genuinely
+     present, provable from one number.
+- **Impact — this is the whole product in one data point:** the same single-number check
+  that confirms a real feature here would **catch a silent omission** — a "completed" plate
+  with the countersinks dropped would weigh ~13.08 g, not ~12.72 g. Trust does not come from
+  the API's status field; it comes from deterministic post-generation validation. That is ToolCRIB.
