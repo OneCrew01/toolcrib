@@ -32,6 +32,13 @@
 - C004 candidate: text-to-cad iteration endpoint (`/ml/text-to-cad/iteration`) —
   unexplored surface.
 
+**Optional night-team backlog (scope FROZEN — only if idle after core is green):**
+Two additive feature specs filed in `docs/backlog/` — [BL-001](./backlog/BL-001-uniform-symmetric-apply.md)
+(uniform/symmetric apply, ship candidate) and [BL-002](./backlog/BL-002-color-as-operation.md)
+(color-as-operation, experimental). New files only; do not touch the demo path or the
+core loop; `npm run demo` + `npm test` must stay green. Read `docs/backlog/README.md`
+for the rules of engagement before starting. These are upside, not commitments.
+
 ---
 
 ## 2026-07-22 · Day 2 night — the first tool ships
