@@ -337,7 +337,7 @@ minimal repro, suggested fix.
 - **Workaround (shipped in `server/generators/flushmount.mjs`):** decompose into
   simple convex booleans — straight opening prism + separate 2-profile chamfer
   frustum. Executes at every sampled scale (12/12 sample files).
-- **Status:** issue-grade; queued for operator go-ahead (issue #5 candidate).
+- **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1294
 
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
