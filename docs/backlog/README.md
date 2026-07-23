@@ -48,6 +48,12 @@ extended," never as two new products.
 |---|---|---|---|
 | [BL-001](./BL-001-uniform-symmetric-apply.md) | Uniform / symmetric apply — one definition across aligned ends | ready · not started | 1 (ship candidate) |
 | [BL-002](./BL-002-color-as-operation.md) | Color as the operation — "paint the op" | ready · not started | 2 (experimental) |
+| [BL-003](./BL-003-burn-cert-reference.md) | Burn-cert reference — design-for-flammability + min-wall gate + print recipe | **operator-released 07-23 · in build** | released |
+| [BL-004](./BL-004-weight-and-balance.md) | Assembly weight & balance — mass-weighted CG gate | **operator-released 07-23 · in build** | released |
+
+*BL-003/004 released early by explicit operator call (2026-07-23): build now IF the
+engineering rules above hold (new files only, demo untouched, suite green). BL-001/002
+remain frozen-until-idle.*
 
 *Origin: operator ideas, 2026-07-23 — both born from real panel-fab friction. Filed for
 the night team; operator scope stays frozen.*
