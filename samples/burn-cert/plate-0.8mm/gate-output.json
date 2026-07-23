@@ -1,0 +1,55 @@
+{
+  "tool": "burncert-validate",
+  "gate": "FAIL",
+  "material": "PC-ABS-FR",
+  "floorMm": 1.5,
+  "floorBasis": "material-specific UL listing (BC-003)",
+  "sampledMinMm": 0.8,
+  "sampledMedianMm": 40,
+  "marginMm": -0.7,
+  "method": "ray-sampled, 12 samples",
+  "approximate": "Approximate by nature: facet centroids only — an edge-on facet reads the part's span, not its wall, and features thinner than the sampling density can hide.",
+  "mesh": {
+    "triangles": 12,
+    "watertight": true,
+    "bboxMm": {
+      "x": 60,
+      "y": 40,
+      "z": 0.79999995
+    },
+    "volumeMm3": 1919.9999
+  },
+  "chemistryNote": "Material chemistry sets the floor and geometry cannot overcome it: a flammable filament in a perfect shape still fails, and a rating held at 3 mm does not follow the material down to 1 mm.",
+  "citation": {
+    "floor": "UL-94 thickness data — Forge Labs, 'UL-94 Fire Safety Standards in Additive Manufacturing' (secondary source), Ch. UL-94, Sec. Thickness-specific ratings, para Fetched 2026-07-23 (forgelabs.com/blog/ul-94-fire-safety-standards-additive-manufacturing) — confirm against the UL Yellow Card for the exact filament grade",
+    "chemistry": "UL-94 thickness data — Forge Labs, 'UL-94 Fire Safety Standards in Additive Manufacturing' (secondary source), Ch. UL-94, Sec. Thickness-specific ratings, para Fetched 2026-07-23 (forgelabs.com/blog/ul-94-fire-safety-standards-additive-manufacturing) — confirm against the UL Yellow Card for the exact filament grade"
+  },
+  "verification": {
+    "status": "PENDING_OPERATOR",
+    "rules": [
+      {
+        "id": "BC-001",
+        "status": "PENDING_OPERATOR",
+        "verifiedBy": null,
+        "date": null,
+        "notes": "Confirmed from a fetched secondary source 2026-07-23; operator verifies against the UL Yellow Card for the exact filament grade before sign-off."
+      },
+      {
+        "id": "BC-003",
+        "status": "PENDING_OPERATOR",
+        "verifiedBy": null,
+        "date": null,
+        "notes": "Confirmed from a fetched secondary source 2026-07-23; operator verifies against the UL Yellow Card for the exact filament grade before sign-off."
+      },
+      {
+        "id": "BC-006",
+        "status": "PENDING_OPERATOR",
+        "verifiedBy": null,
+        "date": null,
+        "notes": "Confirmed from a fetched secondary source 2026-07-23; operator verifies against the UL Yellow Card for the exact filament grade before sign-off."
+      }
+    ]
+  },
+  "disclaimer": "ADVISORY — design-for-burn-cert, not certification. Nothing in this output certifies a part: compliance is demonstrated only by physical specimen burn testing per 14 CFR 25.853 / Appendix F. Material chemistry sets the floor; geometry cannot overcome it. Flag, don't certify.",
+  "watermark": "DRAFT — NOT VERIFIED"
+}

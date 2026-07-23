@@ -387,6 +387,29 @@ and confirmed to resolve before it was written down.
   `end_of_stream.whole_response` in 45.5 s server-side. Metering handle:
   `session_data.api_call_id` = `end_of_stream.id` — one API call per turn.
 
+## FN-029 · `/file/center-of-mass` answers in a Y-up frame — agreement to 1.4e-6 mm once you map it
+- **API:** File · `POST /file/center-of-mass` · **Date:** 2026-07-23 · repro: `server/wb/zoo-com-crosscheck.mjs`
+- **Type:** convention trap + agreement datum (FN-021 companion)
+- Local signed-tetrahedra centroid of the real plate export: [~0, ~0, 1.000] mm in the
+  mesh's own coordinates. Zoo returns [≈0, **1.0000014**, ≈0] — the value moved from Z
+  to Y. A deliberately asymmetric probe box (centroid [5,10,20]) returns exactly
+  [5, 20, −10]: **(x,y,z)_zoo = (x, z, −y)_mesh**. After mapping back, max |Δ| =
+  **1.4e-6 mm** — FN-021's trust extends from mass to first moments.
+- **Impact:** a weight-and-balance gate armed against Zoo's axis labels without the
+  frame map would gate the WRONG axis while looking perfectly healthy. ToolCRIB
+  computes locally in the mesh frame and treats the API as cross-check only.
+- **Suggested doc edit:** state the response coordinate convention on the
+  `/file/center-of-mass` page.
+
+## FN-030 · STL export quantizes to float32 — exact-at-spec walls need an epsilon
+- **Surface:** any STL export path · **Date:** 2026-07-23
+- **Type:** gotcha (gate-design input)
+- A Zoo-exported 0.8 mm plate reads z-span `0.79999995`. Any gate comparing
+  STL-measured geometry against a spec floor must carry a float32 grace (our min-wall
+  gate uses 1e-3 mm) or an exactly-at-floor wall false-fails. Bonus datum: hand-
+  authored KCL 2.0 constraint sketches export clean through `export_kcl` — millimeters
+  preserved as authored, minimal watertight binary STL.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)

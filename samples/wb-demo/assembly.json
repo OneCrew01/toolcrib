@@ -1,0 +1,36 @@
+{
+  "assembly": "wb-demo — flush-mount panel + insert + ballast block",
+  "frame": "shared assembly frame, millimeters; positions are operator-declared placements (not solved constraints)",
+  "parts": [
+    {
+      "name": "flush-panel",
+      "stlPath": "samples/flush-mount/pair-rect-c0.15/panel.stl",
+      "densityKgM3": 1240,
+      "densityNote": "PLA, solid/nominal",
+      "positionMm": [0, 0, 0]
+    },
+    {
+      "name": "flush-insert",
+      "stlPath": "samples/flush-mount/pair-rect-c0.15/insert.stl",
+      "densityKgM3": 1240,
+      "densityNote": "PLA, solid/nominal",
+      "positionMm": [0, 0, 0],
+      "positionNote": "both flush-mount parts are modeled in the same seated frame (flat show face on z=0), so the seated insert sits at the origin"
+    },
+    {
+      "name": "ballast-block",
+      "stlPath": "samples/wb-demo/ballast.stl",
+      "densityKgM3": 1240,
+      "measuredMassG": 4.6,
+      "measuredNote": "calibration-hook DEMO VALUE standing in for the operator's scale reading — replace with the real weigh-in; measured basis overrides the 4.96 g solid/nominal model",
+      "positionMm": [20, 0, 3],
+      "positionNote": "sitting on the panel top face (panel spans z 0..3)"
+    }
+  ],
+  "cgWindow": { "axis": "x", "minMm": 0.0, "maxMm": 8.0 },
+  "shifted": {
+    "part": "ballast-block",
+    "positionMm": [45, 0, 3],
+    "note": "same assembly, ballast slid 25 mm outboard — the gate must refuse this one"
+  }
+}

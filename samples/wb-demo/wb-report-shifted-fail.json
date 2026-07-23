@@ -1,0 +1,93 @@
+{
+  "generated": "2026-07-23T20:00:27.870Z",
+  "tool": "server/wb/run-wb-demo.mjs (BL-004)",
+  "assembly": "wb-demo — flush-mount panel + insert + ballast block",
+  "scenario": "ballast moved to [45.000, 0.000, 3.000] — same assembly, ballast slid 25 mm outboard — the gate must refuse this one",
+  "frame": "shared assembly frame, millimeters; positions are operator-declared placements (not solved constraints)",
+  "cgWindow": {
+    "axis": "x",
+    "minMm": 0,
+    "maxMm": 8
+  },
+  "gate": {
+    "result": "FAIL",
+    "cgOnAxisMm": 13.42644847259686,
+    "error": {
+      "name": "CgWindowError",
+      "code": "CG_OUTSIDE_WINDOW",
+      "message": "combined CG 13.426 mm on x is outside the declared window [0, 8] mm — package refused",
+      "axis": "x",
+      "minMm": 0,
+      "maxMm": 8
+    }
+  },
+  "totalMassG": 15.417330980898132,
+  "cgMm": [
+    13.42644847259686,
+    2.8955097135380226e-17,
+    3.6448086527307972
+  ],
+  "perPart": [
+    {
+      "name": "flush-panel",
+      "massG": 6.655473514231465,
+      "basis": "modeled",
+      "cgMm": [
+        -5.648350578346789e-17,
+        6.707416311786812e-17,
+        1.4924815117389583
+      ],
+      "volumeMm3": 5367.317350186666,
+      "densityKgM3": 1240,
+      "modeledMassG": 6.655473514231465,
+      "positionMm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "flush-insert",
+      "massG": 4.1618574666666674,
+      "basis": "modeled",
+      "cgMm": [
+        1.1290766194652305e-17,
+        0,
+        2.273035601315322
+      ],
+      "volumeMm3": 3356.3366666666675,
+      "densityKgM3": 1240,
+      "modeledMassG": 4.1618574666666674,
+      "positionMm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ballast-block",
+      "massG": 4.6,
+      "basis": "measured",
+      "cgMm": [
+        45,
+        0,
+        8
+      ],
+      "volumeMm3": 4000,
+      "densityKgM3": 1240,
+      "modeledMassG": 4.96,
+      "measuredMassG": 4.6,
+      "positionMm": [
+        45,
+        0,
+        3
+      ]
+    }
+  ],
+  "disclaimers": [
+    "Advisory weight & balance: this report flags, it does not certify.",
+    "Modeled mass is solid/nominal; printed mass depends on infill and filament density. A part's measuredMassG (operator's scale) overrides modeled mass, and each row states which basis it used.",
+    "No aerodynamics: no lift, stall, control authority, or thrust. Weight and balance only — never implies \"will it fly.\"",
+    "Part positions are operator-declared placements in the assembly frame, not solved constraints."
+  ]
+}

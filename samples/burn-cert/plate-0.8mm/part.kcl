@@ -1,0 +1,43 @@
+/*
+ToolCRIB burn-cert coupon plate — DELIBERATELY THIN wall (0.8 mm).
+Built to FAIL the sampled min-wall gate against the PC-ABS-FR 1.5 mm floor
+(BC-003, PENDING operator sign-off — docs/VERIFICATION_LOG.md). The same
+plate 0.7 mm thicker passes; this one is caught before it ever prints.
+ADVISORY — design-for-burn-cert, not certification.
+*/
+@settings(defaultLengthUnit = mm, kclVersion = 2.0)
+
+plateWidth = 60mm
+plateHeight = 40mm
+plateThickness = 0.8mm
+
+plateSketch = sketch(on = XY) {
+  bottomEdge = line(start = [var -30mm, var -20mm], end = [var 30mm, var -20mm])
+  rightEdge = line(start = [var 30mm, var -20mm], end = [var 30mm, var 20mm])
+  topEdge = line(start = [var 30mm, var 20mm], end = [var -30mm, var 20mm])
+  leftEdge = line(start = [var -30mm, var 20mm], end = [var -30mm, var -20mm])
+
+  coincident([bottomEdge.end, rightEdge.start])
+  coincident([rightEdge.end, topEdge.start])
+  coincident([topEdge.end, leftEdge.start])
+  coincident([leftEdge.end, bottomEdge.start])
+  horizontal(bottomEdge)
+  vertical(rightEdge)
+  horizontal(topEdge)
+  vertical(leftEdge)
+  distance([bottomEdge.start, bottomEdge.end]) == plateWidth
+  distance([rightEdge.start, rightEdge.end]) == plateHeight
+  horizontalDistance([bottomEdge.start, ORIGIN]) == plateWidth / 2
+  verticalDistance([bottomEdge.start, ORIGIN]) == plateHeight / 2
+}
+
+plateRegion = region(point = [0mm, 0mm], sketch = plateSketch)
+plateBlank = extrude(plateRegion, length = plateThickness)
+hiddenPlateSketch = hide(plateSketch)
+
+finishedPlate = appearance(
+  plateBlank,
+  color = "#e07a2f",
+  metalness = 5,
+  roughness = 60,
+)

@@ -89,3 +89,47 @@ Clearances are **per side**; formulas are dimension-preserving (mm in, mm out).
 | FMF-008 | chamfer-lead-in-depth-min | 2 × clearance per side, 0.6 mm floor | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
 | FMF-009 | insert-dimension | opening dimension − 2 × clearance per side | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
 | FMF-010 | inner-dimension-compensation | 0 mm (class absorbs undersize after coupon calibration) | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+
+## Rules — table `burn-cert`
+
+Design-for-flammability rows (table file: `server/reference/tables/burn-cert.mjs`,
+BL-003). **Nothing in this table certifies a part** — real certification is a physical
+specimen burn test per 14 CFR 25.853 / Appendix F; these rows only encode the published
+findings the geometry and print recipe are designed toward. Sign-off follows steps 1–6
+above, against the printed sources named per row.
+
+**Source-confirmation notes (2026-07-23, encoding session).**
+- **FAA TC TN23-65** ("An Evaluation of the Flammability of 3D Printed Parts") could
+  **not** be fetched: `fire.tc.faa.gov/pdf/tctn23-65.pdf` answered **HTTP 503** and the
+  ROSA-P mirror (`rosap.ntl.bts.gov/view/dot/72825/dot_72825_DS1.pdf`) answered
+  **HTTP 403** to automated fetch. Search-index snippets of the PDF corroborate: the
+  title; vertical-Bunsen-burner method per the FAA Aircraft Materials Fire Test
+  Handbook / 14 CFR 25.853; "the three variables having the most significant effect
+  being material type, sample thickness, and infill percentage"; and low infill (<20%)
+  recording average burn lengths beyond 3 in under 60-second testing. Corroboration is
+  not confirmation: **every TN23-65 number below is UNCONFIRMED** and carried from the
+  operator-released backlog brief — the operator verifies value AND section against the
+  printed technical note. The `>40 s → <5 s` flame-time pair and the `0.5–2.0 in`
+  higher-infill burn-length band were **not** corroborated by any fetched text at all.
+- **UL-94 thickness values** (general 1.5 mm practice floor; ULTEM 9085 V-0 at
+  0.508 mm; PC-ABS-FR V-0 at 1.5 mm; ratings are thickness-specific — V-0 at 3 mm may
+  be V-1 at 1 mm) **were confirmed verbatim from a fetched secondary source**
+  (`forgelabs.com/blog/ul-94-fire-safety-standards-additive-manufacturing`,
+  fetched 2026-07-23). The authoritative record is the **UL Yellow Card for the exact
+  filament grade** — sign-off requires checking the Yellow Card, not the blog.
+- **14 CFR 25.853(a)** text was fetched and confirmed 2026-07-23 via the Cornell LII
+  mirror (`law.cornell.edu/cfr/text/14/25.853`): "Materials … must meet the applicable
+  test criteria prescribed in part I of appendix F of this part…". Context only —
+  Appendix F test criteria themselves were not fetched.
+
+| Rule ID | Parameter | Encoded value | Claimed source | Status | Verified by | Date |
+|---|---|---|---|---|---|---|
+| BC-001 | min-wall-general-fr | 1.5 mm | UL-94 practice — Forge Labs (fetched 2026-07-23); verify vs UL Yellow Card | PENDING | | |
+| BC-002 | min-wall-material (ULTEM 9085) | 0.508 mm | UL-94 V-0 listing — Forge Labs (fetched 2026-07-23); verify vs UL Yellow Card | PENDING | | |
+| BC-003 | min-wall-material (PC-ABS-FR) | 1.5 mm | UL-94 V-0 listing — Forge Labs (fetched 2026-07-23); verify vs UL Yellow Card | PENDING | | |
+| BC-004 | wall-flame-time-datum | 6.35 mm (0.10→0.25 in: >40 s → <5 s) | FAA TC TN23-65 — UNCONFIRMED (unfetchable at encoding) | PENDING | | |
+| BC-005 | min-infill-percent (package requirement) | 25% | FAA TC TN23-65 (<20% → >3 in burn length) — UNCONFIRMED (unfetchable at encoding) | PENDING | | |
+| BC-006 | material-floor (note) | chemistry sets the floor; geometry cannot overcome it | UL-94 thickness-specificity — Forge Labs (fetched 2026-07-23) | PENDING | | |
+| BC-007 | design-uniform-wall (note) | uniform walls at/above the floor | FAA TC TN23-65 dominant-variables finding — UNCONFIRMED | PENDING | | |
+| BC-008 | design-no-thin-fins (note) | no fins/webs below the floor; ribs on full-thickness walls | FAA TC TN23-65 dominant-variables finding — UNCONFIRMED | PENDING | | |
+| BC-009 | cert-context (note) | certification = physical specimen test per 25.853(a)/App F | 14 CFR 25.853(a) — fetched 2026-07-23 (Cornell LII mirror) | PENDING | | |
