@@ -49,15 +49,30 @@ test("flush-face relationship: insert depth == panel thickness when lipMm = 0", 
   assert.equal(params.derived.entrySide, "front");
 });
 
-test("rect panel: opening cut plus four chamfer wedges, sequential subtracts", () => {
+test("rect panel: opening prism + 2-profile chamfer frustum, two subtracts, no wedges", () => {
   const { panelKcl } = generateFlushMountPair(rectSpec());
+  // wedge subtracts after the opening cut die on the engine (FN-024) — the
+  // panel path must stay wedge-free
+  assert.ok(!panelKcl.includes("wedge"), "no wedge cutters on the panel path");
+  assert.match(panelKcl, /openingCutter = extrude\(openingRegion, length = panelThickness \+ 2 \* cutOverlap, symmetric = true, method = NEW\)/);
+  assert.match(panelKcl, /frustBaseSketch = sketch\(on = offsetPlane\(XY, offset = panelThickness - chamferDepth\)\)/);
+  assert.match(panelKcl, /frustTopSketch = sketch\(on = offsetPlane\(XY, offset = faceTopZ\)\)/);
+  assert.match(panelKcl, /chamferCutter = loft\(\[frustBaseRegion, frustTopRegion\], vDegree = 1\)/);
+  assert.match(panelKcl, /panelCut1 = subtract\(panelBlank, tools = \[openingCutter\]\)/);
+  assert.match(panelKcl, /panelCut2 = subtract\(panelCut1, tools = \[chamferCutter\]\)/);
+  assert.equal((panelKcl.match(/subtract\(/g) ?? []).length, 2, "exactly two subtracts on the panel");
+  // frustum flare is a precomputed literal with its formula in the comment
+  assert.match(panelKcl, /^flarePerSide = \d+(\.\d+)?mm\s+\/\/ \(chamferDepth \+ cutOverlap\) x tan\(chamferAngle\)/m);
+});
+
+test("rect insert keeps its wedge chamfer chain (chain executes clean on the engine)", () => {
+  const { insertKcl } = generateFlushMountPair(rectSpec());
   for (const w of ["wedgeEast", "wedgeWest", "wedgeNorth", "wedgeSouth"]) {
-    assert.ok(panelKcl.includes(`${w}Sketch = sketch(`), `${w} sketch`);
-    assert.ok(panelKcl.includes(`subtract(`), "subtract present");
+    assert.ok(insertKcl.includes(`${w}Sketch = sketch(`), `${w} sketch`);
   }
-  assert.match(panelKcl, /wedgeNorthSketch = sketch\(on = YZ\)/);
-  assert.match(panelKcl, /panelCut5 = subtract\(panelCut4, tools = \[wedgeSouthCutter\]\)/);
-  assert.match(panelKcl, /symmetric = true, method = NEW/);
+  assert.match(insertKcl, /wedgeNorthSketch = sketch\(on = YZ\)/);
+  assert.match(insertKcl, /plugCut5 = subtract\(plugCut4, tools = \[wedgeSouthCutter\]\)/);
+  assert.match(insertKcl, /symmetric = true, method = NEW/);
 });
 
 test("rear lip: flange constants and plug depth accumulate", () => {

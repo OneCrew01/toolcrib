@@ -1,90 +1,144 @@
 {
-  "generatedAt": "2026-07-23T14:33:34.684Z",
-  "executeProbe": {
-    "kcl": {
-      "url": "https://api.zoo.dev/file/execute/kcl?output=part.stl",
-      "status": 400,
-      "ms": 369,
-      "body": {
-        "request_id": "a3d5fc51-23f1-4885-a9d1-ccd29d42d897",
-        "message": "bad parameter in URL path: unknown variant `kcl`, expected one of `go`, `python`, `node`"
-      }
+  "generatedAt": "2026-07-23T15:20:00.000Z",
+  "method": "Live Zoo engine via MCP: execute_kcl on all 12 sample .kcl files, export_kcl (stl) per part, calculate_kcl_physical_properties on the pair-rect pair at density 1240 kg/m3 (~PLA), snapshot_of_kcl isometric preview of the pair-rect panel.",
+  "engineExecute": {
+    "pair-rect-c0.15/panel.kcl": true,
+    "pair-rect-c0.15/insert.kcl": true,
+    "pair-round-c0.15/panel.kcl": true,
+    "pair-round-c0.15/insert.kcl": true,
+    "coupons/c0.10/panel.kcl": true,
+    "coupons/c0.10/insert.kcl": true,
+    "coupons/c0.15/panel.kcl": true,
+    "coupons/c0.15/insert.kcl": true,
+    "coupons/c0.20/panel.kcl": true,
+    "coupons/c0.20/insert.kcl": true,
+    "coupons/c0.25/panel.kcl": true,
+    "coupons/c0.25/insert.kcl": true
+  },
+  "stlExports": {
+    "pair-rect-c0.15/panel.stl": 5556,
+    "pair-rect-c0.15/insert.stl": 5153,
+    "pair-round-c0.15/panel.stl": 140345,
+    "pair-round-c0.15/insert.stl": 230186,
+    "coupons/c0.10/panel.stl": 5437,
+    "coupons/c0.10/insert.stl": 2898,
+    "coupons/c0.15/panel.stl": 5437,
+    "coupons/c0.15/insert.stl": 3018,
+    "coupons/c0.20/panel.stl": 5437,
+    "coupons/c0.20/insert.stl": 2826,
+    "coupons/c0.25/panel.stl": 5437,
+    "coupons/c0.25/insert.stl": 3018
+  },
+  "physicalProperties": {
+    "densityKgM3": 1240,
+    "pair-rect-c0.15/panel": {
+      "measured": {
+        "volumeCm3": 5.3673170630948634,
+        "massG": 6.655473158237631,
+        "surfaceAreaMm2": 4454.197332961485,
+        "boundingBox": {
+          "center": { "x": 0, "y": 0, "z": 1.850000023841858 },
+          "dimensions": { "x": 100, "y": 100, "z": 4.300000190734863 }
+        }
+      },
+      "expected": {
+        "volumeMm3Nominal": "60x40x3 - 30x20x3 opening = 5400, minus entry-chamfer ring (run 0.8mm @ 45deg, ~33 mm3) = ~5367",
+        "volumeCm3": 5.367,
+        "massG": 6.655,
+        "solidBoundingBoxMm": { "x": 60, "y": 40, "z": 3 }
+      },
+      "match": "volume and mass match analytic expectation to 4 significant figures",
+      "caveat": "bounding_box is contaminated by construction geometry: the 100x100 xy extent is the offsetPlane display plane, not the solid; z spans the faceTopZ plane at 4mm. Volume/mass/surface figures are for the finished solid."
     },
-    "kclNoOutput": {
-      "url": "https://api.zoo.dev/file/execute/kcl",
-      "status": 400,
-      "ms": 610,
-      "body": {
-        "request_id": "116d13e6-19f6-4e7e-a1ea-f4aa74cf21ca",
-        "message": "bad parameter in URL path: unknown variant `kcl`, expected one of `go`, `python`, `node`"
-      }
-    },
-    "nodeControl": {
-      "url": "https://api.zoo.dev/file/execute/node",
-      "status": 500,
-      "ms": 559,
-      "body": {
-        "request_id": "0341b741-2577-4cca-b916-27187b298f15",
-        "error_code": "Internal",
-        "message": "Internal Server Error"
-      }
-    },
-    "pythonControl": {
-      "url": "https://api.zoo.dev/file/execute/python",
-      "status": 500,
-      "ms": 594,
-      "body": {
-        "request_id": "82539780-51d7-4f89-a814-105809e13a07",
-        "error_code": "Internal",
-        "message": "Internal Server Error"
-      }
+    "pair-rect-c0.15/insert": {
+      "measured": {
+        "volumeCm3": 3.356336967167787,
+        "massG": 4.161857839288055,
+        "surfaceAreaMm2": 2113.0391614860855,
+        "boundingBox": {
+          "center": { "x": 0, "y": 0, "z": 2.6500000953674316 },
+          "dimensions": { "x": 36, "y": 26, "z": 5.300000190734863 }
+        }
+      },
+      "expected": {
+        "volumeMm3Nominal": "flange 34x24x2 (1632) + plug 29.7x19.7x3 (1755) minus leading-edge chamfer wedges (~31 mm3) = ~3356",
+        "volumeCm3": 3.356,
+        "massG": 4.162,
+        "solidBoundingBoxMm": { "x": 34, "y": 24, "z": 5 }
+      },
+      "match": "volume and mass match analytic expectation to 4 significant figures",
+      "caveat": "bounding_box (36x26x5.3) is inflated by intermediate cutter footprints (ringBlank = flange + cutOverlap per side); volume/mass are the finished solid."
     }
   },
-  "wsBoundingBoxes": [
-    {
-      "label": "main panel outline",
-      "expectedMm": {
-        "x": 60,
-        "y": 40,
-        "z": 3
+  "snapshot": "pair-rect-c0.15/panel-preview.png (isometric; shows plate, through opening, entry chamfer band)",
+  "engineFindings": {
+    "id": "FN-024",
+    "summary": "subtract() robustness on the Zoo engine is tool-shape- and scale-dependent. Failing (deterministic, 'The Zoo engine cannot handle this 3D subtraction yet'): wedge-prism subtract after an opening subtract; 3-profile loft cutter (straight walls + flare) at 40x40 panel scale and at chamfer 0.8 even at 60x60 scale; multi-tool single subtract of opening+wedges; wedge chains crossing prior wedge grooves. Passing: straight prism subtract; convex 2-profile frustum loft subtract; prism-then-frustum and frustum-then-prism sequences; the f4 Text-to-CAD 3-profile loft at exactly 60x60/30/chamfer 0.5; the insert's 4-wedge chain on a plain extrusion. Fix shipped: rect panel now cuts with opening prism + 2-profile chamfer frustum (two simple booleans)."
+  },
+  "prior": {
+    "generatedAt": "2026-07-23T14:33:34.684Z",
+    "executeProbe": {
+      "kcl": {
+        "url": "https://api.zoo.dev/file/execute/kcl?output=part.stl",
+        "status": 400,
+        "ms": 369,
+        "body": {
+          "request_id": "a3d5fc51-23f1-4885-a9d1-ccd29d42d897",
+          "message": "bad parameter in URL path: unknown variant `kcl`, expected one of `go`, `python`, `node`"
+        }
       },
-      "measuredMm": {
-        "x": 60,
-        "y": 40,
-        "z": 3
+      "kclNoOutput": {
+        "url": "https://api.zoo.dev/file/execute/kcl",
+        "status": 400,
+        "ms": 610,
+        "body": {
+          "request_id": "116d13e6-19f6-4e7e-a1ea-f4aa74cf21ca",
+          "message": "bad parameter in URL path: unknown variant `kcl`, expected one of `go`, `python`, `node`"
+        }
       },
-      "match": true
+      "nodeControl": {
+        "url": "https://api.zoo.dev/file/execute/node",
+        "status": 500,
+        "ms": 559,
+        "body": {
+          "request_id": "0341b741-2577-4cca-b916-27187b298f15",
+          "error_code": "Internal",
+          "message": "Internal Server Error"
+        }
+      },
+      "pythonControl": {
+        "url": "https://api.zoo.dev/file/execute/python",
+        "status": 500,
+        "ms": 594,
+        "body": {
+          "request_id": "82539780-51d7-4f89-a814-105809e13a07",
+          "error_code": "Internal",
+          "message": "Internal Server Error"
+        }
+      }
     },
-    {
-      "label": "main insert body outline",
-      "expectedMm": {
-        "x": 29.7,
-        "y": 19.7,
-        "z": 3
+    "wsBoundingBoxes": [
+      {
+        "label": "main panel outline",
+        "expectedMm": { "x": 60, "y": 40, "z": 3 },
+        "measuredMm": { "x": 60, "y": 40, "z": 3 },
+        "match": true
       },
-      "measuredMm": {
-        "x": 29.7,
-        "y": 19.7,
-        "z": 3
+      {
+        "label": "main insert body outline",
+        "expectedMm": { "x": 29.7, "y": 19.7, "z": 3 },
+        "measuredMm": { "x": 29.7, "y": 19.7, "z": 3 },
+        "match": true
       },
-      "match": true
-    },
-    {
-      "label": "coupon c0.10 insert outline",
-      "expectedMm": {
-        "x": 19.8,
-        "y": 19.8,
-        "z": 3
-      },
-      "measuredMm": {
-        "x": 19.8,
-        "y": 19.8,
-        "z": 3
-      },
-      "match": true
-    }
-  ],
-  "notes": [
-    "KCL could not be executed server-side; derived dimensions validated by rebuilding outline solids over the modeling websocket and reading bounding boxes back from the engine."
-  ]
+      {
+        "label": "coupon c0.10 insert outline",
+        "expectedMm": { "x": 19.8, "y": 19.8, "z": 3 },
+        "measuredMm": { "x": 19.8, "y": 19.8, "z": 3 },
+        "match": true
+      }
+    ],
+    "notes": [
+      "KCL could not be executed server-side; derived dimensions validated by rebuilding outline solids over the modeling websocket and reading bounding boxes back from the engine."
+    ]
+  }
 }

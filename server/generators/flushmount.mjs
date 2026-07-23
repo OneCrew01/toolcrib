@@ -6,11 +6,19 @@
 // here, gated (throw on rule violations), and emitted as named KCL
 // constants so remixers edit numbers, not geometry.
 //
-// Chamfers are built geometrically — profile cutters (extruded wedges for
-// rect openings, revolved cones for round ones) — because the sampled KCL
-// corpus contains no chamfer()/fillet() stdlib call. Every construct used
-// here (sketch{} constraints, region(), extrude, revolve, subtract,
-// translate, appearance, hide) appears verbatim in generated samples.
+// Chamfers are built geometrically because the sampled KCL corpus contains
+// no chamfer()/fillet() call (stdlib chamfer() exists but needs tagged
+// edges, which the corpus constraint-sketch style cannot express). The rect
+// PANEL cuts in two engine-proven booleans: a straight opening prism, then
+// a convex 2-profile frustum loft (opening size at the chamfer start, flared
+// above the face) for the entry chamfer. Measured 2026-07-23: wedge subtracts
+// after the opening cut AND 3-profile loft subtracts both die scale-dependently
+// with "The Zoo engine cannot handle this 3D subtraction yet" (FN-024); the
+// prism + frustum pair executes at every sampled scale. The rect INSERT keeps
+// its extruded wedge cutters (that chain executes clean), and round parts use
+// revolved profiles. Every construct used here (sketch{} constraints,
+// region(), offsetPlane, loft, extrude, revolve, subtract, translate,
+// appearance, hide) appears verbatim in generated samples.
 //
 // Pure module: no I/O, no network, no clock.
 
@@ -95,8 +103,8 @@ function profileSketch(name, plane, verts, regionPoint) {
 }
 
 // Centered rectangle, corpus vertex order (bottom edge first).
-function rectSketch(name, halfW, halfH) {
-  return profileSketch(name, "XY", [
+function rectSketch(name, halfW, halfH, plane = "XY") {
+  return profileSketch(name, plane, [
     { x: { v: -halfW.v, e: halfW.e }, y: { v: -halfH.v, e: halfH.e } },
     { x: { v: +halfW.v, e: halfW.e }, y: { v: -halfH.v, e: halfH.e } },
     { x: { v: +halfW.v, e: halfW.e }, y: { v: +halfH.v, e: halfH.e } },
@@ -158,7 +166,7 @@ export function generateFlushMountPair(spec) {
   const ow = round ? opening.diameterMm : opening.widthMm;
   const oh = round ? opening.diameterMm : opening.heightMm;
   gate(ow > 0 && oh > 0, "opening dims must be positive");
-  gate(!(opening.cornerRadiusMm > 0), "cornerRadiusMm > 0 not supported in v1 — rect openings emit sharp corners with corner-relief chamfer overshoot");
+  gate(!(opening.cornerRadiusMm > 0), "cornerRadiusMm > 0 not supported in v1 — rect panel openings emit sharp chamfered corners (lofted cutter); insert wedges add slight corner relief");
   gate(c > 0, "clearancePerSideMm must be positive — a flush fit is a deliberate clearance, not zero");
   const { angleDeg: A, depthMm: d } = chamfer;
   gate(A > 5 && A < 80, `chamfer.angleDeg must be in (5, 80), got ${A}`);
@@ -207,7 +215,9 @@ export function generateFlushMountPair(spec) {
       totalLateralPlayMm: r4(2 * c),
       entrySide: lip > 0 ? "back" : "front",
       modelOrientation: "both parts modeled with the chamfered lead-in at +Z top; flat show face on z=0 — print as exported, no supports",
-      cornerTreatment: round ? "exact revolved chamfer" : "wedge cutters overshoot the corners: slight corner relief, deliberate — eases the fit like a machinist's relief cut",
+      cornerTreatment: round
+        ? "exact revolved chamfer"
+        : "panel opening: single lofted cutter — sharp chamfered corners; insert: wedge cutters overshoot the corners — slight corner relief, deliberate, eases the fit like a machinist's relief cut",
     },
     formulas: {
       insertWidth: round
@@ -259,7 +269,12 @@ function chamferConsts(faceRef, faceVal, dd) {
 }
 
 function rectPanel(dd) {
-  const { W, H, T, ow, oh, A, d, e, bite, colors } = dd;
+  const { W, H, T, ow, oh, A, d, e, colors } = dd;
+  // Loft-top flare per side: the taper from the chamfer-start profile to the
+  // top profile crosses the entry face (z = panelThickness) at exactly
+  // chamferDepth x tan(chamferAngle). Computed in JS, emitted as a literal —
+  // the executor rejects tan()/unit algebra in constants (measured 2026-07-23).
+  const flare = (d + OV) * Math.tan(rad(A));
   const L = header("PANEL, rect opening", "Opening cut through, entry edge chamfered so the insert leads in.");
   L.push(
     constLine("panelWidth", mm(W)),
@@ -269,41 +284,40 @@ function rectPanel(dd) {
     constLine("openingHeight", mm(oh)),
     constLine("chamferAngle", `${fmt(A)}deg`, "measured from the opening wall"),
     constLine("chamferDepth", mm(d)),
-    ...chamferConsts("panelThickness", T, dd),
-    constLine("wedgeSpanY", "openingHeight + 2 * chamferReach + 2mm"),
-    constLine("wedgeSpanX", "openingWidth + 2 * chamferReach + 2mm"),
+    constLine("cutOverlap", mm(OV), "cutter pierces faces, never kisses them"),
+    constLine("chamferRun", mm(two(e)), "chamferDepth x tan(chamferAngle) — the flare width on the entry face"),
+    constLine("flarePerSide", mm(two(flare)), "(chamferDepth + cutOverlap) x tan(chamferAngle) — loft flare at faceTopZ; crosses the entry face at exactly chamferRun"),
+    constLine("faceTopZ", "panelThickness + cutOverlap"),
     "",
   );
   L.push(rectSketch("plate", { v: W / 2, e: "panelWidth / 2" }, { v: H / 2, e: "panelHeight / 2" }));
   L.push("panelBlank = extrude(plateRegion, length = panelThickness)");
   L.push("hide(plateSketch)");
   L.push("");
+  L.push("// Two engine-proven booleans: straight opening prism, then a convex");
+  L.push("// 2-profile frustum loft for the entry chamfer. Wedge subtracts after the");
+  L.push("// opening cut and 3-profile loft cutters both fail scale-dependently with");
+  L.push('// "cannot handle this 3D subtraction yet" (FN-024, measured 2026-07-23).');
   L.push(rectSketch("opening", { v: ow / 2, e: "openingWidth / 2" }, { v: oh / 2, e: "openingHeight / 2" }));
   L.push("openingCutter = extrude(openingRegion, length = panelThickness + 2 * cutOverlap, symmetric = true, method = NEW)");
   L.push("  |> translate(z = panelThickness / 2, global = true)");
   L.push("hide(openingSketch)");
   L.push("");
-  const mk = (name, plane, half, sign, span) => {
-    L.push(profileSketch(name, plane, wedgeVerts({
-      mode: "female", half, sign, d, e, bite, topZ: T,
-      topZExpr: "faceTopZ", lowZExpr: "wedgeLowZ",
-      reachExpr: "chamferReach", biteExpr: "chamferBite",
-    })));
-    L.push(`${name}Cutter = extrude(${name}Region, length = ${span}, symmetric = true, method = NEW)`);
-    L.push(`hide(${name}Sketch)`);
-    L.push("");
-  };
-  // Entry-edge chamfer: four wedge cutters riding the taper line.
-  mk("wedgeEast", "XZ", { v: ow / 2, e: "openingWidth / 2" }, +1, "wedgeSpanY");
-  mk("wedgeWest", "XZ", { v: ow / 2, e: "openingWidth / 2" }, -1, "wedgeSpanY");
-  mk("wedgeNorth", "YZ", { v: oh / 2, e: "openingHeight / 2" }, +1, "wedgeSpanX");
-  mk("wedgeSouth", "YZ", { v: oh / 2, e: "openingHeight / 2" }, -1, "wedgeSpanX");
+  L.push(rectSketch("frustBase",
+    { v: ow / 2, e: "openingWidth / 2" }, { v: oh / 2, e: "openingHeight / 2" },
+    "offsetPlane(XY, offset = panelThickness - chamferDepth)"));
+  L.push("hide(frustBaseSketch)");
+  L.push("");
+  L.push(rectSketch("frustTop",
+    { v: ow / 2 + flare, e: "openingWidth / 2 + flarePerSide" }, { v: oh / 2 + flare, e: "openingHeight / 2 + flarePerSide" },
+    "offsetPlane(XY, offset = faceTopZ)"));
+  L.push("hide(frustTopSketch)");
+  L.push("");
+  L.push("chamferCutter = loft([frustBaseRegion, frustTopRegion], vDegree = 1)");
+  L.push("");
   L.push("panelCut1 = subtract(panelBlank, tools = [openingCutter])");
-  L.push("panelCut2 = subtract(panelCut1, tools = [wedgeEastCutter])");
-  L.push("panelCut3 = subtract(panelCut2, tools = [wedgeWestCutter])");
-  L.push("panelCut4 = subtract(panelCut3, tools = [wedgeNorthCutter])");
-  L.push("panelCut5 = subtract(panelCut4, tools = [wedgeSouthCutter])");
-  L.push(appearanceLine("finishedPanel", "panelCut5", colors.panel));
+  L.push("panelCut2 = subtract(panelCut1, tools = [chamferCutter])");
+  L.push(appearanceLine("finishedPanel", "panelCut2", colors.panel));
   return L.join("\n") + "\n";
 }
 

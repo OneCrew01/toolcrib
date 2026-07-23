@@ -9,6 +9,9 @@
 //   4. writes samples/flush-mount/validation.json
 //
 // Run from repo root:  node server/generators/flushmount-validate.mjs
+// With --write-samples: generate + write the sample set only — no network
+// probes, and validation.json is left untouched (the live-engine validation
+// loop records execute/export/mass results there instead).
 // Token comes from .env via loadToken(); it is never printed.
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -19,7 +22,8 @@ import { loadToken } from "../lib/zoo.mjs";
 
 const BASE = "https://api.zoo.dev";
 const OUT = join("samples", "flush-mount");
-const token = loadToken();
+const WRITE_ONLY = process.argv.includes("--write-samples");
+const token = WRITE_ONLY ? null : loadToken();
 
 const COLORS = { panel: "#2e5e78", insert: "#e07a2f" };
 
@@ -108,6 +112,11 @@ writePair(join(OUT, "pair-round-c0.15"), roundSpec);
 const coupons = {};
 for (const c of [0.1, 0.15, 0.2, 0.25]) {
   coupons[c] = writePair(join(OUT, "coupons", `c${c.toFixed(2)}`), couponSpec(c));
+}
+
+if (WRITE_ONLY) {
+  console.log("\n--write-samples: generation only; probes skipped, validation.json untouched.");
+  process.exit(0);
 }
 
 // 2. execute probe — kcl first (the actual question), node as control

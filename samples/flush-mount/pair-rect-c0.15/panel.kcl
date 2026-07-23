@@ -13,14 +13,10 @@ openingWidth = 30mm
 openingHeight = 20mm
 chamferAngle = 45deg  // measured from the opening wall
 chamferDepth = 0.8mm
-cutOverlap = 1mm
+cutOverlap = 1mm  // cutter pierces faces, never kisses them
 chamferRun = 0.8mm  // chamferDepth x tan(chamferAngle) — the flare width on the entry face
-chamferReach = 1.8mm  // chamferRun x (chamferDepth + cutOverlap) / chamferDepth — taper extended past the face
-chamferBite = 0.35mm  // overshoot along the taper — keeps boolean cuts off coincident faces
-wedgeLowZ = 1.85mm  // panelThickness - chamferDepth - chamferBite x chamferDepth / chamferRun
+flarePerSide = 1.8mm  // (chamferDepth + cutOverlap) x tan(chamferAngle) — loft flare at faceTopZ; crosses the entry face at exactly chamferRun
 faceTopZ = panelThickness + cutOverlap
-wedgeSpanY = openingHeight + 2 * chamferReach + 2mm
-wedgeSpanX = openingWidth + 2 * chamferReach + 2mm
 
 plateSketch = sketch(on = XY) {
   s0 = line(start = [var -30mm, var -20mm], end = [var 30mm, var -20mm])
@@ -45,6 +41,10 @@ plateRegion = region(point = [0mm, 0mm], sketch = plateSketch)
 panelBlank = extrude(plateRegion, length = panelThickness)
 hide(plateSketch)
 
+// Two engine-proven booleans: straight opening prism, then a convex
+// 2-profile frustum loft for the entry chamfer. Wedge subtracts after the
+// opening cut and 3-profile loft cutters both fail scale-dependently with
+// "cannot handle this 3D subtraction yet" (FN-024, measured 2026-07-23).
 openingSketch = sketch(on = XY) {
   s0 = line(start = [var -15mm, var -10mm], end = [var 15mm, var -10mm])
   s1 = line(start = [var 15mm, var -10mm], end = [var 15mm, var 10mm])
@@ -69,85 +69,52 @@ openingCutter = extrude(openingRegion, length = panelThickness + 2 * cutOverlap,
   |> translate(z = panelThickness / 2, global = true)
 hide(openingSketch)
 
-wedgeEastSketch = sketch(on = XZ) {
-  s0 = line(start = [var 14.65mm, var 1.85mm], end = [var 16.8mm, var 4mm])
-  s1 = line(start = [var 16.8mm, var 4mm], end = [var 14.65mm, var 4mm])
-  s2 = line(start = [var 14.65mm, var 4mm], end = [var 14.65mm, var 1.85mm])
+frustBaseSketch = sketch(on = offsetPlane(XY, offset = panelThickness - chamferDepth)) {
+  s0 = line(start = [var -15mm, var -10mm], end = [var 15mm, var -10mm])
+  s1 = line(start = [var 15mm, var -10mm], end = [var 15mm, var 10mm])
+  s2 = line(start = [var 15mm, var 10mm], end = [var -15mm, var 10mm])
+  s3 = line(start = [var -15mm, var 10mm], end = [var -15mm, var -10mm])
 
   coincident([s0.end, s1.start])
   coincident([s1.end, s2.start])
-  coincident([s2.end, s0.start])
-  horizontal(s1)
-  vertical(s2)
-  horizontalDistance([ORIGIN, s0.start]) == openingWidth / 2 - chamferBite
-  horizontalDistance([ORIGIN, s1.start]) == openingWidth / 2 + chamferReach
-  verticalDistance([ORIGIN, s0.start]) == wedgeLowZ
-  verticalDistance([ORIGIN, s1.start]) == faceTopZ
+  coincident([s2.end, s3.start])
+  coincident([s3.end, s0.start])
+  horizontal(s0)
+  vertical(s1)
+  horizontal(s2)
+  vertical(s3)
+  horizontalDistance([s0.start, ORIGIN]) == openingWidth / 2
+  horizontalDistance([ORIGIN, s1.start]) == openingWidth / 2
+  verticalDistance([s0.start, ORIGIN]) == openingHeight / 2
+  verticalDistance([ORIGIN, s2.start]) == openingHeight / 2
 }
-wedgeEastRegion = region(point = [15.3667mm, 3.2833mm], sketch = wedgeEastSketch)
-wedgeEastCutter = extrude(wedgeEastRegion, length = wedgeSpanY, symmetric = true, method = NEW)
-hide(wedgeEastSketch)
+frustBaseRegion = region(point = [0mm, 0mm], sketch = frustBaseSketch)
+hide(frustBaseSketch)
 
-wedgeWestSketch = sketch(on = XZ) {
-  s0 = line(start = [var -14.65mm, var 1.85mm], end = [var -16.8mm, var 4mm])
-  s1 = line(start = [var -16.8mm, var 4mm], end = [var -14.65mm, var 4mm])
-  s2 = line(start = [var -14.65mm, var 4mm], end = [var -14.65mm, var 1.85mm])
+frustTopSketch = sketch(on = offsetPlane(XY, offset = faceTopZ)) {
+  s0 = line(start = [var -16.8mm, var -11.8mm], end = [var 16.8mm, var -11.8mm])
+  s1 = line(start = [var 16.8mm, var -11.8mm], end = [var 16.8mm, var 11.8mm])
+  s2 = line(start = [var 16.8mm, var 11.8mm], end = [var -16.8mm, var 11.8mm])
+  s3 = line(start = [var -16.8mm, var 11.8mm], end = [var -16.8mm, var -11.8mm])
 
   coincident([s0.end, s1.start])
   coincident([s1.end, s2.start])
-  coincident([s2.end, s0.start])
-  horizontal(s1)
-  vertical(s2)
-  horizontalDistance([s0.start, ORIGIN]) == openingWidth / 2 - chamferBite
-  horizontalDistance([s1.start, ORIGIN]) == openingWidth / 2 + chamferReach
-  verticalDistance([ORIGIN, s0.start]) == wedgeLowZ
-  verticalDistance([ORIGIN, s1.start]) == faceTopZ
+  coincident([s2.end, s3.start])
+  coincident([s3.end, s0.start])
+  horizontal(s0)
+  vertical(s1)
+  horizontal(s2)
+  vertical(s3)
+  horizontalDistance([s0.start, ORIGIN]) == openingWidth / 2 + flarePerSide
+  horizontalDistance([ORIGIN, s1.start]) == openingWidth / 2 + flarePerSide
+  verticalDistance([s0.start, ORIGIN]) == openingHeight / 2 + flarePerSide
+  verticalDistance([ORIGIN, s2.start]) == openingHeight / 2 + flarePerSide
 }
-wedgeWestRegion = region(point = [-15.3667mm, 3.2833mm], sketch = wedgeWestSketch)
-wedgeWestCutter = extrude(wedgeWestRegion, length = wedgeSpanY, symmetric = true, method = NEW)
-hide(wedgeWestSketch)
+frustTopRegion = region(point = [0mm, 0mm], sketch = frustTopSketch)
+hide(frustTopSketch)
 
-wedgeNorthSketch = sketch(on = YZ) {
-  s0 = line(start = [var 9.65mm, var 1.85mm], end = [var 11.8mm, var 4mm])
-  s1 = line(start = [var 11.8mm, var 4mm], end = [var 9.65mm, var 4mm])
-  s2 = line(start = [var 9.65mm, var 4mm], end = [var 9.65mm, var 1.85mm])
-
-  coincident([s0.end, s1.start])
-  coincident([s1.end, s2.start])
-  coincident([s2.end, s0.start])
-  horizontal(s1)
-  vertical(s2)
-  horizontalDistance([ORIGIN, s0.start]) == openingHeight / 2 - chamferBite
-  horizontalDistance([ORIGIN, s1.start]) == openingHeight / 2 + chamferReach
-  verticalDistance([ORIGIN, s0.start]) == wedgeLowZ
-  verticalDistance([ORIGIN, s1.start]) == faceTopZ
-}
-wedgeNorthRegion = region(point = [10.3667mm, 3.2833mm], sketch = wedgeNorthSketch)
-wedgeNorthCutter = extrude(wedgeNorthRegion, length = wedgeSpanX, symmetric = true, method = NEW)
-hide(wedgeNorthSketch)
-
-wedgeSouthSketch = sketch(on = YZ) {
-  s0 = line(start = [var -9.65mm, var 1.85mm], end = [var -11.8mm, var 4mm])
-  s1 = line(start = [var -11.8mm, var 4mm], end = [var -9.65mm, var 4mm])
-  s2 = line(start = [var -9.65mm, var 4mm], end = [var -9.65mm, var 1.85mm])
-
-  coincident([s0.end, s1.start])
-  coincident([s1.end, s2.start])
-  coincident([s2.end, s0.start])
-  horizontal(s1)
-  vertical(s2)
-  horizontalDistance([s0.start, ORIGIN]) == openingHeight / 2 - chamferBite
-  horizontalDistance([s1.start, ORIGIN]) == openingHeight / 2 + chamferReach
-  verticalDistance([ORIGIN, s0.start]) == wedgeLowZ
-  verticalDistance([ORIGIN, s1.start]) == faceTopZ
-}
-wedgeSouthRegion = region(point = [-10.3667mm, 3.2833mm], sketch = wedgeSouthSketch)
-wedgeSouthCutter = extrude(wedgeSouthRegion, length = wedgeSpanX, symmetric = true, method = NEW)
-hide(wedgeSouthSketch)
+chamferCutter = loft([frustBaseRegion, frustTopRegion], vDegree = 1)
 
 panelCut1 = subtract(panelBlank, tools = [openingCutter])
-panelCut2 = subtract(panelCut1, tools = [wedgeEastCutter])
-panelCut3 = subtract(panelCut2, tools = [wedgeWestCutter])
-panelCut4 = subtract(panelCut3, tools = [wedgeNorthCutter])
-panelCut5 = subtract(panelCut4, tools = [wedgeSouthCutter])
-finishedPanel = appearance(panelCut5, color = "#2e5e78", metalness = 5, roughness = 60)
+panelCut2 = subtract(panelCut1, tools = [chamferCutter])
+finishedPanel = appearance(panelCut2, color = "#2e5e78", metalness = 5, roughness = 60)

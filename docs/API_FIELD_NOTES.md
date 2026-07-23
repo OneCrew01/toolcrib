@@ -319,6 +319,26 @@ minimal repro, suggested fix.
   strip pass, for STEP the workaround is REST `step→obj` conversion then import.
 - **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1293
 
+## FN-024 · "The Zoo engine cannot handle this 3D subtraction yet" — boolean fails on cut-crossing tools, with absolute-scale sensitivity
+- **API:** Engine (KCL executor / modeling booleans) · **Date:** 2026-07-23
+- **Type:** bug (engine-side; the error text itself asks for a report)
+- **Symptom:** `subtract()` fails with *"The Zoo engine cannot handle this 3D
+  subtraction yet. Please report this as an issue."* Deterministic per geometry
+  (failing cases reproduced 2–4×; passing cases repeat clean).
+- **Minimal repro:** 40×40×3 plate → cut a 20×20 through prism → subtract a wedge
+  prism riding the opening's entry edge → dies on the second subtract.
+- **Trigger characterization (10-probe matrix):** NOT "second subtract" — a 5-boolean
+  chain executes clean when each wedge shaves virgin corners of an uncut extrusion
+  (our insert). FAILS when the tool crosses edges/faces created by a prior cut, or
+  when a loft cutter carries a coplanar middle-profile seam. **Strangest finding:
+  absolute-scale sensitivity — the identical 3-profile loft cutter passes against a
+  60×60 blank and fails against a 40×40 blank.** (Text-to-cad's own f4 output only
+  executes at f4's exact numbers.)
+- **Workaround (shipped in `server/generators/flushmount.mjs`):** decompose into
+  simple convex booleans — straight opening prism + separate 2-profile chamfer
+  frustum. Executes at every sampled scale (12/12 sample files).
+- **Status:** issue-grade; queued for operator go-ahead (issue #5 candidate).
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)

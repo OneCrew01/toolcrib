@@ -49,11 +49,13 @@
   anything, currently).
 
 **Operator queue (the fun kind)**
-1. **Print the coupon set** — `samples/flush-mount/coupons/c0.10..c0.25`: open each
-   `.kcl` in Zoo Design Studio (the ForgeGate project — its first real job), export
-   STL, print panel + inserts in two colors, then run the bench sign-off procedure in
+1. **Print the coupon set — STLs are READY, no Design Studio step needed:**
+   `samples/flush-mount/coupons/c0.10..c0.25/panel.stl + insert.stl` (exported via the
+   live engine, all 12 sample files execute clean — post-Lee websocket lane). Print
+   panels and inserts in two colors, then the bench sign-off procedure in
    VERIFICATION_LOG (calipers + initials = FMF rules go VERIFIED).
 2. Red-pen session for the AC table rows (unchanged, still waiting on the printed AC).
+3. Go/no-go: FN-024 as issue #5 (the engine's error text literally asks for it).
 
 **Next (Day 3, pre-office-hours 6:45 AM Thu)**
 - Wire trunk end-to-end: request → reference (allowDraft) → generate (flushmount OR
