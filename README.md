@@ -38,7 +38,7 @@ The demo part is small on purpose. The pattern is the product.
 | Text-to-CAD (`POST /ai/text-to-cad/{format}?kcl=true`) | ✅ verified 2026-07-22 | async; returns constraint-based, parametric KCL 2.0 — genuinely editable |
 | STEP export | ✅ verified 2026-07-22 | via `/async/operations/{id}` outputs (see FN-007); glTF preview comes free |
 | Engine mass/volume validation (`/file/mass`) | ✅ verified 2026-07-22 | API mass matched hand calc to 0.02% (FN-008) |
-| Agent copilot session (`/ws/ml/copilot`) | 🔜 planned | websocket |
+| Agent copilot session (`/ws/ml/copilot`) | ✅ verified 2026-07-23 | full agent round-trip in 49 s: KCL gen → lint → execute → snapshot → analysis (FN-026..028) |
 | Engine modeling commands (websocket) | ✅ verified 2026-07-22 | post-upgrade `headers` auth (FN-013); ~50 ms round-trips (FN-014) |
 | Engine bounding box | ✅ verified 2026-07-22 | cube → exact dims via `bounding_box` (FN-015); null for imported objects (FN-022) |
 | DXF export (`export2d`) | ✅ verified 2026-07-22 | real AC1014 ASCII DXF in ~54 ms (FN-016) |

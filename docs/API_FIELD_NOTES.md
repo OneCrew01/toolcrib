@@ -339,6 +339,49 @@ minimal repro, suggested fix.
   frustum. Executes at every sampled scale (12/12 sample files).
 - **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1294
 
+## FN-025 · web-zookeeper: excellent spec, no README, and the package can't be installed as published
+- **Surface:** github.com/KittyCAD/web-zookeeper (the copilot reference client) · **Date:** 2026-07-23
+- **Type:** doc-gap (the kind this contest exists for)
+- The repo's only doc is SPECIFICATION.md — genuinely excellent — but there's no
+  README, no install/usage instructions, and the package isn't on npm.
+  `package.json` declares `files:["dist"]` and `main: dist/web-zookeeper.js`, yet
+  `dist/` isn't committed and there's no `prepare` script — so
+  `npm i github:KittyCAD/web-zookeeper` installs a package whose entrypoint doesn't
+  exist. Build needs `make` (Windows friction); the real steps are
+  `node esbuild.config.mjs` + `tsc -p tsconfig.types.json`.
+- **Offer:** a README + `prepare` script is a 30-minute PR; queued for operator go.
+
+## FN-026 · Copilot socket opens every session with a FAKE auth failure
+- **API:** `wss://api.zoo.dev/ws/ml/copilot` · **Date:** 2026-07-23 · repro: `server/spikes/ws-copilot-spike.mjs`
+- **Type:** rough-edge / doc-gap (client-breaking)
+- Auth headers sent 2 ms after open; the server still opens every session (3/3) with
+  `error: Please send { headers: … } over this websocket.` The official client
+  swallows it by **exact string comparison** of the error text. Any independent
+  client's natural reading is "auth failed, abort." Also undocumented outside source
+  comments: send nothing until the first server payload arrives, or the backend may
+  close the socket.
+
+## FN-027 · Duplicate server frames, no sequence numbers
+- **API:** copilot websocket · **Date:** 2026-07-23 (3/3 sessions)
+- `conversation_id` arrives twice every session; an identical 1,463-byte
+  `tool_output` arrived twice in the prompt run. No seq/request-id on server frames —
+  clients can only dedupe by content equality.
+
+## FN-028 · Three wire encodings in one protocol — and the SDK disagrees with itself
+- **API:** copilot websocket + `@kittycad/lib` · **Date:** 2026-07-23
+- Live: everything is JSON text EXCEPT `replay` (one MessagePack binary whose inner
+  messages are UTF-8 JSON byte arrays). Images in `files` frames are JSON `number[]`
+  bytes (~4× inflation: 129 KB of JSON for a ~33 KB JPEG). Meanwhile `@kittycad/lib`
+  ships an unused BSON encoder and its `MlCopilotWs.parseMessage` fallback tries
+  JSON→**BSON** while the shipped worker tries JSON→**msgpack** — follow the lib
+  helper and you cannot decode replay.
+- **Also captured (capability row CLOSED):** full copilot lifecycle verified live —
+  headers auth (FN-013 pattern), `list_modes` (auto default; fast/thoughtful disabled
+  on this plan), one prompt → skill activation → KCL via `edit_kcl_code` → constraint
+  check → lint → format → execute → 4-view snapshot → physical analysis →
+  `end_of_stream.whole_response` in 45.5 s server-side. Metering handle:
+  `session_data.api_call_id` = `end_of_stream.id` — one API call per turn.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)
