@@ -317,7 +317,7 @@ minimal repro, suggested fix.
 - **Impact:** any workflow that exports from Zoo and re-imports to Zoo (iteration,
   preview-of-prior-work, remix) breaks out of the box; the fix for glTF is a local
   strip pass, for STEP the workaround is REST `step→obj` conversion then import.
-- **Status:** issue-grade; queued for operator go-ahead + Thursday office hours.
+- **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1293
 
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
