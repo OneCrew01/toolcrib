@@ -54,3 +54,38 @@ Formulas are dimension-preserving multiples: millimeter inputs give millimeter r
 - The flush/countersunk, preferred, typical-pitch, and transverse-pitch values do **not**
   appear in the fetched AC Ch. 4 Sec. 4 text. They are standard AMT-handbook practice and are
   cited to FAA-H-8083-31A with paragraph UNCONFIRMED rather than to an invented AC paragraph.
+
+## Rules — table `flush-mount-fit`
+
+These rows encode **bench practice, not FAA data** (table file:
+`server/reference/tables/flush-mount-fit.mjs`). There is no printed source text to check
+them against — sign-off is by printed fit coupon and calipers on the target machine, then
+flipping the rule's `verification` block in the table file, same as steps 3–6 above.
+
+**Bench sign-off procedure.** (1) On the target machine (calibrated, 0.4 mm nozzle),
+print one coupon pair per clearance class from the generator's own output
+(`samples/flush-mount/coupons/` — panel and insert in different filaments so the flush
+fit reads). (2) Deburr nothing — test as-printed. (3) Measure opening and insert with
+calipers (0.01 mm) on both axes at mid-depth; record actual clearance per side =
+(opening − insert) / 2. (4) Seat the insert and grade against the class definition:
+snug = firm thumb pressure, no rattle; sliding = drops in and out freely; loose =
+visible clearance, still reads flush. (5) Chamfer check: the insert should self-center
+when dropped at a slight angle. (6) A class passes only if seated behavior matches at
+BOTH band edges (print min and max pairs if the nominal result is marginal). Initial
+and date the row, flip the rule's `verification` block in the same commit, and note
+machine, filament, and measured actual clearance. Any nozzle, filament, or machine
+change resets the class rows to PENDING.
+Clearances are **per side**; formulas are dimension-preserving (mm in, mm out).
+
+| Rule ID | Parameter | Encoded value | Claimed source | Status | Verified by | Date |
+|---|---|---|---|---|---|---|
+| FMF-001 | clearance-per-side-min (snug/press) | 0.10 mm | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-002 | clearance-per-side-max (snug/press) | 0.15 mm | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-003 | clearance-per-side-min (smooth-sliding) | 0.20 mm | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-004 | clearance-per-side-max (smooth-sliding) | 0.25 mm | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-005 | clearance-per-side-min (loose/service) | 0.30 mm | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-006 | clearance-per-side-max (loose/service) | 0.35 mm | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-007 | chamfer-lead-in-angle | 45° | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-008 | chamfer-lead-in-depth-min | 2 × clearance per side, 0.6 mm floor | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-009 | insert-dimension | opening dimension − 2 × clearance per side | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |
+| FMF-010 | inner-dimension-compensation | 0 mm (class absorbs undersize after coupon calibration) | Bench practice — FDM fit coupons (Bambu P1S, 0.4mm nozzle) — UNCONFIRMED | PENDING | | |

@@ -46,6 +46,22 @@ The demo part is small on purpose. The pattern is the product.
 Running findings, bugs, and doc gaps are logged in
 [`docs/API_FIELD_NOTES.md`](docs/API_FIELD_NOTES.md).
 
+## The first tool: say the joint, get the joint
+
+`server/generators/flushmount.mjs` generates a **flush-mount pair** — panel with a
+chamfered opening plus the insert that sits flush in it — from a parameter spec:
+clearance per side (backed by the fit-rule table), 45° lead-in chamfers sized
+`≥ 2 × clearance`, optional rear registration lip, each part in its own color so the
+fit reads visually. Output is remixer-friendly KCL 2.0: your numbers are named
+constants, every derived dimension carries its formula as a comment, and the
+generator refuses to emit geometry that violates its own arithmetic gates. Printable
+fit-coupon sets at four clearances live in `samples/flush-mount/coupons/`.
+
+Why deterministic generation instead of prompting? Campaign C003 (FN-020): text-to-cad
+*can* build this pair — when the prompt pre-chews the engineering. Phrase it like a
+machinist ("0.3 mm total clearance") and it fails outright; phrase it casually and you
+get silently different geometry — with no API signal telling you which you got.
+
 ## The reliability harness (the night shift)
 
 Because a `completed` status is not proof of correct geometry (FN-006: the same

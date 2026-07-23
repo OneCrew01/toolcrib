@@ -1,0 +1,47 @@
+{
+  "spec": {
+    "panel": {
+      "widthMm": 50,
+      "heightMm": 50,
+      "thicknessMm": 3
+    },
+    "opening": {
+      "shape": "round",
+      "diameterMm": 25
+    },
+    "clearancePerSideMm": 0.15,
+    "chamfer": {
+      "angleDeg": 45,
+      "depthMm": 0.8
+    },
+    "insert": {
+      "lipMm": 2
+    },
+    "colors": {
+      "panel": "#2e5e78",
+      "insert": "#e07a2f"
+    }
+  },
+  "derived": {
+    "chamferRunMm": 0.8,
+    "chamferAngleConvention": "angle measured from the opening wall (insertion axis): run = depth * tan(angle)",
+    "insert": {
+      "diameterMm": 24.7,
+      "depthMm": 3,
+      "lipOverhangMm": 2,
+      "lipThicknessMm": 2,
+      "totalDepthMm": 5,
+      "flangeDiameterMm": 29
+    },
+    "totalLateralPlayMm": 0.3,
+    "entrySide": "back",
+    "modelOrientation": "both parts modeled with the chamfered lead-in at +Z top; flat show face on z=0 — print as exported, no supports",
+    "cornerTreatment": "exact revolved chamfer"
+  },
+  "formulas": {
+    "insertWidth": "insertDiameter = openingDiameter - 2 x clearance = 24.70mm",
+    "insertDepth": "insertDepth = panelThickness = 3.00mm — the flush relationship",
+    "chamferRun": "chamferRun = chamferDepth x tan(chamferAngle) = 0.80mm",
+    "leadInRule": "chamferDepth 0.80mm >= 2 x clearance 0.30mm"
+  }
+}

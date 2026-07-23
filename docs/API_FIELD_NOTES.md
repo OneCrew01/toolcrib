@@ -246,6 +246,45 @@ minimal repro, suggested fix.
 - **This is the entry's thesis measured end-to-end:** fastening intent needs a
   deterministic rule layer in front of generation, and a validation gate behind it.
 
+## FN-019 · `/file/execute/{lang}` cannot execute KCL — and currently cannot execute anything
+- **API:** platform (litterbox) · `POST /file/execute/{lang}` · **Date:** 2026-07-22
+- **Type:** doc-gap + outage observation
+- **Actual:** (a) the `lang` path param accepts only `go|python|node` —
+  `POST /file/execute/kcl` → 400 `unknown variant 'kcl'`. (b) Control probes with the
+  *supported* languages both fail server-side with 500 `Internal` (request ids
+  `59c8b1ee…` node, `915ebd98…` python; reproduced; preserved in
+  `samples/flush-mount/validation.json`).
+- **Impact:** there is no server-side KCL execution on public REST. KCL becomes
+  geometry only client-side (Design Studio / kcl compiler) or by hand-compiling to
+  modeling-websocket commands. For a tool that emits KCL, that means validation runs
+  over the websocket (as ours now does) and STL export of authored KCL needs Design
+  Studio in the loop.
+- **Ask for Zoo:** is litterbox deprecated or down? A `kcl` variant here (code in →
+  executed geometry + exports out) would be the single most useful endpoint for
+  library authors.
+
+## FN-020 · Can text-to-cad make a flush-mount pair? Yes — if you do its engineering for it (campaign C003)
+- **API:** Agent/ML · **Date:** 2026-07-22 · 7 unique phrasings × 1 run, $13.40
+- **Type:** capability measurement (nuanced — and it strengthens the thesis)
+- **Setup:** every case asked differently for the same thing: 60 mm panel + separate
+  insert, flush front face, 0.15 mm/side clearance, chamfered lead-ins, two colors.
+- **The good:** 6/7 completed with plausible mass. Three engineering-literate
+  phrasings (fully-specified, assembly-framing, explicit "two separate solids")
+  converged on the **identical** mass — 28.9343 g — and the explicit-two-bodies
+  result audits line-by-line correct: parametric `insertSize = holeSize − 2 ×
+  clearancePerSide`, proper 0.5×45° chamfers on both leading edges, true flush face,
+  both colors.
+- **The failures live exactly where real users live:** the machinist's fit callout
+  ("0.3 mm TOTAL clearance" — requires halving per side) burned **15 minutes and
+  failed outright** (FN-006 class); product framing silently dropped the two-color
+  requirement; vernacular and underspecified phrasings produced *slightly different*
+  parts (28.9753 g, 28.9452 g) — silent geometry drift.
+- **The point:** outcome quality tracked prompt-engineering skill, not intent —
+  and the API emits no signal separating the perfect results from the drifted ones.
+  We only know which is which because we hand-derived expected mass and read the KCL.
+  A deterministic generator (`server/generators/flushmount.mjs`) plus a validation
+  gate removes both problems: correct by construction, verified by measurement.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)

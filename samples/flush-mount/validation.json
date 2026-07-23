@@ -1,0 +1,90 @@
+{
+  "generatedAt": "2026-07-22T23:45:40.730Z",
+  "executeProbe": {
+    "kcl": {
+      "url": "https://api.zoo.dev/file/execute/kcl?output=part.stl",
+      "status": 400,
+      "ms": 158,
+      "body": {
+        "request_id": "2dffd332-7015-4377-8753-fce578f2d017",
+        "message": "bad parameter in URL path: unknown variant `kcl`, expected one of `go`, `python`, `node`"
+      }
+    },
+    "kclNoOutput": {
+      "url": "https://api.zoo.dev/file/execute/kcl",
+      "status": 400,
+      "ms": 121,
+      "body": {
+        "request_id": "a9bb7640-751e-494b-989b-ac61818e23a4",
+        "message": "bad parameter in URL path: unknown variant `kcl`, expected one of `go`, `python`, `node`"
+      }
+    },
+    "nodeControl": {
+      "url": "https://api.zoo.dev/file/execute/node",
+      "status": 500,
+      "ms": 451,
+      "body": {
+        "request_id": "59c8b1ee-f11d-4733-80ad-b513365b9304",
+        "error_code": "Internal",
+        "message": "Internal Server Error"
+      }
+    },
+    "pythonControl": {
+      "url": "https://api.zoo.dev/file/execute/python",
+      "status": 500,
+      "ms": 460,
+      "body": {
+        "request_id": "915ebd98-e178-42de-9d57-871f2cb38a36",
+        "error_code": "Internal",
+        "message": "Internal Server Error"
+      }
+    }
+  },
+  "wsBoundingBoxes": [
+    {
+      "label": "main panel outline",
+      "expectedMm": {
+        "x": 60,
+        "y": 40,
+        "z": 3
+      },
+      "measuredMm": {
+        "x": 60,
+        "y": 40,
+        "z": 3
+      },
+      "match": true
+    },
+    {
+      "label": "main insert body outline",
+      "expectedMm": {
+        "x": 29.7,
+        "y": 19.7,
+        "z": 3
+      },
+      "measuredMm": {
+        "x": 29.7,
+        "y": 19.7,
+        "z": 3
+      },
+      "match": true
+    },
+    {
+      "label": "coupon c0.10 insert outline",
+      "expectedMm": {
+        "x": 19.8,
+        "y": 19.8,
+        "z": 3
+      },
+      "measuredMm": {
+        "x": 19.8,
+        "y": 19.8,
+        "z": 3
+      },
+      "match": true
+    }
+  ],
+  "notes": [
+    "KCL could not be executed server-side; derived dimensions validated by rebuilding outline solids over the modeling websocket and reading bounding boxes back from the engine."
+  ]
+}

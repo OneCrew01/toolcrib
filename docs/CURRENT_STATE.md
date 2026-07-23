@@ -2,6 +2,34 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
+## 2026-07-22 · Day 2 night — the first tool ships
+
+**Works**
+- **Flush-mount pair generator** (`server/generators/flushmount.mjs`, 15/15 tests):
+  spec → panel + insert KCL, arithmetic-gated, chamfers built geometrically (corpus
+  has no chamfer stdlib), two colors, optional rear lip; round variant is a single
+  revolve. Engine-measured outline validation over the websocket: 3/3 exact bbox.
+- **Fit rules** (`flush-mount-fit`, FMF-001..010, 12/12 tests): FDM clearance classes
+  + chamfer/insert formulas, fail-closed, bench-verification procedure in the log.
+- **C003** (7 phrasings, $13.40): 6/7 plausible, 3 phrasings mass-identical and one
+  audited fully correct — but the machinist's fit callout failed hard and casual
+  phrasings drifted silently (FN-020). FN-019: litterbox can't execute KCL (or
+  anything, currently).
+
+**Operator queue (the fun kind)**
+1. **Print the coupon set** — `samples/flush-mount/coupons/c0.10..c0.25`: open each
+   `.kcl` in Zoo Design Studio (the ForgeGate project — its first real job), export
+   STL, print panel + inserts in two colors, then run the bench sign-off procedure in
+   VERIFICATION_LOG (calipers + initials = FMF rules go VERIFIED).
+2. Red-pen session for the AC table rows (unchanged, still waiting on the printed AC).
+
+**Next (Day 3, pre-office-hours 6:45 AM Thu)**
+- Wire trunk end-to-end: request → reference (allowDraft) → generate (flushmount OR
+  text-to-cad) → mass/bbox gate → package stub, all through the state machine.
+- Add FN-019 litterbox request ids + FN-020 scorecard to the office-hours flow.
+
+---
+
 ## 2026-07-22 · Day 2 — trunk built, protocol cracked, thesis quantified
 
 **Works (all tested: 21/21 across two suites, `npm test`)**

@@ -14,7 +14,7 @@ const SYS = { kind: ACTOR.SYS, id: "pipeline" };
 const HUMAN = { kind: ACTOR.HUMAN, id: "reviewer@example.com" };
 
 const validSample = JSON.parse(
-  readFileSync(new URL("../../samples/requests/flush-plate.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../samples/requests/plain-plate.json", import.meta.url), "utf8"),
 );
 const invalidSample = JSON.parse(
   readFileSync(new URL("../../samples/requests/invalid-missing-material.json", import.meta.url), "utf8"),

@@ -95,6 +95,10 @@ async function runOne({ c, runIdx }) {
     if (status === "failed") return { ...entry, verdict: "generation_failed", error: record?.error ?? null };
     if (status === "timeout") return { ...entry, verdict: "timeout_client" };
 
+    // FN-011/FN-018: instant completion = prompt-dedupe cache hit. Cached KCL is
+    // already saved above; its outputs are known-unreachable, so don't burn retries.
+    if (latencyS < 2) return { ...entry, verdict: "completed_dedupe_hit" };
+
     const outputs = await zoo.fetchOutputs(job.id);
     if (!outputs) return { ...entry, verdict: "completed_outputs_unreachable" }; // FN-011
     const stepB64 = outputs["source.step"];
