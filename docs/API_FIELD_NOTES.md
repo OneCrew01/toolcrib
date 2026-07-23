@@ -2,7 +2,10 @@
 
 Real observations from building against the Zoo API. Every entry reproduced before it
 was written down. Format per entry: what the docs implied, what actually happened,
-minimal repro, suggested fix.
+minimal repro, suggested fix. Findings that touch a documented surface cite the exact
+Zoo doc page they confirm, contradict, or fill — inline where it matters most and in the
+**Zoo documentation cross-reference** table at the end. Every cited doc URL was loaded
+and confirmed to resolve before it was written down.
 
 ---
 
@@ -82,6 +85,7 @@ minimal repro, suggested fix.
 
 ## FN-006 · Fastening-feature generation is non-deterministic — same prompt fails ~2/3, and the failed hop leaks internal cluster DNS
 > **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1291
+> **Zoo docs — contradicts:** [POST /ai/text-to-cad/{output_format}](https://zoo.dev/docs/developer-tools/api/ml/generate-a-cad-model-from-text) documents a clean `queued → in_progress → completed/failed` lifecycle; it does not disclose that the same prompt is non-deterministic across runs or that a `failed` status can carry an internal-transport error string.
 - **API:** Agent/ML · `POST /ai/text-to-cad/step?kcl=true`
 - **Date:** 2026-07-22 · **3 runs total: 2 failed, 1 passed** (ids below)
 - **Type:** bug (reliability) + bug (error hygiene)
@@ -338,6 +342,7 @@ minimal repro, suggested fix.
   simple convex booleans — straight opening prism + separate 2-profile chamfer
   frustum. Executes at every sampled scale (12/12 sample files).
 - **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1294
+- **Zoo docs — fills a gap:** the [`subtract()` standard-library page](https://zoo.dev/docs/kcl-std/functions/std-solid-subtract) documents the boolean as "removes tool solids from base solids" with no stated limitation; it does not warn that the operation can fail on tools that cross prior-cut edges, nor that success is sensitive to the model's absolute scale. A "known limitations" note on that page would have saved the decomposition hunt.
 
 ## FN-025 · web-zookeeper: excellent spec, no README, and the package can't be installed as published
 - **Surface:** github.com/KittyCAD/web-zookeeper (the copilot reference client) · **Date:** 2026-07-23
@@ -399,6 +404,7 @@ minimal repro, suggested fix.
   broken; we did, for about ten minutes.
 - **Suggested fix:** include `outputs` on the user record (or document the split), and
   pad the base64 (or document that it's unpadded).
+- **Zoo docs — fills a gap:** [GET /async/operations/{id}](https://zoo.dev/docs/developer-tools/api/api-calls/get-an-async-operation) is the only reference page that carries `outputs`; the [text-to-CAD endpoint page](https://zoo.dev/docs/developer-tools/api/ml/generate-a-cad-model-from-text) never states that the exported files live on the async-operations surface rather than the user record. Neither page mentions the unpadded-base64 encoding.
 - **Nice find en route:** requesting `step` also returned `source.gltf` free — a ready
   in-browser preview asset.
 
@@ -471,3 +477,32 @@ Legend: ✅ verified · ◐ partial · ☐ not yet run · ➖ deliberately skipp
   that confirms a real feature here would **catch a silent omission** — a "completed" plate
   with the countersinks dropped would weigh ~13.08 g, not ~12.72 g. Trust does not come from
   the API's status field; it comes from deterministic post-generation validation. That is ToolCRIB.
+- **Zoo docs — confirms + extends:** the gate is built on [POST /file/mass](https://zoo.dev/docs/developer-tools/api/file/get-cad-file-mass) used exactly as documented; the finding extends the doc by showing a single mass value functions as a feature-presence proof, which the endpoint page does not itself claim.
+
+---
+
+## Zoo documentation cross-reference
+
+Every finding above that touches a documented Zoo surface is mapped here to the exact doc
+page it **confirms** (behaves as documented), **contradicts** (behaves against the doc), or
+**fills** (a real gap the doc does not cover). Each URL was fetched and confirmed to resolve
+on 2026-07-23. GitHub-issue filings are listed inline in the notes; this table is Zoo's own
+documentation only.
+
+| Finding | Zoo surface | Zoo doc page | Relationship |
+|---|---|---|---|
+| FN-001 | Bearer auth on `GET /user` | [API reference overview](https://zoo.dev/docs/developer-tools/api) | confirms |
+| FN-002 | OpenAPI spec served at API root | [API reference overview](https://zoo.dev/docs/developer-tools/api) | fills — spec location under-advertised |
+| FN-003 · FN-017 | `GET /user/payment/balance` | [Get balance for your user](https://zoo.dev/docs/developer-tools/api/payments/get-balance-for-your-user) | fills — grant not labeled; no credits→minutes mapping |
+| FN-004 · FN-016 | Export formats / DXF path | [Convert CAD file](https://zoo.dev/docs/developer-tools/api/file/convert-cad-file-from-one-format-to-another) | fills — DXF (`OutputFormat2d`/`export2d`) not cross-linked |
+| FN-005 · FN-006 · FN-018 · FN-020 | Text-to-CAD generation | [Generate a CAD model from text](https://zoo.dev/docs/developer-tools/api/ml/generate-a-cad-model-from-text) | contradicts — latency variance + non-determinism undocumented |
+| FN-007 · FN-011 | `outputs` surface split | [Get an async operation](https://zoo.dev/docs/developer-tools/api/api-calls/get-an-async-operation) | fills — outputs live only here; dedupe hits carry no async record |
+| FN-008 · FN-010 · FN-021 | Mass / volume validation | [Get CAD file mass](https://zoo.dev/docs/developer-tools/api/file/get-cad-file-mass) | confirms — 0.02% agreement; reproduced offline to every digit |
+| FN-019 | `POST /file/execute/{lang}` | [Executor API](https://zoo.dev/docs/developer-tools/api/executor) | confirms lang enum · fills — no `kcl` variant, endpoints 500 |
+| FN-024 | KCL boolean `subtract()` | [`subtract()` standard library](https://zoo.dev/docs/kcl-std/functions/std-solid-subtract) | fills — no note on cut-crossing / absolute-scale failure |
+| FN-009 · FN-013 · FN-014 · FN-015 · FN-022 · FN-023 | Modeling command websocket | [Engine API](https://zoo.dev/docs/developer-tools/engine-api) | fills — post-upgrade auth frame + protocol not in the overview |
+| FN-025 · FN-026 · FN-027 · FN-028 | Copilot websocket / agent client | [Agent API](https://zoo.dev/docs/developer-tools/agent-api) | fills — copilot ws lifecycle + encodings undocumented |
+
+*Method note: doc pages were verified by fetching each URL; two candidate deep-links
+(`/api/executor/get-an-async-operation`, `/api/file/get-mass`) returned 404 during
+verification and were replaced with the correct paths above rather than cited blind.*
