@@ -40,8 +40,10 @@ The demo part is small on purpose. The pattern is the product.
 | Engine mass/volume validation (`/file/mass`) | ✅ verified 2026-07-22 | API mass matched hand calc to 0.02% (FN-008) |
 | Agent copilot session (`/ws/ml/copilot`) | 🔜 planned | websocket |
 | Engine modeling commands (websocket) | ✅ verified 2026-07-22 | post-upgrade `headers` auth (FN-013); ~50 ms round-trips (FN-014) |
-| Engine bounding box | ✅ verified 2026-07-22 | cube → exact dims via `bounding_box` (FN-015) |
+| Engine bounding box | ✅ verified 2026-07-22 | cube → exact dims via `bounding_box` (FN-015); null for imported objects (FN-022) |
 | DXF export (`export2d`) | ✅ verified 2026-07-22 | real AC1014 ASCII DXF in ~54 ms (FN-016) |
+| Render/preview PNG | ✅ verified 2026-07-23 | import → `zoom_to_fit` → `take_snapshot`, ~2.5 s (FN-022) |
+| Round-trip re-import of own exports | ❌ broken | `internal_engine: import failed`; glTF fixable by stripping Zoo's own extension (FN-023) |
 
 Running findings, bugs, and doc gaps are logged in
 [`docs/API_FIELD_NOTES.md`](docs/API_FIELD_NOTES.md).
@@ -92,11 +94,21 @@ everything in it was written inside the window. See
 ```bash
 git clone <this repo>
 cd toolcrib
-cp .env.example .env   # add your Zoo API token (dev.zoo.dev → API tokens)
-npm run demo           # runs the thin thread: intent → CAD → export → validate
+npm run demo   # full loop, zero network, zero API minutes, no install step
 ```
 
-`npm run demo` has no dependencies beyond Node 18+ — no install step.
+`npm run demo` walks one real request through the entire machine — validation →
+cited reference consult → generation (replayed from real prior Zoo outputs) →
+measured geometry gates → a hash-sealed 11-file job package (CAD source, STL/STEP,
+engine-rendered preview, validation report, 13-section manufacturing PDF, tamper-
+evident manifest) — and parks it at the human-review gate with the full transition
+ledger printed and verified. No token needed; no dependencies beyond Node 18+.
+
+With a Zoo token in `.env` (`cp .env.example .env`), the same pipeline runs live:
+
+```bash
+TOOLCRIB_ALLOW_LIVE=1 node server/pipeline/run-job.mjs samples/requests/plain-plate.json --backend=live
+```
 
 ## Safety note
 

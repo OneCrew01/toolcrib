@@ -285,6 +285,40 @@ minimal repro, suggested fix.
   A deterministic generator (`server/generators/flushmount.mjs`) plus a validation
   gate removes both problems: correct by construction, verified by measurement.
 
+## FN-021 · Offline mesh analysis reproduces Engine `/file/mass` to every printed digit
+- **API:** Engine (as cross-check) · **Date:** 2026-07-23 · repro: `server/package/stl-analyze.mjs`
+- **Type:** pleasant-surprise / architecture input
+- A ~60-line zero-dependency STL analyzer (divergence-theorem volume, edge-pairing
+  watertightness) over the real Zoo export `samples/plain-plate-stl/source.stl`
+  (540 triangles) computes 4,843.9277 mm³ → **13.0786 g** at 2700 kg/m³ — identical
+  to Zoo's `/file/mass` (13.078606 g, FN-008) to every printed digit.
+- **Consequence:** the geometry/mass gate costs zero API spend once a mesh exists;
+  the Engine call becomes a cross-check, not a dependency. The trust layer can audit
+  the API with independent math — and does, on every job.
+
+## FN-022 · Render route verified: import → zoom_to_fit → take_snapshot, ~2.5 s per PNG
+- **API:** Engine websocket · **Date:** 2026-07-23 · repro: `server/spikes/ws-snapshot-spike.mjs`
+- **Type:** capability verified (last open capability row closed)
+- One session: `import_files` (or build commands) → `zoom_to_fit {padding:0.2}` →
+  `take_snapshot {format:"png"}` → base64 `contents` → valid PNG (`\x89PNG`). Real
+  plate render: 42.7 KB PNG in ~2.3 s wall. `import_files` works fine as plain JSON
+  text frames at ~450 KB despite the spec's binary/bson note. Caveat: `bounding_box`
+  returns null dimensions for *imported* objects (works for path-built solids).
+- All eleven DoD bundle artifact types are now producible.
+
+## FN-023 · The engine cannot re-import its own exports
+- **API:** Engine websocket `import_files` · **Date:** 2026-07-23 · repro: spike `--fmt step|gltf`
+- **Type:** bug (round-trip integrity)
+- **Actual:** importing Zoo's own AP242 STEP export of a part fails
+  (`internal_engine: import failed` — and sometimes no reply at all, >15 s silent);
+  importing Zoo's own glTF export fails the same way — **until you strip Zoo's own
+  `KITTYCAD_boundary_representation` extension**, after which the identical mesh
+  imports perfectly. GLB repacking does not help; the extension is the trigger.
+- **Impact:** any workflow that exports from Zoo and re-imports to Zoo (iteration,
+  preview-of-prior-work, remix) breaks out of the box; the fix for glTF is a local
+  strip pass, for STEP the workaround is REST `step→obj` conversion then import.
+- **Status:** issue-grade; queued for operator go-ahead + Thursday office hours.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)

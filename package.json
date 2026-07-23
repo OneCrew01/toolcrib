@@ -4,9 +4,11 @@
   "description": "Open-source trust layer for AI-generated CAD on the Zoo.dev APIs — say the joint, get the joint.",
   "type": "module",
   "scripts": {
-    "demo": "node server/day1-thinthread.mjs",
+    "demo": "node server/pipeline/run-job.mjs samples/requests/plain-plate.json --backend=replay",
+    "demo:thinthread": "node server/day1-thinthread.mjs",
+    "job": "node server/pipeline/run-job.mjs",
     "campaign": "node server/harness/run-campaign.mjs",
-    "test": "node --test \"server/state/*.test.mjs\" \"server/reference/*.test.mjs\" \"server/generators/*.test.mjs\"",
+    "test": "node --test \"server/state/*.test.mjs\" \"server/reference/*.test.mjs\" \"server/generators/*.test.mjs\" \"server/package/*.test.mjs\" \"server/pipeline/*.test.mjs\"",
     "test:state": "node --test \"server/state/*.test.mjs\"",
     "test:reference": "node --test \"server/reference/*.test.mjs\""
   },

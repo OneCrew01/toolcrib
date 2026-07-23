@@ -2,6 +2,38 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
+## 2026-07-23 · Day 3 — the trunk is live; `npm run demo` IS the product
+
+**Works (full suite green; `npm run demo` = judge path)**
+- **Pipeline** (`server/pipeline/`): one request walks DRAFT → … →
+  WAITING_FOR_HUMAN_REVIEW; backends replay/flushmount/live behind one interface;
+  failures land in the right states with measured values in the ledger reason;
+  EXPORT_FAILED + PDF_FAILED added to the machine.
+- **DoD package** (`server/package/`): 11-file bundle, 13-section PDF from a zero-dep
+  PDF writer, manifest + recomputable packageHash, `dodCheck` audit — replay bundle
+  audits complete, including the engine-rendered preview PNG.
+- **Local STL analyzer**: volume/watertight/bbox with zero deps — reproduces Engine
+  `/file/mass` to every printed digit (FN-021).
+- **Preview route verified** (FN-022): import → zoom_to_fit → take_snapshot, ~2.5 s.
+- **New bug found** (FN-023, issue-grade, awaiting operator go): the engine cannot
+  re-import its own STEP/glTF exports; glTF fixed by stripping Zoo's own extension.
+
+**Operator queue**
+1. Print the fit coupons (unchanged — Design Studio export → P1S).
+2. Red-pen the AC table rows (unchanged).
+3. Go/no-go: file FN-023 as issue #4 on modeling-api.
+4. Office hours Thu 6:45 AM — kit is loaded; add the FN-021 agreement line and the
+   live `npm run demo` as the show-and-tell opener.
+
+**Next (Day 4 territory)**
+- Live-backend supervised run (one real text-to-cad job through the trunk).
+- Fold expectedMassG into the request schema (currently read from the raw file).
+- UI first pass: job list + review/approve screen against the backend.
+- C004 candidate: text-to-cad iteration endpoint (`/ml/text-to-cad/iteration`) —
+  unexplored surface.
+
+---
+
 ## 2026-07-22 · Day 2 night — the first tool ships
 
 **Works**

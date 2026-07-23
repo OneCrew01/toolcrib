@@ -35,6 +35,8 @@ export const STATE = Object.freeze({
   GENERATION_FAILED: "GENERATION_FAILED",
   OUTPUTS_UNREACHABLE: "OUTPUTS_UNREACHABLE",
   GEOMETRY_INVALID: "GEOMETRY_INVALID",
+  EXPORT_FAILED: "EXPORT_FAILED",
+  PDF_FAILED: "PDF_FAILED",
 });
 
 const S = STATE;
@@ -61,8 +63,10 @@ export const MACHINE = Object.freeze({
   // "completed" is not "correct" (FN-010) — geometry must prove itself here.
   [S.GEOMETRY_CHECK]: { actor: ACTOR.SYS, next: [S.PACKAGING, S.GEOMETRY_INVALID] },
 
-  [S.PACKAGING]: { actor: ACTOR.SYS, next: [S.PDF_GENERATION] },
-  [S.PDF_GENERATION]: { actor: ACTOR.SYS, next: [S.WAITING_FOR_HUMAN_REVIEW] },
+  // Packaging and PDF are deliverables, not formalities: a package that cannot
+  // seal its exports or render its review sheet is a failed job, not a shrug.
+  [S.PACKAGING]: { actor: ACTOR.SYS, next: [S.PDF_GENERATION, S.EXPORT_FAILED] },
+  [S.PDF_GENERATION]: { actor: ACTOR.SYS, next: [S.WAITING_FOR_HUMAN_REVIEW, S.PDF_FAILED] },
 
   // The gate. The machine parks a job here; only a human moves it past.
   [S.WAITING_FOR_HUMAN_REVIEW]: {
@@ -79,6 +83,8 @@ export const MACHINE = Object.freeze({
   [S.GENERATION_FAILED]: { actor: ACTOR.HUMAN, next: [] },
   [S.OUTPUTS_UNREACHABLE]: { actor: ACTOR.HUMAN, next: [] },
   [S.GEOMETRY_INVALID]: { actor: ACTOR.HUMAN, next: [] },
+  [S.EXPORT_FAILED]: { actor: ACTOR.HUMAN, next: [] },
+  [S.PDF_FAILED]: { actor: ACTOR.HUMAN, next: [] },
 });
 
 export const TERMINAL = Object.freeze(

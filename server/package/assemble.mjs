@@ -1,0 +1,517 @@
+// Definition-of-Done package assembler. Takes a job that survived the state
+// machine plus the artifacts its run produced, and writes the complete bundle
+// a human reviewer signs at the gate: request, intent, CAD, exports, reports,
+// manufacturing PDF, API log, pending approval record, sealed manifest.
+//
+// Everything in the bundle is derived from real inputs — no placeholders. A
+// skipped optional file is recorded twice on purpose: as a manifest entry
+// with status "skipped" AND as a warning, so it cannot hide in either view.
+//
+// Reproducible by design: all in-file timestamps come from the job (or
+// opts.now), so assembling the same inputs twice yields byte-identical files
+// and the same packageHash.
+
+import { createHash } from "node:crypto";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { analyzeStl } from "./stl-analyze.mjs";
+import { createPdf } from "./pdf.mjs";
+
+export class ExportError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "ExportError";
+    this.code = code; // MISSING_STL | MISSING_KCL
+  }
+}
+
+export class PdfError extends Error {
+  constructor(message, cause) {
+    super(message);
+    this.name = "PdfError";
+    this.cause = cause;
+  }
+}
+
+// The 13 sections every manufacturingPackage.pdf must carry, in order.
+export const PDF_SECTIONS = Object.freeze([
+  "Title Block",
+  "Design Intent",
+  "Input Measurements",
+  "CAD Preview",
+  "Key Dimensions",
+  "Material & Machine",
+  "Export List",
+  "Validation Results",
+  "Warnings & Assumptions",
+  "Setup Checklist",
+  "Inspection Checklist",
+  "Approval Record",
+  "Revision History",
+]);
+
+const GATE_RESULTS = new Set(["PASS", "FAIL", "SKIPPED"]);
+
+const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
+
+/**
+ * packageHash recipe — a judge recomputes it in three lines:
+ *   hashes = manifest.files.filter(f => f.status === "present").map(f => f.sha256)
+ *   hashes.sort()                              // plain lexicographic sort
+ *   packageHash === sha256(hashes.join("\n"))  // utf8, no trailing newline
+ * manifest.json itself is never hashed — it is the container that carries
+ * the result and could not contain its own digest.
+ */
+export function packageHashOf(fileHashes) {
+  return sha256(fileHashes.slice().sort().join("\n"));
+}
+
+const toBuf = (v) =>
+  v == null ? null : Buffer.isBuffer(v) ? v : Buffer.from(String(v), "utf8");
+
+const slug = (s) =>
+  String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "part";
+
+const round = (n, p = 2) => Number(n.toFixed(p));
+
+// Pull "50 mm"-style stated measurements out of a free-text prompt so the
+// PDF's Input Measurements section quotes the requester's own numbers.
+function statedMeasurements(prompt) {
+  const seen = new Set();
+  const out = [];
+  for (const m of String(prompt ?? "").matchAll(/(\d+(?:\.\d+)?)\s*(mm|cm|in|ft|yd|m)\b/g)) {
+    const label = `${m[1]} ${m[2]}`;
+    if (!seen.has(label)) { seen.add(label); out.push(label); }
+  }
+  return out;
+}
+
+/**
+ * Assemble the DoD bundle for one job.
+ *
+ * @param {object} job        LocalStore job: {jobId, rev, state, request, createdAt, updatedAt}
+ * @param {object} artifacts  what the run produced:
+ *   {kcl (REQUIRED string|Buffer), stl?, step?, png? (Buffers),
+ *    partName?, machine?, reference?: [{parameter?, citation?, verification?, watermark?}],
+ *    apiRun?: {calls?: [], totalCalls?, minutesUsed?}, ledger?: LedgerRow[], warnings?: string[]}
+ * @param {Array}  gates      [{gate, result: PASS|FAIL|SKIPPED, threshold?, measured?, notes?}]
+ * @param {object} opts       {outRoot (REQUIRED), expectMesh = true, projectId?, workflowId?, now?}
+ * @returns {{bundleDir: string, manifest: object, analysis: object|null}}
+ */
+export function assemblePackage(job, artifacts = {}, gates = [], opts = {}) {
+  if (!job || typeof job.jobId !== "string" || !/^[A-Za-z0-9_-]+$/.test(job.jobId))
+    throw new RangeError(`assemblePackage: job.jobId must be filename-safe, got ${JSON.stringify(job?.jobId)}`);
+  if (!job.request || typeof job.request !== "object")
+    throw new RangeError("assemblePackage: job.request missing — validate before packaging");
+  if (!opts.outRoot) throw new RangeError("assemblePackage: opts.outRoot is required — no hidden default output dir");
+
+  const req = job.request;
+  const expectMesh = opts.expectMesh ?? true;
+  const stamp = opts.now ?? job.updatedAt ?? new Date().toISOString();
+  const projectId = opts.projectId ?? "toolcrib";
+  const workflowId = opts.workflowId ?? "generate-validate-package-v1";
+  const part = slug(artifacts.partName ?? req.title ?? "part");
+
+  const kcl = toBuf(artifacts.kcl);
+  if (!kcl || kcl.length === 0)
+    throw new ExportError("MISSING_KCL", `job ${job.jobId}: cad/${part}.kcl is required and no KCL was provided — ` +
+      "the user text-to-cad record always carries KCL even when outputs are unreachable (FN-011)");
+
+  const stl = toBuf(artifacts.stl);
+  if ((!stl || stl.length === 0) && expectMesh)
+    throw new ExportError("MISSING_STL", `job ${job.jobId}: exports/${part}.stl is REQUIRED and the backend was ` +
+      "expected to produce a mesh (opts.expectMesh) — got none. Known cause: dedupe-hit jobs complete with " +
+      "permanently unreachable outputs (FN-011). Re-dispatch or pass expectMesh:false to park a mesh-less bundle.");
+
+  const validation = gates.map((g) => {
+    const result = String(g.result ?? "").toUpperCase();
+    if (!GATE_RESULTS.has(result))
+      throw new RangeError(`gate ${JSON.stringify(g.gate)}: result must be PASS|FAIL|SKIPPED, got ${JSON.stringify(g.result)}`);
+    const row = { gate: String(g.gate), result };
+    if (g.threshold != null) row.threshold = String(g.threshold);
+    if (g.measured != null) row.measured = String(g.measured);
+    if (g.notes != null) row.notes = String(g.notes);
+    return row;
+  });
+
+  const analysis = stl && stl.length > 0 ? (artifacts.stlAnalysis ?? analyzeStl(stl)) : null;
+  const reference = Array.isArray(artifacts.reference) ? artifacts.reference : [];
+
+  const warnings = [...(artifacts.warnings ?? [])];
+  for (const r of reference)
+    if (r.watermark)
+      warnings.push(`${r.watermark}: ${r.parameter ?? "reference lookup"} used before operator sign-off (docs/VERIFICATION_LOG.md)`);
+  for (const v of validation)
+    if (v.result === "FAIL")
+      warnings.push(`gate ${v.gate} FAILED — measured ${v.measured ?? "n/a"} against threshold ${v.threshold ?? "n/a"}`);
+
+  // ---- write the bundle -------------------------------------------------
+  const bundleDir = join(opts.outRoot, job.jobId);
+  const files = [];
+  const emit = (rel, buf, format) => {
+    const abs = join(bundleDir, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, buf);
+    files.push({
+      path: rel, format, revision: job.rev, createdAt: stamp,
+      status: "present", bytes: buf.length, sha256: sha256(buf),
+    });
+  };
+  const skip = (rel, format, note) => {
+    files.push({
+      path: rel, format, revision: job.rev, createdAt: stamp,
+      status: "skipped", bytes: 0, sha256: null, note,
+    });
+    warnings.push(`${rel} SKIPPED — ${note}`);
+  };
+
+  emit("generationRequest.json", Buffer.from(JSON.stringify(req, null, 2) + "\n"), "json");
+  emit("designIntent.md", Buffer.from(designIntentMd(job, req, reference, artifacts.machine)), "md");
+  emit(`cad/${part}.kcl`, kcl, "kcl");
+
+  if (stl && stl.length > 0) emit(`exports/${part}.stl`, stl, "stl");
+  else skip(`exports/${part}.stl`, "stl",
+    "REQUIRED mesh absent and opts.expectMesh was false — bundle parked incomplete; dodCheck will flag it");
+
+  const step = toBuf(artifacts.step);
+  if (step && step.length > 0) emit(`exports/${part}.step`, step, "step");
+  else skip(`exports/${part}.step`, "step", "no STEP bytes provided by this run — optional export");
+
+  const png = toBuf(artifacts.png);
+  if (png && png.length > 0) emit(`previews/${part}.png`, png, "png");
+  else skip(`previews/${part}.png`, "png",
+    "no render route exists on the measured API surface — text-to-cad outputs carry geometry only, never an image (docs/API_FIELD_NOTES.md)");
+
+  emit("reports/validationReport.md", Buffer.from(validationReportMd(job, validation, analysis, req)), "md");
+
+  let pdfBytes;
+  try {
+    pdfBytes = buildManufacturingPdf({ job, req, part, files, validation, warnings, analysis, reference, artifacts, stamp });
+  } catch (e) {
+    throw new PdfError(`job ${job.jobId}: manufacturingPackage.pdf failed to build: ${e.message}`, e);
+  }
+  if (!pdfBytes || pdfBytes.length === 0 || pdfBytes.subarray(0, 5).toString() !== "%PDF-")
+    throw new PdfError(`job ${job.jobId}: PDF writer returned invalid bytes`);
+  emit("reports/manufacturingPackage.pdf", pdfBytes, "pdf");
+
+  const apiRun = {
+    jobId: job.jobId,
+    totalCalls: artifacts.apiRun?.totalCalls ?? artifacts.apiRun?.calls?.length ?? 0,
+    minutesUsed: artifacts.apiRun?.minutesUsed ?? 0,
+    calls: artifacts.apiRun?.calls ?? [],
+    ...(artifacts.apiRun ? {} : { note: "no API activity recorded for this assembly (offline/fixture run)" }),
+  };
+  emit("logs/apiRun.json", Buffer.from(JSON.stringify(apiRun, null, 2) + "\n"), "json");
+
+  emit("approvals/approvalRecord.json", Buffer.from(JSON.stringify({
+    state: "pending",
+    jobId: job.jobId,
+    revision: job.rev,
+    createdAt: stamp,
+    approver: null,
+    decidedAt: null,
+    decision: null,
+    note: "Approval is a HUMAN-gated state transition (WAITING_FOR_HUMAN_REVIEW -> APPROVED). " +
+      "The approval step rewrites this file; the assembler never does.",
+  }, null, 2) + "\n"), "json");
+
+  const manifest = {
+    jobId: job.jobId,
+    projectId,
+    revision: job.rev,
+    workflowId,
+    packageStatus: files.some((f) => f.status === "skipped") ? "complete-with-notes" : "complete",
+    completedAt: stamp,
+    packageHash: packageHashOf(files.filter((f) => f.status === "present").map((f) => f.sha256)),
+    files,
+    validation,
+    apiRuns: { totalCalls: apiRun.totalCalls, minutesUsed: apiRun.minutesUsed },
+    warnings,
+  };
+  writeFileSync(join(bundleDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+
+  return { bundleDir, manifest, analysis };
+}
+
+// ---- markdown reports ----------------------------------------------------
+
+function referenceLine(r) {
+  const cite = typeof r.citation === "object" && r.citation !== null
+    ? Object.entries(r.citation).map(([k, v]) => `${k}: ${v}`).join("; ")
+    : String(r.citation ?? "citation not supplied");
+  return `${r.parameter ?? "rule"} — ${cite}${r.watermark ? ` [${r.watermark}]` : ""}`;
+}
+
+function designIntentMd(job, req, reference, machine) {
+  const lines = [
+    `# Design Intent — ${req.title ?? job.jobId}`,
+    "",
+    `- Job: \`${job.jobId}\` (rev ${job.rev})`,
+    `- Requester: ${req.requester ?? "unknown"}`,
+    `- Created: ${job.createdAt ?? "n/a"}`,
+    "",
+    "## Intent",
+    "",
+    ...(req.prompt
+      ? [`> ${req.prompt}`]
+      : ["```json", JSON.stringify(req.structuredIntent ?? {}, null, 2), "```"]),
+    "",
+    "## Material",
+    "",
+    `${req.material?.name ?? "unspecified"} — density ${req.material?.densityKgM3 ?? "?"} kg/m3`,
+    "",
+    `Units: ${req.units ?? "unspecified"}`,
+  ];
+  if (machine) {
+    lines.push("", "## Target machine", "",
+      `${machine.make ?? ""} ${machine.model ?? ""} (\`${machine.id ?? "?"}\`) — ${machine.process ?? "?"}`.trim());
+  }
+  if (reference.length > 0) {
+    lines.push("", "## Reference basis", "");
+    for (const r of reference) lines.push(`- ${referenceLine(r)}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+function validationReportMd(job, validation, analysis, req) {
+  const lines = [
+    `# Validation Report — job \`${job.jobId}\` rev ${job.rev}`,
+    "",
+    "Every gate below also appears in `manifest.json` `validation[]`; both are",
+    "written from the same array in the same pass.",
+    "",
+    "| gate | result | threshold | measured |",
+    "|---|---|---|---|",
+    ...validation.map((v) =>
+      `| ${v.gate} | ${v.result} | ${v.threshold ?? "—"} | ${v.measured ?? "—"} |`),
+  ];
+  if (analysis) {
+    const d = req.material?.densityKgM3;
+    lines.push("", "## Local mesh analysis (stl-analyze)", "",
+      `- Bounding box: ${round(analysis.bboxMm.x)} x ${round(analysis.bboxMm.y)} x ${round(analysis.bboxMm.z)} mm`,
+      `- Watertight: ${analysis.watertight}`,
+      `- Volume: ${round(analysis.volumeMm3, 3)} mm3 (${analysis.triangles} triangles)`,
+      ...(d ? [`- Derived mass at ${d} kg/m3: ${round(analysis.volumeMm3 * d * 1e-6, 4)} g`] : []));
+  }
+  return lines.join("\n") + "\n";
+}
+
+// ---- the 13-section manufacturing PDF -------------------------------------
+
+function buildManufacturingPdf({ job, req, part, files, validation, warnings, analysis, reference, artifacts, stamp }) {
+  const doc = createPdf();
+  const machine = artifacts.machine;
+  const density = req.material?.densityKgM3;
+  let n = 0;
+  const sec = (title) => {
+    n += 1;
+    doc.space(6).subheading(`${n}. ${title}`).rule();
+  };
+
+  doc.heading("Manufacturing Package");
+
+  sec(PDF_SECTIONS[0]); // Title Block
+  doc.kv("Job ID", job.jobId)
+    .kv("Title", req.title ?? "untitled")
+    .kv("Revision", String(job.rev))
+    .kv("Requester", req.requester ?? "unknown")
+    .kv("Packaged", stamp)
+    .kv("State", job.state ?? "unknown");
+
+  sec(PDF_SECTIONS[1]); // Design Intent
+  doc.text(req.prompt ?? JSON.stringify(req.structuredIntent ?? {}, null, 1));
+
+  sec(PDF_SECTIONS[2]); // Input Measurements
+  const stated = statedMeasurements(req.prompt);
+  if (stated.length > 0)
+    doc.text(`Stated in the request (units ${req.units ?? "?"}): ${stated.join(", ")}`);
+  else doc.text(`Request supplied structured intent; units ${req.units ?? "?"}.`);
+  if (density != null) doc.text(`Material density (input): ${density} kg/m3`);
+
+  sec(PDF_SECTIONS[3]); // CAD Preview
+  const pngEntry = files.find((f) => f.path.startsWith("previews/"));
+  if (pngEntry && pngEntry.status === "present")
+    doc.text(`Preview image: ${pngEntry.path} (${pngEntry.bytes} bytes)`);
+  else doc.text(`Preview SKIPPED: ${pngEntry?.note ?? "not produced"}. CAD source of record: cad/${part}.kcl.`);
+
+  sec(PDF_SECTIONS[4]); // Key Dimensions
+  if (analysis) {
+    doc.kv("Bounding box", `${round(analysis.bboxMm.x)} x ${round(analysis.bboxMm.y)} x ${round(analysis.bboxMm.z)} mm`)
+      .kv("Volume", `${round(analysis.volumeMm3, 3)} mm3`)
+      .kv("Watertight", String(analysis.watertight))
+      .kv("Triangles", String(analysis.triangles));
+    if (density != null)
+      doc.kv("Derived mass", `${round(analysis.volumeMm3 * density * 1e-6, 4)} g at ${density} kg/m3`);
+  } else {
+    doc.text("No mesh in this bundle — dimensions unverified (see Warnings & Assumptions).");
+  }
+
+  sec(PDF_SECTIONS[5]); // Material & Machine
+  doc.kv("Material", `${req.material?.name ?? "unspecified"} (${density ?? "?"} kg/m3)`);
+  if (machine) {
+    doc.kv("Machine", `${machine.make ?? ""} ${machine.model ?? ""} (${machine.id ?? "?"})`.trim())
+      .kv("Process", machine.process ?? "?")
+      .kv("Build volume", machine.buildVolumeMm
+        ? `${machine.buildVolumeMm.x} x ${machine.buildVolumeMm.y} x ${machine.buildVolumeMm.z} mm`
+        : "unspecified");
+    if (machine.notes) doc.text(machine.notes, { size: 8.5 });
+  } else {
+    doc.text("No machine profile attached to this run.");
+  }
+
+  sec(PDF_SECTIONS[6]); // Export List
+  doc.table(
+    [["path", "status", "bytes", "sha256 (first 16)"],
+    ...files.map((f) => [f.path, f.status, f.status === "present" ? String(f.bytes) : "—",
+      f.sha256 ? f.sha256.slice(0, 16) : "—"])],
+    [0.42, 0.13, 0.12, 0.33],
+  );
+  doc.text("Full digests and the packageHash recipe live in manifest.json.", { size: 8.5 });
+
+  sec(PDF_SECTIONS[7]); // Validation Results
+  if (validation.length > 0)
+    doc.table(
+      [["gate", "result", "threshold", "measured"],
+      ...validation.map((v) => [v.gate, v.result, v.threshold ?? "—", v.measured ?? "—"])],
+      [0.3, 0.14, 0.28, 0.28],
+    );
+  else doc.text("No gates were run against this job — treat as unvalidated.");
+
+  sec(PDF_SECTIONS[8]); // Warnings & Assumptions
+  if (warnings.length > 0) for (const w of warnings) doc.text(`- ${w}`, { size: 9 });
+  else doc.text("No warnings raised during assembly.", { size: 9 });
+  if (reference.length > 0) {
+    doc.space(4).text("Reference basis:", { bold: true, size: 9 });
+    for (const r of reference) doc.text(`- ${referenceLine(r)}`, { size: 9 });
+  }
+  doc.space(4).text("Assumption: STL coordinates are millimeters (the pipeline requests and exports mm).", { size: 9 });
+
+  sec(PDF_SECTIONS[9]); // Setup Checklist
+  doc.check(`Confirm material stock/filament matches request: ${req.material?.name ?? "unspecified"}.`);
+  if (machine && analysis && machine.buildVolumeMm) {
+    const bv = machine.buildVolumeMm;
+    const fits = analysis.bboxMm.x <= bv.x && analysis.bboxMm.y <= bv.y && analysis.bboxMm.z <= bv.z;
+    doc.check(`Verify part envelope ${round(analysis.bboxMm.x)} x ${round(analysis.bboxMm.y)} x ` +
+      `${round(analysis.bboxMm.z)} mm fits build volume ${bv.x} x ${bv.y} x ${bv.z} mm ` +
+      `(computed: ${fits ? "FITS" : "DOES NOT FIT"}).`);
+  }
+  if (machine?.nozzleDiameterMm) doc.check(`Confirm nozzle ${machine.nozzleDiameterMm} mm installed.`);
+  doc.check(`Load geometry from exports/ — verify file hash against manifest before slicing/setup.`);
+
+  sec(PDF_SECTIONS[10]); // Inspection Checklist
+  if (analysis) {
+    doc.check(`Measure overall X: expect ${round(analysis.bboxMm.x)} mm.`);
+    doc.check(`Measure overall Y: expect ${round(analysis.bboxMm.y)} mm.`);
+    doc.check(`Measure overall Z: expect ${round(analysis.bboxMm.z)} mm.`);
+    if (density != null)
+      doc.check(`Weigh part: expect ~${round(analysis.volumeMm3 * density * 1e-6, 2)} g ` +
+        `(volume ${round(analysis.volumeMm3, 1)} mm3 x ${density} kg/m3) if produced in the requested material.`);
+  } else {
+    doc.check("No mesh shipped — dimensional inspection targets must come from the CAD source.");
+  }
+  doc.check("Compare features against the design intent statement (section 2).");
+
+  sec(PDF_SECTIONS[11]); // Approval Record
+  doc.kv("State", "pending")
+    .kv("Record", "approvals/approvalRecord.json")
+    .kv("Gate", "WAITING_FOR_HUMAN_REVIEW -> APPROVED requires a HUMAN actor");
+  doc.space(10).text("Approved by: ____________________________    Date: ______________", { size: 10 });
+
+  sec(PDF_SECTIONS[12]); // Revision History
+  const ledger = Array.isArray(artifacts.ledger) ? artifacts.ledger : [];
+  if (ledger.length > 0)
+    doc.table(
+      [["ts", "rev", "transition", "actor", "reason"],
+      ...ledger.slice(-20).map((r) => [r.ts, String(r.rev), `${r.from ?? "-"} -> ${r.to}`,
+        `${r.actor?.kind ?? "?"}:${r.actor?.id ?? "?"}`, r.reason ?? ""])],
+      [0.22, 0.06, 0.3, 0.2, 0.22],
+    );
+  else
+    doc.table(
+      [["rev", "created", "updated", "state"],
+      [String(job.rev), job.createdAt ?? "n/a", job.updatedAt ?? "n/a", job.state ?? "n/a"]],
+      [0.1, 0.32, 0.32, 0.26],
+    );
+
+  return doc.render();
+}
+
+// ---- DoD master checklist --------------------------------------------------
+
+// Files the DoD demands with status "present"; step/png may be skipped-with-note.
+const DOD_REQUIRED = [
+  ["generationRequest.json", (p) => p === "generationRequest.json"],
+  ["designIntent.md", (p) => p === "designIntent.md"],
+  ["cad/<part>.kcl", (p) => /^cad\/.+\.kcl$/.test(p)],
+  ["exports/<part>.stl", (p) => /^exports\/.+\.stl$/.test(p)],
+  ["reports/validationReport.md", (p) => p === "reports/validationReport.md"],
+  ["reports/manufacturingPackage.pdf", (p) => p === "reports/manufacturingPackage.pdf"],
+  ["logs/apiRun.json", (p) => p === "logs/apiRun.json"],
+  ["approvals/approvalRecord.json", (p) => p === "approvals/approvalRecord.json"],
+];
+const DOD_OPTIONAL = [/^exports\/.+\.step$/, /^previews\/.+\.png$/];
+
+/**
+ * Re-audit a bundle on disk against the Definition of Done. Trusts nothing:
+ * re-reads every file, re-hashes, recomputes packageHash, and cross-checks
+ * the validation report against the manifest.
+ * @returns {{complete: boolean, misses: string[]}}
+ */
+export function dodCheck(bundleDir) {
+  const misses = [];
+  const manifestPath = join(bundleDir, "manifest.json");
+  if (!existsSync(manifestPath))
+    return { complete: false, misses: ["manifest.json missing — bundle is unsealed"] };
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch (e) {
+    return { complete: false, misses: [`manifest.json unparseable: ${e.message}`] };
+  }
+
+  for (const k of ["jobId", "revision", "packageStatus", "completedAt", "packageHash"])
+    if (manifest[k] == null) misses.push(`manifest.${k} missing`);
+  const files = Array.isArray(manifest.files) ? manifest.files : (misses.push("manifest.files missing"), []);
+
+  for (const [label, match] of DOD_REQUIRED) {
+    const entry = files.find((f) => match(f.path));
+    if (!entry) misses.push(`${label}: no manifest entry`);
+    else if (entry.status !== "present") misses.push(`${label}: REQUIRED but status is "${entry.status}"`);
+  }
+
+  for (const f of files) {
+    if (f.status === "skipped") {
+      if (!f.note) misses.push(`${f.path}: skipped without a note`);
+      if (!DOD_OPTIONAL.some((re) => re.test(f.path)) && !/^exports\/.+\.stl$/.test(f.path))
+        misses.push(`${f.path}: skipped but not an optional file`);
+      if (!(manifest.warnings ?? []).some((w) => w.includes(f.path)))
+        misses.push(`${f.path}: skip not mirrored into manifest.warnings`);
+      continue;
+    }
+    const abs = join(bundleDir, f.path);
+    if (!existsSync(abs)) { misses.push(`${f.path}: listed present but missing on disk`); continue; }
+    const bytes = readFileSync(abs);
+    if (bytes.length !== f.bytes) misses.push(`${f.path}: size mismatch (disk ${bytes.length}, manifest ${f.bytes})`);
+    if (sha256(bytes) !== f.sha256) misses.push(`${f.path}: sha256 mismatch — content altered after sealing`);
+  }
+
+  const recomputed = packageHashOf(files.filter((f) => f.status === "present").map((f) => f.sha256));
+  if (recomputed !== manifest.packageHash)
+    misses.push(`packageHash mismatch: manifest ${manifest.packageHash}, recomputed ${recomputed}`);
+
+  const pdfEntry = files.find((f) => f.path === "reports/manufacturingPackage.pdf" && f.status === "present");
+  if (pdfEntry && existsSync(join(bundleDir, pdfEntry.path))) {
+    const head = readFileSync(join(bundleDir, pdfEntry.path)).subarray(0, 5).toString();
+    if (head !== "%PDF-") misses.push("manufacturingPackage.pdf: does not start with %PDF-");
+  }
+
+  const reportPath = join(bundleDir, "reports/validationReport.md");
+  if (existsSync(reportPath)) {
+    const report = readFileSync(reportPath, "utf8");
+    for (const v of manifest.validation ?? [])
+      if (!report.includes(v.gate) || !report.includes(v.result))
+        misses.push(`validationReport.md: gate ${v.gate} (${v.result}) not reflected in the report`);
+  }
+
+  return { complete: misses.length === 0, misses };
+}

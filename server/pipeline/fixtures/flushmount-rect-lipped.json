@@ -1,0 +1,16 @@
+{
+  "title": "Flush-mount pair: 30x20 rect insert, rear lip, in a 60x40x3 panel",
+  "structuredIntent": {
+    "flushMount": {
+      "panel": { "widthMm": 60, "heightMm": 40, "thicknessMm": 3 },
+      "opening": { "shape": "rect", "widthMm": 30, "heightMm": 20 },
+      "clearancePerSideMm": 0.15,
+      "chamfer": { "angleDeg": 45, "depthMm": 0.8 },
+      "insert": { "lipMm": 2 },
+      "colors": { "panel": "#2e5e78", "insert": "#e07a2f" }
+    }
+  },
+  "material": { "name": "PETG", "densityKgM3": 1270 },
+  "units": "mm",
+  "requester": "bench@example.com"
+}

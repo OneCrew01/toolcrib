@@ -1,0 +1,262 @@
+// The trunk: one generation request walks the whole state machine to a
+// hash-sealed job package parked at the human gate.
+//
+//   DRAFT -> VALIDATING -> GENERATING -> GEOMETRY_CHECK -> PACKAGING
+//         -> PDF_GENERATION -> WAITING_FOR_HUMAN_REVIEW
+//
+// Every departure from the happy path is a named state with the measured
+// reason in the ledger, and the machine never moves a job past the gate.
+//
+//   node server/pipeline/run-job.mjs <requestFile> --backend=replay|flushmount|live [--out=dir]
+
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { ACTOR, STATE } from "../state/states.mjs";
+import { LocalStore } from "../state/store.mjs";
+import { makeBackend, GenerationError } from "./backends.mjs";
+import { consultReference } from "./consult.mjs";
+import { evaluateGates } from "./gates.mjs";
+
+const REPO = fileURLToPath(new URL("../..", import.meta.url));
+const SYS = { kind: ACTOR.SYS, id: "pipeline-orchestrator" };
+
+// Packager-track contracts. Prefer the real modules; fall back to the labeled
+// stubs in ./contract-stubs.mjs only when the real files do not exist yet.
+async function loadPackageDeps(deps = {}) {
+  const out = { analyzeStl: deps.analyzeStl, assemblePackage: deps.assemblePackage, fallbacks: [] };
+  const tryReal = async (mod, key) => {
+    if (out[key]) return;
+    try {
+      out[key] = (await import(mod))[key];
+      if (typeof out[key] !== "function") throw Object.assign(new Error(`${mod} exports no ${key}()`), { code: "ERR_MODULE_NOT_FOUND" });
+    } catch (e) {
+      if (e.code !== "ERR_MODULE_NOT_FOUND") throw e; // a broken real module is a bug, not a fallback case
+      out[key] = (await import("./contract-stubs.mjs"))[key];
+      out.fallbacks.push(key);
+    }
+  };
+  await tryReal("../package/stl-analyze.mjs", "analyzeStl");
+  await tryReal("../package/assemble.mjs", "assemblePackage");
+  return out;
+}
+
+// The store snapshots job.artifacts alongside state; transitions stay the
+// ledger's business, artifacts are working memory on the snapshot.
+function persistArtifacts(store, job) {
+  writeFileSync(join(store.jobsDir, `${job.jobId}.json`), JSON.stringify(job, null, 2) + "\n");
+}
+
+function gateThreshold(gate, machine, expectedMassG) {
+  if (gate === "envelope" && machine?.buildVolumeMm) {
+    const b = machine.buildVolumeMm;
+    return { threshold: `fit ${b.x}x${b.y}x${b.z}mm (any orientation)` };
+  }
+  if (gate === "watertight") return { threshold: "closed 2-manifold" };
+  if (gate === "mass" && expectedMassG) return { threshold: `${expectedMassG.minG}-${expectedMassG.maxG}g` };
+  return null;
+}
+
+function gateMeasured(gate, measured) {
+  if (!measured) return null;
+  if (gate === "envelope") {
+    const b = measured.bboxMm;
+    return { measured: `${b.x}x${b.y}x${b.z}mm` };
+  }
+  if (gate === "watertight") return { measured: String(measured.watertight) };
+  if (gate === "mass" && measured.massG != null) return { measured: `${measured.massG}g` };
+  return null;
+}
+
+/**
+ * Drive ONE job from a request file to wherever the machine says it belongs.
+ * @returns {{jobId, finalState, job, ledger, verify, gates, consult, pkg}}
+ */
+export async function runJob(requestPath, {
+  backend = "replay",
+  dataDir = join(REPO, "server", "pipeline", "data"),
+  outRoot,
+  machinePath = join(REPO, "samples", "machines", "bambu-p1s.json"),
+  fixturesDir,
+  deps,
+  log = console.log,
+} = {}) {
+  outRoot ??= join(dataDir, "packages");
+  const store = new LocalStore({ dataDir });
+  const machine = JSON.parse(readFileSync(machinePath, "utf8"));
+  const { analyzeStl, assemblePackage, fallbacks } = await loadPackageDeps(deps);
+
+  const raw = JSON.parse(readFileSync(requestPath, "utf8"));
+  // expectedMassG rides the raw file only — request normalization whitelists
+  // it away, so the acceptance range is captured here, before validation.
+  const expectedMassG = raw.expectedMassG && typeof raw.expectedMassG === "object" ? raw.expectedMassG : undefined;
+
+  let job = await store.createJob(raw, { actor: SYS });
+  const { jobId } = job;
+  // move() refreshes the local job: transition re-reads the snapshot, so a
+  // stale reference here would silently roll the state back on next persist.
+  const move = async (to, reason) => (job = await store.transition(jobId, to, { actor: SYS, reason }));
+  const finish = async (pkg = null, gates = null, consult = null) => {
+    job = await store.getJob(jobId);
+    const ledger = await store.readLedger(jobId);
+    const verify = await store.verifyLedger(jobId);
+    log(`\n--- ledger for job ${jobId} ---`);
+    for (const r of ledger) log(`  ${String(r.from ?? "·").padEnd(24)} -> ${r.to.padEnd(24)} [${r.actor.kind}:${r.actor.id}] ${r.reason}`);
+    log(`  ledger verify: ${verify.ok ? `OK (${verify.rows} rows, hash chain intact)` : `BROKEN at row ${verify.row}: ${verify.reason}`}`);
+    return { jobId, finalState: job.state, job, ledger, verify, gates, consult, pkg };
+  };
+
+  // 1 — validate the intent envelope
+  await move(STATE.VALIDATING, `request file: ${resolve(requestPath)}`);
+  const validation = await store.runValidation(jobId);
+  if (!validation.ok) return finish();
+  job = validation.job; // now GENERATING with the normalized request
+
+  // 2 — reference consult (advisory, watermarked when drafts are involved)
+  const consult = consultReference(job.request);
+  job.artifacts = { ...(job.artifacts ?? {}), referenceConsult: consult };
+  persistArtifacts(store, job);
+
+  // 3 — generate
+  const gen = makeBackend(backend, { fixturesDir });
+  let artifacts;
+  try {
+    artifacts = await gen.generate(job);
+  } catch (e) {
+    const state = e instanceof GenerationError ? e.state : STATE.GENERATION_FAILED;
+    await move(state, e.message);
+    return finish(null, null, consult);
+  }
+  job.artifacts.generation = {
+    backend: gen.name,
+    kclBytes: artifacts.kcl?.length ?? 0,
+    files: Object.fromEntries(Object.entries(artifacts.files ?? {}).map(([k, v]) => [k, v.length])),
+    apiRuns: artifacts.apiRuns,
+    notes: artifacts.notes,
+    ...(artifacts.params ? { params: artifacts.params } : {}),
+  };
+  persistArtifacts(store, job);
+  const consultNote = consult.lookups.length
+    ? `${consult.lookups.length} reference rule lookup(s)${consult.watermark ? " — " + consult.watermark : ""}`
+    : `reference consult skipped: ${consult.reason}`;
+  await move(STATE.GEOMETRY_CHECK, `${gen.name} backend produced kcl(${job.artifacts.generation.kclBytes}B) + files [${Object.keys(artifacts.files ?? {}).join(", ") || "none"}]; ${consultNote}`);
+
+  // 4 — geometry gates against the machine envelope and physics
+  let analysis = null;
+  if (artifacts.files?.stl) {
+    try {
+      analysis = analyzeStl(artifacts.files.stl);
+    } catch (e) {
+      await move(STATE.GEOMETRY_INVALID, `stl analysis failed: ${e.message}`);
+      return finish(null, null, consult);
+    }
+  }
+  const gates = evaluateGates({
+    analysis,
+    machine,
+    densityKgM3: job.request.material?.densityKgM3,
+    expectedMassG,
+  });
+  job.artifacts.gates = gates;
+  persistArtifacts(store, job);
+  if (!gates.ok) {
+    const failed = gates.results.filter((r) => r.status === "fail");
+    await move(
+      STATE.GEOMETRY_INVALID,
+      `gate(s) failed: ${failed.map((f) => `${f.gate} — ${f.detail}`).join("; ")}; measured ${JSON.stringify(gates.measured)}`,
+    );
+    return finish(null, gates, consult);
+  }
+  const gateSummary = gates.results.map((r) => `${r.gate}=${r.status}`).join(", ");
+  await move(STATE.PACKAGING, analysis
+    ? `gates: ${gateSummary}; measured ${JSON.stringify(gates.measured)}`
+    : `gates: ${gateSummary} — NO MESH PRODUCED, nothing about printed form was checked`);
+
+  // 5 — package + review PDF; contract failures land in their own states.
+  // Adapt pipeline shapes to the packager contract: flat artifact buffers,
+  // gate rows in PASS|FAIL|SKIPPED vocabulary, reference rows from the consult.
+  const gateRows = gates.results.map((g) => ({
+    gate: g.gate,
+    result: g.status === "pass" ? "PASS" : g.status === "fail" ? "FAIL" : "SKIPPED",
+    ...(gateThreshold(g.gate, machine, expectedMassG) ?? {}),
+    ...(gateMeasured(g.gate, gates.measured) ?? {}),
+    notes: g.detail,
+  }));
+  const asmArtifacts = {
+    kcl: artifacts.kcl,
+    stl: artifacts.files?.stl,
+    step: artifacts.files?.step,
+    png: artifacts.files?.png,
+    ...(analysis ? { stlAnalysis: analysis } : {}),
+    machine,
+    reference: consult.lookups.map((lk) => ({
+      parameter: lk.parameter,
+      citation: lk.result.citation,
+      verification: lk.result.verification,
+      ...(lk.result.watermark ? { watermark: lk.result.watermark } : {}),
+    })),
+    apiRun: { calls: artifacts.apiRuns ?? [], totalCalls: (artifacts.apiRuns ?? []).length, minutesUsed: 0 },
+    ledger: await store.readLedger(jobId),
+    warnings: [...(artifacts.notes ?? []), ...(consult.findings ?? [])],
+  };
+  let pkg;
+  try {
+    pkg = await assemblePackage(job, asmArtifacts, gateRows, {
+      outRoot,
+      expectMesh: artifacts.meshExpected ?? true,
+    });
+  } catch (e) {
+    if (e.name === "ExportError") {
+      await move(STATE.EXPORT_FAILED, `export/packaging failed: ${e.message}`);
+      return finish(null, gates, consult);
+    }
+    if (e.name === "PdfError") {
+      await move(STATE.PDF_GENERATION, "exports sealed; entering PDF render");
+      await move(STATE.PDF_FAILED, `pdf render failed: ${e.message}`);
+      return finish(null, gates, consult);
+    }
+    throw e; // unknown contract violation: crash loud, do not misfile it
+  }
+  const bundleDir = pkg?.bundleDir ?? pkg?.packageDir ?? join(outRoot, jobId);
+  const seal = pkg?.manifest?.packageHash ?? pkg?.manifest?.sealHash;
+  await move(STATE.PDF_GENERATION, `exports sealed at ${bundleDir} (packageHash ${seal ? seal.slice(0, 12) + "…" : "n/a"})${fallbacks.includes("assemblePackage") ? " via contract fallback — packager track not yet landed" : ""}`);
+  const pdfEntry = pkg?.manifest?.files?.find?.((f) => f.path?.endsWith?.("manufacturingPackage.pdf") && f.status === "present");
+  await move(STATE.WAITING_FOR_HUMAN_REVIEW, pdfEntry
+    ? `manufacturingPackage.pdf rendered (${pdfEntry.bytes}B); parked for human review`
+    : "review sheet written (no PDF — fallback packager); parked for human review");
+
+  // 6 — park + notify. The machine stops here by construction.
+  const packageDir = bundleDir;
+  const line = `[toolcrib] ${new Date().toISOString()} job ${jobId} parked at WAITING_FOR_HUMAN_REVIEW — review package: ${packageDir}`;
+  log(line);
+  mkdirSync(packageDir, { recursive: true });
+  appendFileSync(join(packageDir, "notifications.log"), line + "\n");
+
+  return finish(pkg, gates, consult);
+}
+
+// ----------------------------------------------------------------------- CLI
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const args = process.argv.slice(2);
+  const requestPath = args.find((a) => !a.startsWith("--"));
+  const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
+  if (!requestPath) {
+    console.error("usage: node server/pipeline/run-job.mjs <requestFile> --backend=replay|flushmount|live [--out=dir]");
+    process.exit(2);
+  }
+  const backend = flag("backend") ?? "replay";
+  if (backend === "live" && !process.env.TOOLCRIB_ALLOW_LIVE) {
+    console.error("live backend spends real API minutes — set TOOLCRIB_ALLOW_LIVE=1 to confirm");
+    process.exit(2);
+  }
+  runJob(requestPath, { backend, ...(flag("out") ? { outRoot: resolve(flag("out")) } : {}) })
+    .then((r) => {
+      console.log(`\nfinal state: ${r.finalState}`);
+      process.exit(r.finalState === STATE.WAITING_FOR_HUMAN_REVIEW ? 0 : 1);
+    })
+    .catch((e) => {
+      console.error(`pipeline crashed: ${e.stack ?? e}`);
+      process.exit(1);
+    });
+}

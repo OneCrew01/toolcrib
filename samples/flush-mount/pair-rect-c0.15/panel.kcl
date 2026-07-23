@@ -150,4 +150,5 @@ panelCut2 = subtract(panelCut1, tools = [wedgeEastCutter])
 panelCut3 = subtract(panelCut2, tools = [wedgeWestCutter])
 panelCut4 = subtract(panelCut3, tools = [wedgeNorthCutter])
 panelCut5 = subtract(panelCut4, tools = [wedgeSouthCutter])
-finishedPanel = appearance(panelCut5, color = "#2e5e78", metalness = 5, roughness = 60)
+finishedPanel = appearance(panelCut5, color = "#ff0000", metalness = 5, roughness = 60)
+
