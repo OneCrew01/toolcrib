@@ -243,14 +243,17 @@ function selfCheck(panelKcl, insertKcl, p, dd) {
 
 // ------------------------------------------------------------ rect emitters
 
+// Derived chamfer constants are emitted as PRECOMPUTED LITERALS with the formula in
+// the comment: the executor's unit checker rejects tan() results and any expression
+// with a mm^2 intermediate ("number with unknown units") — measured 2026-07-23.
 function chamferConsts(faceRef, faceVal, dd) {
   const { d, e, bite } = dd;
   return [
     constLine("cutOverlap", mm(OV)),
-    constLine("chamferRun", "chamferDepth * tan(chamferAngle)", `= ${two(e)}mm — chamferDepth x tan(chamferAngle), the flare width on the entry face`),
-    constLine("chamferReach", "chamferRun * (chamferDepth + cutOverlap) / chamferDepth", "taper line extended past the face so the cut clears it"),
+    constLine("chamferRun", mm(two(e)), "chamferDepth x tan(chamferAngle) — the flare width on the entry face"),
+    constLine("chamferReach", mm(two((e * (d + OV)) / d)), "chamferRun x (chamferDepth + cutOverlap) / chamferDepth — taper extended past the face"),
     constLine("chamferBite", mm(bite), "overshoot along the taper — keeps boolean cuts off coincident faces"),
-    constLine("wedgeLowZ", `${faceRef} - chamferDepth - chamferBite * chamferDepth / chamferRun`, `= ${two(faceVal - d - (bite * d) / e)}mm`),
+    constLine("wedgeLowZ", mm(two(faceVal - d - (bite * d) / e)), `${faceRef} - chamferDepth - chamferBite x chamferDepth / chamferRun`),
     constLine("faceTopZ", `${faceRef} + cutOverlap`),
   ];
 }
@@ -403,8 +406,8 @@ function roundPanel(dd) {
     constLine("chamferAngle", `${fmt(A)}deg`, "measured from the bore wall"),
     constLine("chamferDepth", mm(d)),
     constLine("cutOverlap", mm(OV)),
-    constLine("chamferRun", "chamferDepth * tan(chamferAngle)", `= ${two(e)}mm — flare width on the entry face`),
-    constLine("chamferReach", "chamferRun * (chamferDepth + cutOverlap) / chamferDepth"),
+    constLine("chamferRun", mm(two(e)), "chamferDepth x tan(chamferAngle) — flare width on the entry face"),
+    constLine("chamferReach", mm(two(reach)), "chamferRun x (chamferDepth + cutOverlap) / chamferDepth"),
     constLine("faceTopZ", "panelThickness + cutOverlap"),
     "",
   );
@@ -445,7 +448,7 @@ function roundInsert(dd) {
     `// insertDiameter = openingDiameter - 2 x clearancePerSide = ${two(iw)}mm`,
     constLine("insertDiameter", "openingDiameter - 2 * clearancePerSide"),
     constLine("insertDepth", "panelThickness", "flush: the insert face lands level with the panel face"),
-    constLine("chamferRun", "chamferDepth * tan(chamferAngle)", `= ${two(e)}mm`),
+    constLine("chamferRun", mm(two(e)), "chamferDepth x tan(chamferAngle)"),
   );
   if (lipped) {
     L.push(

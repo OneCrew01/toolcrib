@@ -31,7 +31,9 @@ test("rect pair emits the named constants, both colors, and KCL 2.0 header", () 
     assert.match(kcl, /@settings\(defaultLengthUnit = mm, kclVersion = 2\.0\)/);
   }
   assert.match(panelKcl, /^openingWidth = 30mm$/m);
-  assert.match(panelKcl, /^chamferRun = chamferDepth \* tan\(chamferAngle\)/m);
+  // derived constants are precomputed literals (executor rejects tan()/mm^2 unit
+  // algebra — measured 2026-07-23) with the formula preserved in the comment
+  assert.match(panelKcl, /^chamferRun = \d+(\.\d+)?mm\s+\/\/ chamferDepth x tan\(chamferAngle\)/m);
   assert.match(insertKcl, /^insertWidth = openingWidth - 2 \* clearancePerSide$/m);
   assert.match(insertKcl, /^insertHeight = openingHeight - 2 \* clearancePerSide$/m);
   assert.match(insertKcl, /\/\/ insertWidth = openingWidth - 2 x clearancePerSide = 29\.70mm/);

@@ -14,7 +14,7 @@ chamferDepth = 0.8mm
 // insertDiameter = openingDiameter - 2 x clearancePerSide = 24.70mm
 insertDiameter = openingDiameter - 2 * clearancePerSide
 insertDepth = panelThickness  // flush: the insert face lands level with the panel face
-chamferRun = chamferDepth * tan(chamferAngle)  // = 0.80mm
+chamferRun = 0.8mm  // chamferDepth x tan(chamferAngle)
 lipOverhang = 2mm  // flange overhang per side behind the panel
 lipThickness = 2mm  // flange thickness = overhang, by convention
 flangeDiameter = openingDiameter + 2 * lipOverhang  // = 29.00mm

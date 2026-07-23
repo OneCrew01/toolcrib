@@ -14,10 +14,10 @@ openingHeight = 20mm
 chamferAngle = 45deg  // measured from the opening wall
 chamferDepth = 0.8mm
 cutOverlap = 1mm
-chamferRun = chamferDepth * tan(chamferAngle)  // = 0.80mm — chamferDepth x tan(chamferAngle), the flare width on the entry face
-chamferReach = chamferRun * (chamferDepth + cutOverlap) / chamferDepth  // taper line extended past the face so the cut clears it
+chamferRun = 0.8mm  // chamferDepth x tan(chamferAngle) — the flare width on the entry face
+chamferReach = 1.8mm  // chamferRun x (chamferDepth + cutOverlap) / chamferDepth — taper extended past the face
 chamferBite = 0.35mm  // overshoot along the taper — keeps boolean cuts off coincident faces
-wedgeLowZ = panelThickness - chamferDepth - chamferBite * chamferDepth / chamferRun  // = 1.85mm
+wedgeLowZ = 1.85mm  // panelThickness - chamferDepth - chamferBite x chamferDepth / chamferRun
 faceTopZ = panelThickness + cutOverlap
 wedgeSpanY = openingHeight + 2 * chamferReach + 2mm
 wedgeSpanX = openingWidth + 2 * chamferReach + 2mm
@@ -150,5 +150,4 @@ panelCut2 = subtract(panelCut1, tools = [wedgeEastCutter])
 panelCut3 = subtract(panelCut2, tools = [wedgeWestCutter])
 panelCut4 = subtract(panelCut3, tools = [wedgeNorthCutter])
 panelCut5 = subtract(panelCut4, tools = [wedgeSouthCutter])
-finishedPanel = appearance(panelCut5, color = "#ff0000", metalness = 5, roughness = 60)
-
+finishedPanel = appearance(panelCut5, color = "#2e5e78", metalness = 5, roughness = 60)

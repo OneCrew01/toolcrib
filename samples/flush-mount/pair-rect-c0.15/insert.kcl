@@ -23,10 +23,10 @@ flangeWidth = openingWidth + 2 * lipOverhang  // = 34.00mm
 flangeHeight = openingHeight + 2 * lipOverhang  // = 24.00mm
 plugDepth = lipThickness + insertDepth  // = 5.00mm total
 cutOverlap = 1mm
-chamferRun = chamferDepth * tan(chamferAngle)  // = 0.80mm — chamferDepth x tan(chamferAngle), the flare width on the entry face
-chamferReach = chamferRun * (chamferDepth + cutOverlap) / chamferDepth  // taper line extended past the face so the cut clears it
+chamferRun = 0.8mm  // chamferDepth x tan(chamferAngle) — the flare width on the entry face
+chamferReach = 1.8mm  // chamferRun x (chamferDepth + cutOverlap) / chamferDepth — taper extended past the face
 chamferBite = 0.35mm  // overshoot along the taper — keeps boolean cuts off coincident faces
-wedgeLowZ = plugDepth - chamferDepth - chamferBite * chamferDepth / chamferRun  // = 3.85mm
+wedgeLowZ = 3.85mm  // plugDepth - chamferDepth - chamferBite x chamferDepth / chamferRun
 faceTopZ = plugDepth + cutOverlap
 wedgeSpanY = insertHeight + 2 * chamferReach + 2mm
 wedgeSpanX = insertWidth + 2 * chamferReach + 2mm

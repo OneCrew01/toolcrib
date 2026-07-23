@@ -13,8 +13,8 @@ openingDiameter = 25mm
 chamferAngle = 45deg  // measured from the bore wall
 chamferDepth = 0.8mm
 cutOverlap = 1mm
-chamferRun = chamferDepth * tan(chamferAngle)  // = 0.80mm — flare width on the entry face
-chamferReach = chamferRun * (chamferDepth + cutOverlap) / chamferDepth
+chamferRun = 0.8mm  // chamferDepth x tan(chamferAngle) — flare width on the entry face
+chamferReach = 1.8mm  // chamferRun x (chamferDepth + cutOverlap) / chamferDepth
 faceTopZ = panelThickness + cutOverlap
 
 plateSketch = sketch(on = XY) {
