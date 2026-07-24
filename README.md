@@ -85,9 +85,9 @@ the runner, budget cap, and stats come free.
 
 ## Status
 
-Day 1 of the build window. This repository was initialized inside the contest window and
-everything in it was written inside the window. See
-[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for what works right now.
+Built entirely inside the contest window — every line of code and every
+measurement. See [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for what works
+right now and when it landed.
 
 ## Setup
 
@@ -126,13 +126,11 @@ per gate), the package panel (every file with its own sha256 and a download link
 plus the full packageHash), and, once a job reaches the human-review gate, a review
 bar that requires a named human before Approve or Request revision does anything.
 
-Three different floors apply here: `npm run demo` alone runs on Node 18+, the full
-suite (`npm test`) needs Node ≥22.6 for the app self-check gate's type-stripping,
-and the console (`npm --prefix app run dev`) needs Node 20.19+ or 22.12+ — Vite 8's
-own engines range. Node 22.6–22.11 clears the test-suite floor but falls in the gap
-below Vite's 22.12 cutoff, so that narrow band runs the tests but not the console.
-If you just want the loop closed with zero setup, `npm run demo` stays the fastest
-path.
+If you just want the loop closed, `npm run demo` needs only Node 18+. Running the
+full suite (`npm test`) needs Node ≥22.6, and the console (`npm --prefix app run
+dev`) needs Node 20.19+ or 22.12+ per Vite 8's own engines range (Node 22.6–22.11
+clears the test-suite floor but sits in the gap below Vite's 22.12 cutoff, so it
+runs the tests but not the console).
 
 ## Drafting with Zookeeper (operator mode)
 
@@ -142,10 +140,12 @@ a part in prose, watch the copilot reason and draft KCL live, then push a finish
 turn into the New Job form as design intent — the reviewed pipeline underneath
 (gates, ledger, human sign-off) is exactly the same pipeline this panel feeds.
 
-The token boundary is doctrine, not an implementation detail: **the token is
-entered at runtime, held in memory only, and talks from your browser straight to
-Zoo — wiped the moment you disconnect. The hosted demo never does this.** The
-ToolCRIB backend has zero involvement in this path — there is no proxy, and we
+The token boundary is doctrine, not an implementation detail. Any public, hosted
+deployment of this console stays replay-only — no token field, no live sessions;
+only a local operator run ever connects a browser to Zoo. **The token is entered
+at runtime, held in memory only, and talks from your browser straight to Zoo —
+wiped the moment you disconnect. The hosted demo never does this.** The ToolCRIB
+backend has zero involvement in this path — there is no proxy, and we
 refused to build one on purpose: a proxy would let anonymous visitors run billable
 agent sessions under our identity, which breaks the per-session metering honesty
 (`api_call_id` = one Zoo API call per turn) the rest of this repo is built around.

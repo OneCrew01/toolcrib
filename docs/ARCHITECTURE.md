@@ -136,12 +136,9 @@ measured live instead, in `server/spikes/ws-copilot-spike.mjs` (FN-025..028).
 Connection phases (`ConnectionPhase`):
 
 ```
-idle --connect()--> connecting --first payload--> handshake --conversation_id--> ready
-                        |                |                                        |
-                        +----- error before ready, or close before deliberate -----+
-                                                    |                              |
-                                                    v                              v
-                                                 failed                  disconnect() -> closed
+idle --connect()--> connecting --(handshake)--> ready --disconnect()--> closed
+                                               |
+                                               +-> failed   (pre-ready error, or any close that is not disconnect()'s own)
 ```
 
 Structure follows the same pure-reducer shape used by the state machine and the

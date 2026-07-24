@@ -24,7 +24,9 @@
   A hardening pass added a client-instance guard against a stale client's async
   close clobbering a fresh session, and surfaced backend-shutdown reasons in the
   status strip.
-- **Full suite: 100 passed + self-checks: 40 passed.**
+- **Nothing new closed in `docs/VERIFICATION_LOG.md`:** all 29 rows (10 HED, 10 FMF,
+  9 BC) are still PENDING — the operator's red-pen and bench sign-off loop is still
+  open.
 
 **Operator queue (unchanged)**
 1. Print the fit coupons and red-pen the AC 43.13-1B / burn-cert table rows against
