@@ -1,29 +1,13 @@
 #!/usr/bin/env node
-// ToolCRIB backend skeleton — the ONLY process that holds the Zoo token.
+// ToolCRIB backend — the ONLY process that would ever hold the Zoo token.
 // The web app is a thin client to this; it never calls Zoo or holds a key.
-// Zero dependencies: node:http + fetch. Grows into the job/state-machine host (Day 2).
+// All routes and behavior live in server/api/server.mjs; this file just boots
+// it on the contract port against the shared pipeline data dir.
 
-import { createServer } from "node:http";
+import { createApiServer } from "./api/server.mjs";
 
-const PORT = process.env.PORT || 8787;
+const PORT = Number(process.env.PORT || 8787);
 
-const routes = {
-  "GET /health": () => ({ ok: true, service: "toolcrib", ts: new Date().toISOString() }),
-  // Day 2+: POST /jobs (create from generationRequest), GET /jobs/:id, POST /jobs/:id/approve
-};
-
-createServer(async (req, res) => {
-  const key = `${req.method} ${new URL(req.url, "http://x").pathname}`;
-  const handler = routes[key];
-  res.setHeader("content-type", "application/json");
-  if (!handler) {
-    res.statusCode = 404;
-    return res.end(JSON.stringify({ error: "not found" }));
-  }
-  try {
-    res.end(JSON.stringify(await handler(req)));
-  } catch (e) {
-    res.statusCode = 500;
-    res.end(JSON.stringify({ error: String(e.message ?? e) }));
-  }
-}).listen(PORT, () => console.log(`toolcrib backend on :${PORT}`));
+createApiServer().listen(PORT, () =>
+  console.log(JSON.stringify({ ts: new Date().toISOString(), evt: "listen", service: "toolcrib", port: PORT })),
+);

@@ -2,6 +2,29 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
+## 2026-07-23 · Day 4 — the review console is live
+
+**Works (96/96 server tests; app builds clean; verified by click-through in a real browser)**
+- **Backend API** (`server/api/`, `npm start`, :8787): jobs create/list/detail with
+  ledger + verification status, named-human decision route (approve → APPROVED →
+  DELIVERED; revise requires a reason), package files served with traversal
+  protection, live backend gated behind TOOLCRIB_ALLOW_LIVE. Shares the CLI's data
+  dir — every prior job appears in the console.
+- **Review console** (`app/`, vite :5175 → proxy :8787): job list with live state
+  chips; job detail with the transition ledger as centerpiece ("ledger verified ✓"
+  badge), gate cards (threshold vs measured), package panel (files + sha256 +
+  downloads, engine-rendered preview, full packageHash, DRAFT amber badges), and the
+  human-review bar (named actor required, two-click approve, 10 s confirm window).
+  Footer states the security property: this app holds no API keys.
+- **Browser-verified end to end:** job 6aabf842 approved through the UI —
+  WAITING_FOR_HUMAN_REVIEW → APPROVED → DELIVERED, two HUMAN ledger rows, chain intact.
+
+**Next (Day 5)**
+- Form-created job click-through + one supervised LIVE text-to-cad job through the
+  console (the money demo for the video).
+- web-zookeeper panel (local/operator mode) as the NL intent layer.
+- Docs polish sweep: README run-the-console section; screenshots.
+
 ## 2026-07-23 · Day 3 — the trunk is live; `npm run demo` IS the product
 
 **Works (full suite green; `npm run demo` = judge path)**
