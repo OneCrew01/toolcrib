@@ -1,0 +1,8 @@
+{
+  "title": "Flush mounting plate, 52 mm square, four corner holes (live-lane proof)",
+  "prompt": "A 52mm x 52mm x 2mm aluminum plate with four 5mm diameter holes, one near each corner, each hole center 10mm from both adjacent edges",
+  "material": { "name": "aluminum 6061", "densityKgM3": 2700 },
+  "units": "mm",
+  "requester": "shop-floor@example.com",
+  "expectedMassG": { "minG": 13.965, "maxG": 14.39 }
+}

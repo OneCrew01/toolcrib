@@ -8,6 +8,13 @@
 // reason in the ledger, and the machine never moves a job past the gate.
 //
 //   node server/pipeline/run-job.mjs <requestFile> --backend=replay|flushmount|live [--out=dir]
+//
+// Live-lane recovery (measured need — a dead supervisor orphans a live
+// generation; re-sending the same prompt dedupes into unreachable outputs,
+// FN-011): --resume-t2c-id=<zooId> (or env TOOLCRIB_RESUME_T2C_ID) makes the
+// live backend adopt that existing generation instead of dispatching a new
+// one, and --resume-job=<jobId> re-enters the walk on a job stranded at
+// GENERATING so its append-only ledger simply continues.
 
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -79,6 +86,8 @@ export async function runJob(requestPath, {
   machinePath = join(REPO, "samples", "machines", "bambu-p1s.json"),
   fixturesDir,
   deps,
+  resumeT2cId, // live backend adopts this existing text-to-cad id (no dispatch)
+  resumeJobId, // re-enter the walk on a job stranded at GENERATING
   log = console.log,
 } = {}) {
   outRoot ??= join(dataDir, "packages");
@@ -91,7 +100,14 @@ export async function runJob(requestPath, {
   // it away, so the acceptance range is captured here, before validation.
   const expectedMassG = raw.expectedMassG && typeof raw.expectedMassG === "object" ? raw.expectedMassG : undefined;
 
-  let job = await store.createJob(raw, { actor: SYS });
+  // Adoption path: a supervisor death mid-generation leaves a job stranded at
+  // GENERATING with a valid ledger. Re-entering the walk on THAT job keeps one
+  // continuous append-only history — strand and recovery both visible.
+  let job = resumeJobId
+    ? await store.getJob(resumeJobId)
+    : await store.createJob(raw, { actor: SYS });
+  if (resumeJobId && job.state !== STATE.GENERATING)
+    throw new Error(`--resume-job requires a job stranded at GENERATING; ${resumeJobId} is at ${job.state}`);
   const { jobId } = job;
   // move() refreshes the local job: transition re-reads the snapshot, so a
   // stale reference here would silently roll the state back on next persist.
@@ -106,19 +122,32 @@ export async function runJob(requestPath, {
     return { jobId, finalState: job.state, job, ledger, verify, gates, consult, pkg };
   };
 
-  // 1 — validate the intent envelope
-  await move(STATE.VALIDATING, `request file: ${resolve(requestPath)}`);
-  const validation = await store.runValidation(jobId);
-  if (!validation.ok) return finish();
-  job = validation.job; // now GENERATING with the normalized request
+  let consult;
+  if (resumeJobId) {
+    // The stranded job already validated + normalized its request and (in the
+    // normal strand point, mid-generation) persisted its consult. Reuse it so
+    // the adopted run tells one continuous story; recompute only if the crash
+    // landed before the consult was persisted.
+    consult = job.artifacts?.referenceConsult ?? consultReference(job.request);
+    if (!job.artifacts?.referenceConsult) {
+      job.artifacts = { ...(job.artifacts ?? {}), referenceConsult: consult };
+      persistArtifacts(store, job);
+    }
+  } else {
+    // 1 — validate the intent envelope
+    await move(STATE.VALIDATING, `request file: ${resolve(requestPath)}`);
+    const validation = await store.runValidation(jobId);
+    if (!validation.ok) return finish();
+    job = validation.job; // now GENERATING with the normalized request
 
-  // 2 — reference consult (advisory, watermarked when drafts are involved)
-  const consult = consultReference(job.request);
-  job.artifacts = { ...(job.artifacts ?? {}), referenceConsult: consult };
-  persistArtifacts(store, job);
+    // 2 — reference consult (advisory, watermarked when drafts are involved)
+    consult = consultReference(job.request);
+    job.artifacts = { ...(job.artifacts ?? {}), referenceConsult: consult };
+    persistArtifacts(store, job);
+  }
 
   // 3 — generate
-  const gen = makeBackend(backend, { fixturesDir });
+  const gen = makeBackend(backend, { fixturesDir, ...(resumeT2cId ? { resumeId: resumeT2cId } : {}) });
   let artifacts;
   try {
     artifacts = await gen.generate(job);
@@ -139,7 +168,9 @@ export async function runJob(requestPath, {
   const consultNote = consult.lookups.length
     ? `${consult.lookups.length} reference rule lookup(s)${consult.watermark ? " — " + consult.watermark : ""}`
     : `reference consult skipped: ${consult.reason}`;
-  await move(STATE.GEOMETRY_CHECK, `${gen.name} backend produced kcl(${job.artifacts.generation.kclBytes}B) + files [${Object.keys(artifacts.files ?? {}).join(", ") || "none"}]; ${consultNote}`);
+  const resumedRun = (artifacts.apiRuns ?? []).find((r) => r.resumed);
+  const resumeNote = resumedRun ? ` — resumed text-to-cad ${resumedRun.id}, no new dispatch` : "";
+  await move(STATE.GEOMETRY_CHECK, `${gen.name} backend produced kcl(${job.artifacts.generation.kclBytes}B) + files [${Object.keys(artifacts.files ?? {}).join(", ") || "none"}]${resumeNote}; ${consultNote}`);
 
   // 4 — geometry gates against the machine envelope and physics
   let analysis = null;
@@ -242,7 +273,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const requestPath = args.find((a) => !a.startsWith("--"));
   const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
   if (!requestPath) {
-    console.error("usage: node server/pipeline/run-job.mjs <requestFile> --backend=replay|flushmount|live [--out=dir]");
+    console.error("usage: node server/pipeline/run-job.mjs <requestFile> --backend=replay|flushmount|live [--out=dir] [--resume-t2c-id=<zooId>] [--resume-job=<jobId>]");
     process.exit(2);
   }
   const backend = flag("backend") ?? "replay";
@@ -250,7 +281,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     console.error("live backend spends real API minutes — set TOOLCRIB_ALLOW_LIVE=1 to confirm");
     process.exit(2);
   }
-  runJob(requestPath, { backend, ...(flag("out") ? { outRoot: resolve(flag("out")) } : {}) })
+  const resumeT2cId = flag("resume-t2c-id") ?? process.env.TOOLCRIB_RESUME_T2C_ID;
+  const resumeJobId = flag("resume-job");
+  if ((resumeT2cId || resumeJobId) && backend !== "live") {
+    console.error("--resume-t2c-id / --resume-job are live-lane recovery — use --backend=live");
+    process.exit(2);
+  }
+  runJob(requestPath, {
+    backend,
+    ...(flag("out") ? { outRoot: resolve(flag("out")) } : {}),
+    ...(resumeT2cId ? { resumeT2cId } : {}),
+    ...(resumeJobId ? { resumeJobId } : {}),
+  })
     .then((r) => {
       console.log(`\nfinal state: ${r.finalState}`);
       process.exit(r.finalState === STATE.WAITING_FOR_HUMAN_REVIEW ? 0 : 1);

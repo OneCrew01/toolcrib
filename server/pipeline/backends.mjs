@@ -112,7 +112,7 @@ function flushmountBackend() {
 
 // --------------------------------------------------------------------- live
 
-function liveBackend({ format = "stl", timeoutMin = 20, client } = {}) {
+function liveBackend({ format = "stl", timeoutMin = 20, client, resumeId } = {}) {
   return {
     name: "live",
     async generate(job) {
@@ -123,23 +123,44 @@ function liveBackend({ format = "stl", timeoutMin = 20, client } = {}) {
       const { zooClient } = await import("../lib/zoo.mjs");
       const zoo = client ?? zooClient();
       const notes = [];
-      const started = await zoo.startTextToCad(prompt, format);
-      const wait = await zoo.waitTextToCad(started.id, { timeoutMin });
-      const run = { id: started.id, format, status: wait.status, latencyS: Math.round(wait.latencyS * 10) / 10 };
+      // Resume-by-id: adopt a generation that is already running (or done)
+      // server-side instead of dispatching a new one. The measured need: a
+      // dead supervisor orphans a live generation — Zoo keeps computing, the
+      // poller is gone — and re-sending the same prompt dedupes into a
+      // completed job whose outputs are unreachable (FN-011). Adoption is
+      // the only recovery that neither re-spends nor dead-ends.
+      let id;
+      if (resumeId) {
+        id = resumeId;
+        notes.push(`live backend: resumed text-to-cad ${id} — adopted existing generation, no new dispatch`);
+      } else {
+        const started = await zoo.startTextToCad(prompt, format);
+        id = started.id;
+      }
+      const wait = await zoo.waitTextToCad(id, { timeoutMin });
+      const run = { id, format, status: wait.status, latencyS: Math.round(wait.latencyS * 10) / 10, ...(resumeId ? { resumed: true } : {}) };
+
+      // Adopting by id means trusting an id; the record's own prompt is the
+      // check that the geometry belongs to THIS job.
+      if (resumeId && wait.record?.prompt && wait.record.prompt !== prompt)
+        throw new GenerationError(
+          STATE.GENERATION_FAILED,
+          `resume refused: text-to-cad ${id} was generated from a different prompt than this job — not adopting foreign geometry`,
+        );
 
       if (wait.status === "failed")
-        throw new GenerationError(STATE.GENERATION_FAILED, `text-to-cad ${started.id} failed after ${run.latencyS}s: ${wait.record?.error ?? "no error text"}`);
+        throw new GenerationError(STATE.GENERATION_FAILED, `text-to-cad ${id} failed after ${run.latencyS}s: ${wait.record?.error ?? "no error text"}`);
       if (wait.status === "timeout")
-        throw new GenerationError(STATE.GENERATION_FAILED, `text-to-cad ${started.id} still running after ${timeoutMin} min — abandoned`);
+        throw new GenerationError(STATE.GENERATION_FAILED, `text-to-cad ${id} still running after ${timeoutMin} min — abandoned`);
 
       // Outputs live ONLY on /async/operations (FN-007) and burst/dedupe jobs
       // can complete with outputs permanently missing there (FN-011).
-      const outputs = await zoo.fetchOutputs(started.id);
+      const outputs = await zoo.fetchOutputs(id);
       if (!outputs) {
-        const instant = wait.latencyS < 20;
+        const instant = !resumeId && wait.latencyS < 20;
         throw new GenerationError(
           STATE.OUTPUTS_UNREACHABLE,
-          `text-to-cad ${started.id} completed in ${run.latencyS}s but its outputs never appeared on /async/operations` +
+          `text-to-cad ${id} completed in ${run.latencyS}s but its outputs never appeared on /async/operations` +
             (instant ? " — instant completion is the dedupe-hit signature (FN-011)" : "") +
             "; KCL source remains recoverable from the user surface",
         );
@@ -150,7 +171,7 @@ function liveBackend({ format = "stl", timeoutMin = 20, client } = {}) {
         const ext = name.split(".").pop();
         files[ext] = zoo.decodeOutput(b64);
       }
-      notes.push(`live backend: text-to-cad ${started.id} completed in ${run.latencyS}s, ${Object.keys(files).length} output file(s)`);
+      notes.push(`live backend: text-to-cad ${id} completed in ${run.latencyS}s, ${Object.keys(files).length} output file(s)`);
 
       return { kcl: wait.record?.code ?? "", files, apiRuns: [run], notes };
     },
