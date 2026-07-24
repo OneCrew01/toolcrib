@@ -141,12 +141,22 @@ function liveBackend({ format = "stl", timeoutMin = 20, client, resumeId } = {})
       const run = { id, format, status: wait.status, latencyS: Math.round(wait.latencyS * 10) / 10, ...(resumeId ? { resumed: true } : {}) };
 
       // Adopting by id means trusting an id; the record's own prompt is the
-      // check that the geometry belongs to THIS job.
-      if (resumeId && wait.record?.prompt && wait.record.prompt !== prompt)
-        throw new GenerationError(
-          STATE.GENERATION_FAILED,
-          `resume refused: text-to-cad ${id} was generated from a different prompt than this job — not adopting foreign geometry`,
-        );
+      // check that the geometry belongs to THIS job. Fail closed: a record
+      // that cannot be checked is a record that does not get adopted —
+      // nothing in the field notes guarantees the prompt field is always
+      // present, and an unverifiable adoption is foreign geometry by default.
+      if (resumeId) {
+        if (!wait.record?.prompt)
+          throw new GenerationError(
+            STATE.GENERATION_FAILED,
+            `resume refused: text-to-cad ${id} carries no prompt field to verify against — refusing to adopt without a match check`,
+          );
+        if (wait.record.prompt !== prompt)
+          throw new GenerationError(
+            STATE.GENERATION_FAILED,
+            `resume refused: text-to-cad ${id} was generated from a different prompt than this job — not adopting foreign geometry`,
+          );
+      }
 
       if (wait.status === "failed")
         throw new GenerationError(STATE.GENERATION_FAILED, `text-to-cad ${id} failed after ${run.latencyS}s: ${wait.record?.error ?? "no error text"}`);

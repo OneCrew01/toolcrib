@@ -216,6 +216,78 @@ test("packaging contract errors map to EXPORT_FAILED and PDF_FAILED", async () =
   assert.equal(r2.verify.ok, true);
 });
 
+// --- live-lane resume: fully offline through the liveBackend client seam ---
+
+function stubZoo({ recordPrompt, code = "// resumed cube kcl\n" } = {}) {
+  return {
+    startTextToCad() {
+      throw new Error("dispatch called during resume — adoption must never spend");
+    },
+    async waitTextToCad() {
+      const record = { ...(recordPrompt !== undefined ? { prompt: recordPrompt } : {}), code };
+      return { status: "completed", record, latencyS: 1 };
+    },
+    async fetchOutputs() {
+      return { "source.stl": Buffer.from(asciiCube(20)).toString("base64") };
+    },
+    decodeOutput: (b64) => Buffer.from(b64, "base64"),
+  };
+}
+
+test("live resume: matching prompt adopts the generation and walks to the gate", async () => {
+  const { dataDir, outRoot, root } = dirs("resume-ok");
+  const requestPath = writeJson(root, "request.json", cubeRequest());
+  const r = await runJob(requestPath, {
+    backend: "live", resumeT2cId: "t2c-resume-ok",
+    client: stubZoo({ recordPrompt: cubeRequest().prompt }),
+    dataDir, outRoot, ...quiet,
+  });
+  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  const genRow = r.ledger.find((row) => row.to === STATE.GEOMETRY_CHECK);
+  assert.match(genRow.reason, /resumed text-to-cad t2c-resume-ok, no new dispatch/);
+  assert.equal(r.job.artifacts.generation.apiRuns[0].resumed, true);
+  assert.equal(r.verify.ok, true);
+});
+
+test("live resume: mismatched record prompt is refused — no foreign geometry", async () => {
+  const { dataDir, outRoot, root } = dirs("resume-mismatch");
+  const requestPath = writeJson(root, "request.json", cubeRequest());
+  const r = await runJob(requestPath, {
+    backend: "live", resumeT2cId: "t2c-mismatch",
+    client: stubZoo({ recordPrompt: "a completely different part" }),
+    dataDir, outRoot, ...quiet,
+  });
+  assert.equal(r.finalState, STATE.GENERATION_FAILED);
+  assert.match(r.ledger.at(-1).reason, /different prompt/);
+  assert.match(r.ledger.at(-1).reason, /not adopting foreign geometry/);
+});
+
+test("live resume: record without a prompt is refused — fail closed, not fail open", async () => {
+  const { dataDir, outRoot, root } = dirs("resume-noprompt");
+  const requestPath = writeJson(root, "request.json", cubeRequest());
+  const r = await runJob(requestPath, {
+    backend: "live", resumeT2cId: "t2c-noprompt",
+    client: stubZoo({ recordPrompt: undefined }),
+    dataDir, outRoot, ...quiet,
+  });
+  assert.equal(r.finalState, STATE.GENERATION_FAILED);
+  assert.match(r.ledger.at(-1).reason, /no prompt field to verify against/);
+});
+
+test("resume-job on a job not stranded at GENERATING throws the specific refusal", async () => {
+  const { dataDir, outRoot } = dirs("resume-badjob");
+  const done = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, ...quiet });
+  assert.equal(done.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  await assert.rejects(
+    () => runJob(PLAIN_PLATE, {
+      backend: "live", resumeJobId: done.jobId,
+      client: stubZoo({ recordPrompt: "irrelevant" }),
+      dataDir, outRoot, ...quiet,
+    }),
+    /requires a job stranded at GENERATING/,
+  );
+});
+
 test("fallback analyzeStl measures a known solid exactly (binary + ascii)", () => {
   const a = analyzeStl(Buffer.from(asciiCube(20)));
   assert.deepEqual(a.bboxMm, { x: 20, y: 20, z: 20 });

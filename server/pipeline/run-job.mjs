@@ -86,6 +86,7 @@ export async function runJob(requestPath, {
   machinePath = join(REPO, "samples", "machines", "bambu-p1s.json"),
   fixturesDir,
   deps,
+  client, // injected zoo client for the live backend (offline-test seam)
   resumeT2cId, // live backend adopts this existing text-to-cad id (no dispatch)
   resumeJobId, // re-enter the walk on a job stranded at GENERATING
   log = console.log,
@@ -147,7 +148,11 @@ export async function runJob(requestPath, {
   }
 
   // 3 — generate
-  const gen = makeBackend(backend, { fixturesDir, ...(resumeT2cId ? { resumeId: resumeT2cId } : {}) });
+  const gen = makeBackend(backend, {
+    fixturesDir,
+    ...(resumeT2cId ? { resumeId: resumeT2cId } : {}),
+    ...(client ? { client } : {}),
+  });
   let artifacts;
   try {
     artifacts = await gen.generate(job);
@@ -287,6 +292,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     console.error("--resume-t2c-id / --resume-job are live-lane recovery — use --backend=live");
     process.exit(2);
   }
+  // Legitimate solo --resume-job case: the crash landed BEFORE dispatch, so
+  // there is no generation to adopt. But if one IS in flight, dispatching a
+  // fresh one re-spends and the same prompt dedupes (FN-011) — warn, don't block.
+  if (resumeJobId && !resumeT2cId)
+    console.error("warning: resuming without --resume-t2c-id will dispatch a NEW live generation for this job — confirm no generation is already in flight");
   runJob(requestPath, {
     backend,
     ...(flag("out") ? { outRoot: resolve(flag("out")) } : {}),
