@@ -1,11 +1,14 @@
 /* ToolCRIB review console — engineering-report aesthetic.
    Two brand accents only: --panel (panel blue), --insert (insert orange) —
    see the :root block below for values. White paper, 1px rules, mono for
-   anything measured. Every color/font/radius value lives in :root; a
-   reskin is variable edits at the top of this file only. */
+   anything measured. Color/font/radius values live in :root, so a reskin
+   is variable edits at the top of this file — except the .brand-mark::after
+   1px logo inset and the 50% radius on the structural status-dot circles,
+   which are intentionally left as literals, not theme values. */
 
 :root {
   --panel: #2e5e78;
+  --panel-hover: #24506a;
   --insert: #e07a2f;
   --ink: #1a1d21;
   --ink-soft: #5a636c;
@@ -13,8 +16,7 @@
   --paper-dim: #f6f7f8;
   --rule: #d7dbdf;
   --rule-soft: #e7eaec;
-  --on-accent: #fff;
-  --panel-hover: #24506a;
+  --on-accent: #ffffff;
 
   --sys-bg: #e9f1f7;
   --sys-fg: #2e5e78;
