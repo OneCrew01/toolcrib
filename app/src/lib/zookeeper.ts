@@ -614,7 +614,12 @@ export class ZookeeperClient {
       if (this.phase !== "failed") this.phase = "closed";
     } else if (this.phase !== "failed") {
       this.phase = "failed";
-      this.note = `connection lost (close code ${ev.code})`;
+      // Keep a more specific note when one is already set (backend_shutdown
+      // reason, pre-handshake socket error) — the generic close-code line is
+      // the fallback only.
+      if (this.note === null) {
+        this.note = `connection lost (close code ${ev.code})`;
+      }
     }
     this.emit();
   }

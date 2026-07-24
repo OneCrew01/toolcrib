@@ -786,6 +786,11 @@ textarea:focus {
   margin-left: auto;
 }
 
+.draft-strip-error {
+  color: var(--fail-fg);
+  font-size: 12px;
+}
+
 .draft-chat {
   margin-bottom: 14px;
 }

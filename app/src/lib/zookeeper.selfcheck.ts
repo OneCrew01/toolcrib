@@ -72,7 +72,11 @@ const FX = {
 
 type Failures = string[];
 
+/** Total checks evaluated by the most recent runSelfChecks() call. */
+let lastRunCheckCount = 0;
+
 function check(failures: Failures, name: string, cond: boolean, detail?: string): void {
+  lastRunCheckCount += 1;
   if (!cond) failures.push(detail ? `${name} — ${detail}` : name);
 }
 
@@ -91,6 +95,7 @@ function feed(
 
 export function runSelfChecks(): string[] {
   const failures: Failures = [];
+  lastRunCheckCount = 0;
 
   // --- classification: every fixture lands on the right kind with the right
   //     payload fields extracted --------------------------------------------
@@ -390,4 +395,38 @@ export function runSelfChecks(): string[] {
   }
 
   return failures;
+}
+
+// ---------------------------------------------------------------------------
+// Self-executing runner — this is what wires the module into the root test
+// gate: `npm test` at the repo root ends with
+//   node --experimental-strip-types app/src/lib/zookeeper.selfcheck.ts
+// which enters this block, prints results, and exits non-zero on any failure.
+//
+// The guard is inert everywhere else: when imported (dev-mode main.tsx, or a
+// bundler) `process.argv[1]` is absent or names a different entry file, so
+// the block no-ops. Typed against globalThis because the app tsconfig loads
+// only vite/client types, not @types/node.
+// ---------------------------------------------------------------------------
+
+interface MinimalProcess {
+  argv?: string[];
+  exitCode?: number;
+}
+
+const proc = (globalThis as { process?: MinimalProcess }).process;
+const entryPath = typeof proc?.argv?.[1] === "string" ? proc.argv[1] : "";
+const runDirectly = entryPath
+  .replaceAll("\\", "/")
+  .endsWith("/lib/zookeeper.selfcheck.ts");
+
+if (runDirectly && proc) {
+  const failures = runSelfChecks();
+  if (failures.length > 0) {
+    console.error(`zookeeper self-checks: ${failures.length} FAILED`);
+    for (const f of failures) console.error(`  - ${f}`);
+    proc.exitCode = 1;
+  } else {
+    console.log(`self-checks: ${lastRunCheckCount} passed`);
+  }
 }

@@ -53,7 +53,19 @@ export function DraftPanelView({
     const t = token.trim();
     if (t === "" || connected) return;
     clientRef.current?.disconnect();
-    const client = new ZookeeperClient({ token: t, onChange: setSnap });
+    // Instance guard: each client only publishes state while it is still the
+    // current one. Without this, a superseded client's ASYNC onClose (the
+    // socket close event lands after disconnect() returns) could clobber a
+    // new client's live snapshot on a quick disconnect → reconnect. The guard
+    // also covers the disconnect() path: its synchronous "closed" emit fires
+    // while clientRef.current === client, then the ref is nulled/replaced and
+    // the trailing close-event emit is dropped.
+    const client: ZookeeperClient = new ZookeeperClient({
+      token: t,
+      onChange: (s) => {
+        if (clientRef.current === client) setSnap(s);
+      },
+    });
     clientRef.current = client;
     // Memory-only doctrine: the field is cleared the moment the client takes
     // the token; the client wipes its own copy once the auth frame is sent.
@@ -182,6 +194,11 @@ export function DraftPanelView({
               api_call_id{" "}
               <span className="mono">{agg.apiCallId ?? "—"}</span>
             </span>
+            {agg.lastError !== null && (
+              <span className="draft-strip-error">
+                last server error: {agg.lastError}
+              </span>
+            )}
             <button type="button" className="btn btn-small" onClick={disconnect}>
               disconnect &amp; wipe token
             </button>
