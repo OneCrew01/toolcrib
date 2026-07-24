@@ -126,10 +126,13 @@ per gate), the package panel (every file with its own sha256 and a download link
 plus the full packageHash), and, once a job reaches the human-review gate, a review
 bar that requires a named human before Approve or Request revision does anything.
 
-Running the full suite (`npm test`) needs Node ≥22.6 — the app self-check gate runs
-under `node --experimental-strip-types`, which needs that floor. The console itself
-runs fine on Node 18+; if you just want the loop closed with zero setup, `npm run
-demo` stays the fastest path.
+Three different floors apply here: `npm run demo` alone runs on Node 18+, the full
+suite (`npm test`) needs Node ≥22.6 for the app self-check gate's type-stripping,
+and the console (`npm --prefix app run dev`) needs Node 20.19+ or 22.12+ — Vite 8's
+own engines range. Node 22.6–22.11 clears the test-suite floor but falls in the gap
+below Vite's 22.12 cutoff, so that narrow band runs the tests but not the console.
+If you just want the loop closed with zero setup, `npm run demo` stays the fastest
+path.
 
 ## Drafting with Zookeeper (operator mode)
 
@@ -154,8 +157,9 @@ trust-layer pattern — cited rule, deterministic gate, honest disclaimer — at
 more aviation-adjacent problems. **Design-for-flammability** (`server/reference/
 tables/burn-cert.mjs`, `server/generators/burncert-validate.mjs`) codifies FAA
 TC TN23-65 / UL-94 wall-thickness findings as a sampled min-wall gate over an STL
-(ray-cast local thickness, float32-aware) and emits a print recipe for the half
-the CAD can't enforce — material, minimum infill, orientation. Nothing here
+(ray-cast local thickness, float32-aware); `server/generators/burncert-recipe.mjs`
+(`printRecipe`) emits the print recipe for the half the CAD can't enforce —
+material, minimum infill, orientation. Nothing here
 certifies anything: real certification is a physical coupon in a burn chamber per
 14 CFR 25.853, and every rule ships watermarked accordingly. Sample pass/fail pair
 in [`samples/burn-cert/`](samples/burn-cert/). **Assembly weight & balance**
