@@ -21,15 +21,18 @@ const INTENT_PLACEHOLDER = `{
 }`;
 
 export function NewJobView({
+  initialPrompt,
   onCreated,
   onCancel,
 }: {
+  /** Prefill for the prompt field — handoff from the Zookeeper draft panel. */
+  initialPrompt?: string;
   onCreated: (jobId: string) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [intentMode, setIntentMode] = useState<"prompt" | "json">("prompt");
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt ?? "");
   const [intentJson, setIntentJson] = useState("");
   const [materialName, setMaterialName] = useState("aluminum 6061");
   const [density, setDensity] = useState("2700");

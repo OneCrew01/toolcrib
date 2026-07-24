@@ -680,6 +680,227 @@ textarea:focus {
   color: var(--on-accent);
 }
 
+/* ---------- top nav ---------- */
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.topnav {
+  display: flex;
+  gap: 14px;
+}
+
+.navlink {
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.navlink:hover {
+  color: var(--panel);
+}
+
+.navlink.on {
+  color: var(--panel);
+  border-bottom-color: var(--insert);
+}
+
+/* ---------- zookeeper draft panel (operator mode) ---------- */
+
+.draft-layout {
+  max-width: 860px;
+}
+
+/* The token-boundary notice — deliberately the loudest element on the page. */
+.draft-notice {
+  border: 1px solid var(--gate-fg);
+  border-left-width: 4px;
+  background: var(--gate-bg);
+  color: var(--gate-fg);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.draft-explain {
+  padding: 12px;
+  font-size: 13px;
+}
+
+.draft-explain p {
+  margin: 0 0 10px;
+  max-width: 64ch;
+}
+
+.draft-explain-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--panel);
+  font-weight: 700;
+}
+
+.draft-token-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-top: 14px;
+}
+
+.draft-token-form .field {
+  margin-bottom: 0;
+}
+
+.draft-token-form .btn {
+  margin-bottom: 1px;
+}
+
+.draft-wiped-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.draft-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  border: 1px solid var(--rule);
+  background: var(--paper-dim);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.draft-status-strip .btn {
+  margin-left: auto;
+}
+
+.draft-chat {
+  margin-bottom: 14px;
+}
+
+.draft-empty {
+  padding: 14px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.draft-turn {
+  padding: 12px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.draft-turn:last-child {
+  border-bottom: none;
+}
+
+.draft-turn-prompt {
+  margin-bottom: 8px;
+}
+
+.draft-turn-prompt-text {
+  font-weight: 600;
+}
+
+.draft-reasoning {
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.draft-reasoning summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.draft-reasoning-body {
+  border-left: 2px solid var(--rule);
+  margin: 6px 0 6px 4px;
+  padding: 4px 0 4px 10px;
+}
+
+.draft-reasoning-line {
+  color: var(--ink-soft);
+  font-size: 11px;
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+}
+
+.draft-reasoning-type {
+  color: var(--panel);
+}
+
+.draft-info {
+  font-size: 12px;
+  font-style: italic;
+  margin: 4px 0;
+}
+
+.draft-reply {
+  white-space: pre-wrap;
+  margin: 8px 0;
+  max-width: 72ch;
+}
+
+.draft-kcl {
+  border: 1px solid var(--rule);
+  margin: 10px 0;
+}
+
+.draft-kcl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--paper-dim);
+}
+
+.draft-kcl-pre {
+  margin: 0;
+  padding: 10px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--paper-dim);
+}
+
+.draft-turn-error {
+  margin: 8px 0 0;
+}
+
+.draft-turn-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.draft-turn-actions-note {
+  font-size: 11px;
+}
+
+.draft-composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.draft-composer textarea {
+  flex: 1;
+  resize: vertical;
+}
+
 /* ---------- review bar ---------- */
 
 .with-review-bar {
