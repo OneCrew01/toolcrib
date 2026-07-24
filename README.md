@@ -110,6 +110,62 @@ With a Zoo token in `.env` (`cp .env.example .env`), the same pipeline runs live
 TOOLCRIB_ALLOW_LIVE=1 node server/pipeline/run-job.mjs samples/requests/plain-plate.json --backend=live
 ```
 
+## Run the review console
+
+```bash
+npm start                    # API on :8787 — the only process holding a Zoo token
+npm --prefix app run dev     # console on :5173, dev proxy to the API
+```
+
+Open `http://localhost:5173`. The job list reads the same flat-file data directory
+the CLI writes, so `npm run demo` and `npm run job` runs already show up before you
+create anything new. Job detail is the transition ledger as centerpiece — every row
+hash-chained, with a "ledger verified ✓ (hash chain intact)" badge (or a loud failure
+if a row was ever tampered with) — followed by gate cards (threshold vs. measured,
+per gate), the package panel (every file with its own sha256 and a download link,
+plus the full packageHash), and, once a job reaches the human-review gate, a review
+bar that requires a named human before Approve or Request revision does anything.
+
+Running the full suite (`npm test`) needs Node ≥22.6 — the app self-check gate runs
+under `node --experimental-strip-types`, which needs that floor. The console itself
+runs fine on Node 18+; if you just want the loop closed with zero setup, `npm run
+demo` stays the fastest path.
+
+## Drafting with Zookeeper (operator mode)
+
+The console's second tab is a natural-language drafting chat with **Zookeeper**,
+Zoo's ML copilot, over its websocket (`wss://api.zoo.dev/ws/ml/copilot`). Describe
+a part in prose, watch the copilot reason and draft KCL live, then push a finished
+turn into the New Job form as design intent — the reviewed pipeline underneath
+(gates, ledger, human sign-off) is exactly the same pipeline this panel feeds.
+
+The token boundary is doctrine, not an implementation detail: **the token is
+entered at runtime, held in memory only, and talks from your browser straight to
+Zoo — wiped the moment you disconnect. The hosted demo never does this.** The
+ToolCRIB backend has zero involvement in this path — there is no proxy, and we
+refused to build one on purpose: a proxy would let anonymous visitors run billable
+agent sessions under our identity, which breaks the per-session metering honesty
+(`api_call_id` = one Zoo API call per turn) the rest of this repo is built around.
+
+## Beyond fastening: the same pattern, two more domains
+
+Two additive backlog items (`docs/backlog/BL-003`, `BL-004`) point the same
+trust-layer pattern — cited rule, deterministic gate, honest disclaimer — at two
+more aviation-adjacent problems. **Design-for-flammability** (`server/reference/
+tables/burn-cert.mjs`, `server/generators/burncert-validate.mjs`) codifies FAA
+TC TN23-65 / UL-94 wall-thickness findings as a sampled min-wall gate over an STL
+(ray-cast local thickness, float32-aware) and emits a print recipe for the half
+the CAD can't enforce — material, minimum infill, orientation. Nothing here
+certifies anything: real certification is a physical coupon in a burn chamber per
+14 CFR 25.853, and every rule ships watermarked accordingly. Sample pass/fail pair
+in [`samples/burn-cert/`](samples/burn-cert/). **Assembly weight & balance**
+(`server/wb/`) computes a mass-weighted combined CG across an assembly's parts,
+labels each part's mass basis as `modeled` or `measured` (a kitchen-scale reading
+overrides the modeled value and the report says which one it used), and arms a
+fail-closed CG-window gate — `CgWindowError` refuses the package outright when the
+combined CG lands outside the declared window. Sample pass/fail pair in
+[`samples/wb-demo/`](samples/wb-demo/).
+
 ## Safety note
 
 Outputs are advisory fabrication aids. Nothing this tool produces is approved data for

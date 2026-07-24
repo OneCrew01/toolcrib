@@ -87,3 +87,82 @@ Rerunnable evidence: `server/spikes/ws-modeling-spike.mjs`.
 `server/day1-thinthread.mjs`: prompt → `POST /ai/text-to-cad/{format}?kcl=true` → poll →
 write KCL + exported files to `samples/` → `POST /file/mass` on the export for a
 validation readout. Plain Node fetch, no dependencies.
+
+## The review API and console
+
+`server/api/server.mjs` (`node:http`, zero dependencies) is a thin HTTP door onto the
+same flat-file job store the CLI pipeline writes — one `dataDir`, so a job created by
+`npm run demo`, `npm run job`, or `POST /api/jobs` all land in the same `GET /api/jobs`
+list.
+
+```
+GET  /health                        liveness
+GET  /api/jobs                      list, newest first
+POST /api/jobs                      { request, backend } -> 202 { jobId }
+GET  /api/jobs/:id                  job + ledger + ledgerVerified + gates + manifest
+POST /api/jobs/:id/decision         { action: approve|revise, actorName, reason? }
+GET  /api/jobs/:id/files/*          package bundle files, streamed
+```
+
+`POST /api/jobs` does not await the pipeline: it watches the new job's ledger file
+for the breadcrumb `runJob()` writes on its first transition (`reason: "request
+file: <path>"`), so the 202 response's `jobId` is real before generation has even
+started — every later outcome, success or failure, still lands through the state
+machine and reads back on the next `GET`. The decision route is the machine's HUMAN
+gate lifted to HTTP verbatim: `actorName` is still required, `revise` still refuses
+without a `reason`, and both actions still go through `store.transition()` — the API
+grants no authority the CLI didn't already have. The files route resolves every
+request against the job's own bundle directory and rejects any path that would
+resolve outside it (`abs.startsWith(bundleDir + sep)`), so a crafted `../` segment
+400s instead of walking off the package.
+
+`app/` is a thin client: it polls the API (2 s on the job-detail view), renders
+whatever the API returns, and holds no Zoo credentials at all — the footer says so
+on every screen except the Zookeeper panel, which says something stronger (below).
+Four views, no router (`react-router` is not installed on purpose): job list, new
+job, job detail, and the Zookeeper draft panel.
+
+## The intent layer: Zookeeper drafting panel
+
+`app/src/lib/zookeeper.ts` is a native client for Zoo's ML copilot websocket
+(`wss://api.zoo.dev/ws/ml/copilot`), written from the reference client's own
+SPECIFICATION.md rather than depending on that package: `web-zookeeper` is credited
+as the reference but not installed, because it is unpublishable as released — its
+`dist/` is not committed and there is no `prepare` script, so
+`npm i github:KittyCAD/web-zookeeper` installs a package whose declared entrypoint
+does not exist (FN-025). Everything the client below assumes about the wire was
+measured live instead, in `server/spikes/ws-copilot-spike.mjs` (FN-025..028).
+
+Connection phases (`ConnectionPhase`):
+
+```
+idle --connect()--> connecting --first payload--> handshake --conversation_id--> ready
+                        |                |                                        |
+                        +----- error before ready, or close before deliberate -----+
+                                                    |                              |
+                                                    v                              v
+                                                 failed                  disconnect() -> closed
+```
+
+Structure follows the same pure-reducer shape used by the state machine and the
+fastening reference: `classifyFrame` (one server frame → a typed `ServerFrame`) and
+`applyFrame`/`beginTurn` (frame + `SessionAggregate` → next aggregate + effect) carry
+zero socket or DOM dependencies, and are the entire surface `zookeeper.selfcheck.ts`
+exercises — recorded frame fixtures run through the same pure functions the browser
+runs live, including FN-026's one-time spurious-auth swallow and FN-027's
+content-keyed duplicate dedupe. `ZookeeperClient` wraps a browser `WebSocket` around
+that reducer: open → send the auth frame → wipe the token → wait for the first
+server payload before sending anything else (racing ahead risks the socket being
+closed, FN-026) → `list_modes` → `conversation_id` → ready to draft.
+
+Token boundary, in words: the token is entered at runtime, held in memory only,
+sent once inside the auth frame straight from the browser to Zoo, and wiped the
+instant that frame is on the wire — and again on disconnect. The backend is never
+in this path; see the README's operator-mode section for why no proxy exists.
+
+The self-check gate is wired into `npm test` itself, not just dev-mode console
+warnings: `node --experimental-strip-types app/src/lib/zookeeper.selfcheck.ts` runs
+as the suite's last step, prints `self-checks: N passed`, and exits non-zero on any
+failure. The same fixtures also run on every `npm run dev` boot (`main.tsx`,
+dev-only, `console.warn` on failure) — a regression to the reducer shows up before
+a real prompt is ever sent.

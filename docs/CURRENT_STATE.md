@@ -2,6 +2,46 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
+## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
+
+**Works (100 server+app tests + self-checks: 40 passed; app builds clean)**
+- **Console theme tokenized** (`app/src/index.css`): the last hardcoded hex/rgba
+  values folded into CSS custom properties (hover shades, on-accent text, corner
+  radius, shadow tint). Zero computed-value change, verified by diffing the built
+  CSS before/after.
+- **Live lane proven end-to-end — including its failure mode:** job 7767ef93
+  (52×52×2 plate, four corner holes) ran a real generation on Zoo (154.2 s); the
+  supervising process died mid-poll, so the live lane grew measured recovery for
+  exactly that: `--resume-t2c-id` adopts the orphaned generation with no re-spend
+  (prompt-match guarded — a resumed record with no prompt at all is refused
+  outright, fail-closed), `--resume-job` re-enters the walk on the stranded job.
+  Mass gate: **14.1802 g measured vs 14.1775 g analytic (0.019%)**. Ledger verified,
+  dodCheck complete.
+- **Zookeeper drafting panel** (`app/src/views/DraftPanel.tsx`,
+  `app/src/lib/zookeeper.ts`): operator-mode NL chat over Zoo's copilot websocket,
+  pure frame-classifier/aggregator plus a thin socket wrapper, **40 self-checks**
+  wired into `npm test` as its last step (not just a dev-mode console warning).
+  A hardening pass added a client-instance guard against a stale client's async
+  close clobbering a fresh session, and surfaced backend-shutdown reasons in the
+  status strip.
+- **Full suite: 100 passed + self-checks: 40 passed.**
+
+**Operator queue (unchanged)**
+1. Print the fit coupons and red-pen the AC 43.13-1B / burn-cert table rows against
+   the printed sources — still PENDING across the board in `docs/VERIFICATION_LOG.md`.
+2. Go/no-go on any FN still queued for filing.
+3. The first live token session in the Zookeeper panel is the operator's to run —
+   it needs a real Zoo token pasted by a human; nothing in this build can exercise
+   operator mode on its own.
+
+**Next (Day 6)**
+- Form-created job click-through + the live-job console click-through — the
+  console side of the money demo, done by the controller today.
+- Video prep.
+- Buffer-week submission gates ahead of the August 5 close.
+
+---
+
 ## 2026-07-23 · Day 4 — the review console is live
 
 **Works (96/96 server tests; app builds clean; verified by click-through in a real browser)**
