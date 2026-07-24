@@ -258,6 +258,7 @@ export function beginTurn(agg: SessionAggregate, prompt: string): SessionAggrega
   return {
     ...agg,
     lastToolOutputJson: null, // dedupe window is per turn
+    lastError: null, // per-turn errors show on their own turn card, not as a stale banner
     turns: [
       ...agg.turns,
       {
