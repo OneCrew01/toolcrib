@@ -50,10 +50,18 @@ extended," never as two new products.
 | [BL-002](./BL-002-color-as-operation.md) | Color as the operation — "paint the op" | ready · not started | 2 (experimental) |
 | [BL-003](./BL-003-burn-cert-reference.md) | Burn-cert reference — design-for-flammability + min-wall gate + print recipe | **LANDED 07-23** (17 tests; pass/fail sample pair; BC rows PENDING operator) | released |
 | [BL-004](./BL-004-weight-and-balance.md) | Assembly weight & balance — mass-weighted CG gate | **LANDED 07-23** (12 tests via `node --test "server/wb/*.test.mjs"`; FN-029 frame trap found) | released |
+| [BL-005](./BL-005-panel-overlay-generator.md) | Panel-overlay generator — backlit, two-tone, modular overlays | ready · not started | 3 (most demo-worthy) |
 
 *BL-003/004 released early by explicit operator call (2026-07-23): build now IF the
 engineering rules above hold (new files only, demo untouched, suite green). BL-001/002
 remain frozen-until-idle.*
+
+*BL-005 filed 2026-07-23 at operator request: replaceable backlit panel overlays. The
+text-path fork (font glyph geo-map, OFL-licensed font) MUST be locked before build.
+Operator is a few days ahead and will decide with the team whether it becomes a feature
+project or a post-makeathon HAS capability. Frozen-until-idle unless the operator calls
+it up — it is the closest of the backlog to the existing flush-mount generator and the
+most visually demo-worthy.*
 
 *Origin: operator ideas, 2026-07-23 — both born from real panel-fab friction. Filed for
 the night team; operator scope stays frozen.*
