@@ -3,5 +3,16 @@
   "prompt": "A 50mm x 50mm x 2mm aluminum plate with four 5mm diameter holes, one near each corner, each hole center 10mm from both adjacent edges",
   "material": { "name": "aluminum 6061", "densityKgM3": 2700 },
   "units": "mm",
-  "requester": "shop-floor@example.com"
+  "requester": "shop-floor@example.com",
+  "expectedMassG": { "minG": 12.945, "maxG": 13.207 },
+  "massBasis": [
+    "JSON has no comments, so this array IS the comment: the arithmetic behind expectedMassG. It is inert — server/state/request.mjs:54 normalizes against a whitelist and drops it; only expectedMassG is read, from the RAW file, at server/pipeline/run-job.mjs:103.",
+    "NOMINAL is design intent, not the shipped mesh: 50 x 50 x 2 = 5000 mm3; four 5 mm dia. through-holes = 4 x pi x 2.5^2 x 2 = 50pi = 157.0796 mm3; solid = 4842.9204 mm3.",
+    "4842.9204 mm3 x 2700 kg/m3 x 1e-6 = 13.075885 g. This reproduces the FN-008 first-principles hand calc (13.077 g).",
+    "BAND = nominal +/-1% = +/-0.130759 g -> 12.945 .. 13.207 g, rounded outward to 3 dp.",
+    "Centered on NOMINAL, deliberately not on the fixture. The replay mesh reads 13.078605 g, which is +0.0208% high because the holes are 32-segment polygons rather than true circles (measured deficit 0.12592 mm2 per hole, exactly pi*r^2 - (32/2)*r^2*sin(2pi/32)). Re-centering on the mesh would bury that discretization error in the middle of the band instead of spending tolerance on it honestly.",
+    "WHY 1%: it is 48x the shipped fixture's tessellation error and ~3x the error of an absurdly coarse 8-segment re-mesh (+0.32%), so re-tessellating the SAME geometry cannot flip the gate red. It still rejects every defect class that matters here: all four holes missing (+3.24%), 6 mm dia. holes instead of 5 mm (-1.44%), 2.05 mm thick instead of 2.00 (+2.5%), 51 mm square instead of 50 (+4%).",
+    "KNOWN LIMIT, stated rather than hidden: exactly ONE missing hole out of four is +0.81% and lands INSIDE this band. Tightening to catch it would put the band edge within ~2.5x of coarse-remesh noise, trading a real false-negative for a likely false-positive.",
+    "Tighter than the live-lane sibling samples/requests/live-plate-52.json (+/-1.5%) on purpose: this replay path is deterministic, whereas live generation is not — FN-018 measured a 3.6% mass spread across five phrasings of one identical intent."
+  ]
 }

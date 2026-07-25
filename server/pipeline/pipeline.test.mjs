@@ -85,8 +85,21 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
   const byGate = Object.fromEntries(r.gates.results.map((g) => [g.gate, g.status]));
   assert.equal(byGate.envelope, "pass");
   assert.equal(byGate.watertight, "pass");
-  assert.equal(byGate.mass, "skipped:no-expectation"); // sample request states no range
+  assert.equal(byGate.mass, "pass"); // range + its arithmetic live in the request's massBasis
   assert.ok(Math.abs(r.gates.measured.massG - 13.0786) < 0.001); // agrees with Zoo /file/mass
+
+  // A verdict with no numbers behind it is not a check. Pin the gate's own
+  // computed-vs-expected sentence, and the headline gate line the demo prints
+  // — that line is the goal's first-named surface, and "mass=pass" there is
+  // the whole point of stating a range in the first place.
+  assert.equal(
+    r.gates.results.find((g) => g.gate === "mass").detail,
+    "computed 13.0786g (4843.9277mm3 x 2700kg/m3) vs expected 12.945-13.207g",
+  );
+  assert.match(
+    r.ledger.find((row) => row.to === STATE.PACKAGING).reason,
+    /^gates: envelope=pass, watertight=pass, mass=pass; measured /,
+  );
 
   // reference consult: rules touched, cited, and honestly watermarked
   assert.equal(r.consult.lookups.length, 2);
@@ -221,7 +234,7 @@ test("oversized part fails the envelope gate into GEOMETRY_INVALID", async () =>
   assert.equal(r.verify.ok, true);
 });
 
-test("mass gate: expected range enforced when the request states one", async () => {
+test("mass gate: enforced when the request states a range, skipped out loud when it does not", async () => {
   const { dataDir, outRoot, root } = dirs("mass");
   const fixturesDir = cubeFixtures(10); // 1000 mm3 x 2700 kg/m3 = 2.7 g
 
@@ -235,6 +248,19 @@ test("mass gate: expected range enforced when the request states one", async () 
   const ok = await runJob(okPath, { backend: "replay", dataDir, outRoot, fixturesDir, ...quiet });
   assert.equal(ok.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
   assert.equal(ok.gates.results.find((g) => g.gate === "mass").status, "pass");
+
+  // The skip branch is still real behaviour and still has to be covered. It
+  // used to be covered incidentally, by plain-plate.json having no range;
+  // now that the sample states one, cover it on purpose. A request with no
+  // expectation must SAY so and still report the number it computed — the
+  // failure mode to guard against is a silent green that measured nothing.
+  const nonePath = writeJson(root, "no-expectation.json", cubeRequest());
+  const none = await runJob(nonePath, { backend: "replay", dataDir, outRoot, fixturesDir, ...quiet });
+  assert.equal(none.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  const skipped = none.gates.results.find((g) => g.gate === "mass");
+  assert.equal(skipped.status, "skipped:no-expectation");
+  assert.equal(skipped.detail, "computed 2.7g; request states no expectedMassG range");
+  assert.equal(none.gates.skipped, true); // and the package must carry the warning
 });
 
 test("backend failure lands in GENERATION_FAILED", async () => {

@@ -206,6 +206,13 @@ export async function runJob(requestPath, {
   });
   job.artifacts.gates = gates;
   persistArtifacts(store, job);
+  // The ledger's gate line is a summary — "mass=pass" without ever showing the
+  // numbers behind it. The detail carries the computed-vs-expected comparison,
+  // and the demo console is the goal's first-named surface, so print it here.
+  // Before the ok/fail branch on purpose: a gate that just went red is exactly
+  // when the operator needs the measurement, not just the verdict.
+  log("\n--- geometry gates ---");
+  for (const g of gates.results) log(`  ${g.gate.padEnd(10)} ${g.status.padEnd(22)} ${g.detail}`);
   if (!gates.ok) {
     const failed = gates.results.filter((r) => r.status === "fail");
     await move(
