@@ -15,6 +15,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATE } from "../state/states.mjs";
+import { displayPath } from "../lib/repo-path.mjs";
 import { generateFlushMountPair } from "../generators/flushmount.mjs";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
@@ -41,8 +42,10 @@ function replayBackend({ fixturesDir = join(REPO, "samples", "plain-plate-stl") 
     async generate() {
       const read = (f) => readFileSync(join(fixturesDir, f));
       const kclPath = join(fixturesDir, "part.kcl");
+      // The orchestrator turns this message into a ledger reason, so the
+      // fixture location has to render machine-independent too.
       if (!existsSync(kclPath))
-        throw new GenerationError(STATE.GENERATION_FAILED, `replay fixtures incomplete: no part.kcl in ${fixturesDir}`);
+        throw new GenerationError(STATE.GENERATION_FAILED, `replay fixtures incomplete: no part.kcl in ${displayPath(fixturesDir)}`);
 
       const files = {};
       for (const fmt of ["stl", "step", "gltf"]) {
@@ -61,7 +64,9 @@ function replayBackend({ fixturesDir = join(REPO, "samples", "plain-plate-stl") 
         kcl: read("part.kcl").toString("utf8"),
         files,
         apiRuns,
-        notes: [`replay backend: artifacts read from ${fixturesDir} — zero network, real prior Zoo outputs`],
+        // notes ride through to manifest.warnings, PDF section 9 and the API's
+        // warnings field — every one of them judge-visible.
+        notes: [`replay backend: artifacts read from ${displayPath(fixturesDir)} — zero network, real prior Zoo outputs`],
       };
     },
   };

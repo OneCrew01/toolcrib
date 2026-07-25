@@ -21,6 +21,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { ACTOR, STATE } from "../state/states.mjs";
+import { displayPath } from "../lib/repo-path.mjs";
 import { LocalStore, TransitionError } from "../state/store.mjs";
 import { runJob } from "../pipeline/run-job.mjs";
 
@@ -215,7 +216,9 @@ async function createJob(ctx, body) {
     .catch((e) => ctx.log(JSON.stringify({ ts: new Date().toISOString(), evt: "pipeline-crash", err: e.message })))
     .finally(() => rmSync(reqPath, { force: true }));
 
-  const jobId = await watchForJobId(ctx, before, `request file: ${reqPath}`, run);
+  // Same renderer the pipeline uses for that reason — the needle only matches
+  // if both sides agree, and neither may print the operator's filesystem.
+  const jobId = await watchForJobId(ctx, before, `request file: ${displayPath(reqPath)}`, run);
   writeFileSync(
     join(ctx.jobsDir, `${jobId}.meta.json`),
     JSON.stringify({ jobId, backend, submittedVia: "api", ts: new Date().toISOString() }) + "\n",

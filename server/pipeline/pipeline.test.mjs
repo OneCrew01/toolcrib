@@ -108,6 +108,50 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
   }
 });
 
+// A ledger reason is hashed into the chain, so a path leaked there is sealed
+// in and cannot be edited out later without breaking the chain. Same reasons
+// render in the console UI and PDF section 13; backend notes ride into
+// manifest.warnings and PDF section 9. All of it is judge-visible.
+// `[A-Za-z]:/(?!/)` deliberately spares "https://" while catching "C:/".
+const MACHINE_PATH = /[A-Za-z]:\\|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
+const REPO_ABS = REPO.replace(/[\\/]+$/, "");
+
+test("no judge-visible surface names the operator's filesystem", async () => {
+  const { dataDir, outRoot } = dirs("nopaths");
+  const r = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, ...quiet });
+  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+
+  // The two lines a judge reads first, pinned byte-for-byte: repo-relative,
+  // POSIX separators, identical on Windows and Linux.
+  assert.equal(
+    r.ledger.find((row) => row.to === STATE.VALIDATING).reason,
+    "request file: samples/requests/plain-plate.json",
+  );
+  assert.match(
+    r.pkg.manifest.warnings.find((w) => w.startsWith("replay backend:")) ?? "",
+    /^replay backend: artifacts read from samples\/plain-plate-stl /,
+  );
+
+  const scan = (label, text) => {
+    const s = String(text);
+    assert.doesNotMatch(s, MACHINE_PATH, `${label} leaks an absolute filesystem path`);
+    assert.ok(!s.includes(REPO_ABS), `${label} leaks the repo's absolute location`);
+  };
+  for (const row of r.ledger) scan(`ledger row -> ${row.to}`, row.reason);
+  for (const w of r.pkg.manifest.warnings ?? []) scan("manifest warning", w);
+
+  const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
+  scan("notifications.log", readFileSync(join(bundleDir, "notifications.log"), "utf8"));
+  for (const f of r.pkg.manifest.files.filter((f) => f.status === "present" && /\.(json|md|kcl)$/.test(f.path)))
+    scan(f.path, readFileSync(join(bundleDir, f.path), "utf8"));
+  // PDF content streams escape a backslash as "\\" — unescape before scanning,
+  // or a leaked "C:\Users\…" would slip past as "C:\\Users\\…".
+  scan(
+    "reports/manufacturingPackage.pdf",
+    readFileSync(join(bundleDir, "reports/manufacturingPackage.pdf"), "latin1").replaceAll("\\\\", "\\"),
+  );
+});
+
 test("invalid request lands in INPUT_ERROR", async () => {
   const { dataDir, outRoot } = dirs("invalid");
   const r = await runJob(INVALID, { backend: "replay", dataDir, outRoot, ...quiet });

@@ -100,6 +100,22 @@ test("create (replay) -> gate -> approve -> DELIVERED, ledger verified throughou
   deliveredJobId = jobId;
 });
 
+// The console UI renders this payload verbatim — ledger reasons, manifest
+// warnings, gate notes. None of it may name the machine the run happened on.
+// `[A-Za-z]:/(?!/)` deliberately spares "https://" while catching "C:/".
+test("the detail payload the console renders names no filesystem path", async () => {
+  const MACHINE_PATH = /[A-Za-z]:\\{1,2}|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
+  const { body } = await api(`/api/jobs/${deliveredJobId}`);
+  const wire = JSON.stringify(body); // exactly the bytes the browser receives
+  assert.doesNotMatch(wire, MACHINE_PATH, "API detail response leaks an absolute path");
+  assert.ok(!wire.includes(REPO.replace(/[\\/]+$/, "")), "API detail response leaks the repo location");
+  // and the reason the create route matches on is the repo-relative rendering
+  assert.match(
+    body.ledger.find((r) => r.to === STATE.VALIDATING).reason,
+    /^request file: <outside-repo>\/[0-9a-f-]+\.json$/,
+  );
+});
+
 test("files route serves bundle files with correct content-types", async () => {
   const manifest = await api(`/api/jobs/${deliveredJobId}/files/manifest.json`);
   assert.equal(manifest.status, 200);
