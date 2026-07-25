@@ -5,9 +5,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATE } from "../state/states.mjs";
 import { runJob } from "./run-job.mjs";
@@ -116,6 +116,19 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
 const MACHINE_PATH = /[A-Za-z]:\\|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
 const REPO_ABS = REPO.replace(/[\\/]+$/, "");
 
+const scan = (label, text) => {
+  const s = String(text);
+  assert.doesNotMatch(s, MACHINE_PATH, `${label} leaks an absolute filesystem path`);
+  assert.ok(!s.includes(REPO_ABS), `${label} leaks the repo's absolute location`);
+};
+
+// Every file under dir, recursively, absolute.
+const walk = (dir) =>
+  readdirSync(dir).flatMap((f) => {
+    const p = join(dir, f);
+    return statSync(p).isDirectory() ? walk(p) : [p];
+  });
+
 test("no judge-visible surface names the operator's filesystem", async () => {
   const { dataDir, outRoot } = dirs("nopaths");
   const r = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, ...quiet });
@@ -132,24 +145,27 @@ test("no judge-visible surface names the operator's filesystem", async () => {
     /^replay backend: artifacts read from samples\/plain-plate-stl /,
   );
 
-  const scan = (label, text) => {
-    const s = String(text);
-    assert.doesNotMatch(s, MACHINE_PATH, `${label} leaks an absolute filesystem path`);
-    assert.ok(!s.includes(REPO_ABS), `${label} leaks the repo's absolute location`);
-  };
   for (const row of r.ledger) scan(`ledger row -> ${row.to}`, row.reason);
   for (const w of r.pkg.manifest.warnings ?? []) scan("manifest warning", w);
 
+  // EVERY file in the bundle, not a filtered subset of manifest.files. The bar
+  // is "the generated bundle contains none", and manifest.files does not list
+  // manifest.json itself, so an extension filter over it skipped the manifest,
+  // both exports and the preview — 6 of the 12 files actually written. Read as
+  // latin1 so binaries are scanned as bytes rather than skipped, and unescape
+  // "\\" first: PDF content streams and JSON both escape a backslash, so a
+  // leaked Windows path would otherwise slip past with doubled separators.
   const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
-  scan("notifications.log", readFileSync(join(bundleDir, "notifications.log"), "utf8"));
-  for (const f of r.pkg.manifest.files.filter((f) => f.status === "present" && /\.(json|md|kcl)$/.test(f.path)))
-    scan(f.path, readFileSync(join(bundleDir, f.path), "utf8"));
-  // PDF content streams escape a backslash as "\\" — unescape before scanning,
-  // or a leaked "C:\Users\…" would slip past as "C:\\Users\\…".
-  scan(
-    "reports/manufacturingPackage.pdf",
-    readFileSync(join(bundleDir, "reports/manufacturingPackage.pdf"), "latin1").replaceAll("\\\\", "\\"),
-  );
+  const bundleFiles = walk(bundleDir);
+  const rel = (abs) => relative(bundleDir, abs).split(sep).join("/");
+  for (const abs of bundleFiles) scan(rel(abs), readFileSync(abs, "latin1").replaceAll("\\\\", "\\"));
+
+  // A filter that quietly matches nothing passes vacuously, so the scan has to
+  // prove it actually looked at the files a judge opens.
+  const names = bundleFiles.map(rel);
+  for (const required of ["manifest.json", "notifications.log", "reports/manufacturingPackage.pdf"])
+    assert.ok(names.includes(required), `bundle scan never reached ${required}`);
+  assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
 });
 
 test("invalid request lands in INPUT_ERROR", async () => {
@@ -199,8 +215,15 @@ test("backend failure lands in GENERATION_FAILED", async () => {
   mkdirSync(empty, { recursive: true });
   const r = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, fixturesDir: empty, ...quiet });
   assert.equal(r.finalState, STATE.GENERATION_FAILED);
-  assert.match(r.ledger.at(-1).reason, /no part\.kcl/);
   assert.equal(r.verify.ok, true);
+
+  // The failure path seals its reason into the hash chain exactly like the
+  // happy path, and renders in the console UI and PDF section 13 the same way.
+  // /no part\.kcl/ alone stays green whether the dir renders relative or
+  // absolute, so pin the rendering itself: this fixturesDir is a temp dir,
+  // which is outside the repo by construction.
+  assert.match(r.ledger.at(-1).reason, /^replay fixtures incomplete: no part\.kcl in <outside-repo>\/empty-fixtures$/);
+  for (const row of r.ledger) scan(`GENERATION_FAILED ledger row -> ${row.to}`, row.reason);
 });
 
 test("flushmount: parks at the gate with the mesh-less bundle loudly incomplete", async () => {

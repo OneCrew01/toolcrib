@@ -5,7 +5,7 @@
 
 import { test, after } from "node:test";
 import assert from "node:assert";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -100,11 +100,13 @@ test("create (replay) -> gate -> approve -> DELIVERED, ledger verified throughou
   deliveredJobId = jobId;
 });
 
+// `[A-Za-z]:/(?!/)` deliberately spares "https://" while catching a drive
+// letter followed by a forward slash.
+const MACHINE_PATH = /[A-Za-z]:\\{1,2}|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
+
 // The console UI renders this payload verbatim — ledger reasons, manifest
 // warnings, gate notes. None of it may name the machine the run happened on.
-// `[A-Za-z]:/(?!/)` deliberately spares "https://" while catching "C:/".
 test("the detail payload the console renders names no filesystem path", async () => {
-  const MACHINE_PATH = /[A-Za-z]:\\{1,2}|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
   const { body } = await api(`/api/jobs/${deliveredJobId}`);
   const wire = JSON.stringify(body); // exactly the bytes the browser receives
   assert.doesNotMatch(wire, MACHINE_PATH, "API detail response leaks an absolute path");
@@ -114,6 +116,33 @@ test("the detail payload the console renders names no filesystem path", async ()
     body.ledger.find((r) => r.to === STATE.VALIDATING).reason,
     /^request file: <outside-repo>\/[0-9a-f-]+\.json$/,
   );
+});
+
+// The success payload is only half the channel. The other half is a message
+// nobody here authored: Node's fs errors name the absolute path they failed
+// on, app/src/lib/api.ts lifts body.error straight into ApiError.message, and
+// the console renders that as the error banner. Measured before the fix — GET
+// /api/jobs with the jobs dir removed answered 500 with an ENOENT naming the
+// operator's home directory. This drives the real uncaught path (readdirSync
+// inside listJobs), not a synthetic throw, so it stays honest about the route.
+test("error responses name no filesystem path, even when Node writes the message", async () => {
+  const scratch = join(mkdtempSync(join(tmpdir(), "toolcrib-api-err-")), "data");
+  const s = createApiServer({ dataDir: scratch, log: () => {} });
+  await new Promise((r) => s.listen(0, "127.0.0.1", r));
+  try {
+    rmSync(join(scratch, "jobs"), { recursive: true, force: true }); // the store's constructor made it
+    const res = await fetch(`http://127.0.0.1:${s.address().port}/api/jobs`);
+    const wire = await res.text(); // exactly the bytes the browser receives
+    assert.equal(res.status, 500, `expected the uncaught readdir to surface as a 500, got ${wire}`);
+    assert.doesNotMatch(wire, MACHINE_PATH, `500 body leaks an absolute path: ${wire}`);
+    assert.ok(!wire.includes(REPO.replace(/[\\/]+$/, "")), "500 body leaks the repo location");
+    // Scrubbed, not blanked: a judge-safe error still has to say what broke.
+    assert.match(wire, /ENOENT/, `the scrub swallowed the diagnosis: ${wire}`);
+    assert.match(wire, /<outside-repo>\/jobs/, `the failing path lost its leaf: ${wire}`);
+  } finally {
+    s.closeAllConnections?.();
+    s.close();
+  }
 });
 
 test("files route serves bundle files with correct content-types", async () => {

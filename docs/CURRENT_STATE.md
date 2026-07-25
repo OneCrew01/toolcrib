@@ -4,7 +4,7 @@
 
 ## 2026-07-24 Â· Day 5 â€” the live lane survives a real crash; Zookeeper joins the console
 
-**Works (122 server+app tests + self-checks: 40 passed; app builds clean)**
+**Works (129 server+app tests + self-checks: 40 passed; app builds clean)**
 - **Console theme tokenized** (`app/src/index.css`): the last hardcoded hex/rgba
   values folded into CSS custom properties (hover shades, on-accent text, corner
   radius, shadow tint). Zero computed-value change, verified by diffing the built

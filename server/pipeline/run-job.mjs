@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from "node:fs"
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ACTOR, STATE } from "../state/states.mjs";
-import { displayPath } from "../lib/repo-path.mjs";
+import { displayPath, scrubPaths } from "../lib/repo-path.mjs";
 import { LocalStore } from "../state/store.mjs";
 import { makeBackend, GenerationError } from "./backends.mjs";
 import { consultReference } from "./consult.mjs";
@@ -161,8 +161,15 @@ export async function runJob(requestPath, {
   try {
     artifacts = await gen.generate(job);
   } catch (e) {
+    // scrubPaths on every message that crosses a contract boundary into the
+    // ledger. Our own strings carry no absolute paths, so this is a no-op on
+    // them — it exists for the messages we do NOT author: a swapped backend, an
+    // injected analyzeStl/assemblePackage (deps is a first-class seam here), or
+    // a raw Node fs error surfacing through one of them. A ledger reason is the
+    // one surface that cannot be corrected after the fact: it is hashed into
+    // the chain, so a path that lands here is sealed in.
     const state = e instanceof GenerationError ? e.state : STATE.GENERATION_FAILED;
-    await move(state, e.message);
+    await move(state, scrubPaths(e.message));
     return finish(null, null, consult);
   }
   job.artifacts.generation = {
@@ -187,7 +194,7 @@ export async function runJob(requestPath, {
     try {
       analysis = analyzeStl(artifacts.files.stl);
     } catch (e) {
-      await move(STATE.GEOMETRY_INVALID, `stl analysis failed: ${e.message}`);
+      await move(STATE.GEOMETRY_INVALID, `stl analysis failed: ${scrubPaths(e.message)}`);
       return finish(null, null, consult);
     }
   }
@@ -247,12 +254,12 @@ export async function runJob(requestPath, {
     });
   } catch (e) {
     if (e.name === "ExportError") {
-      await move(STATE.EXPORT_FAILED, `export/packaging failed: ${e.message}`);
+      await move(STATE.EXPORT_FAILED, `export/packaging failed: ${scrubPaths(e.message)}`);
       return finish(null, gates, consult);
     }
     if (e.name === "PdfError") {
       await move(STATE.PDF_GENERATION, "exports sealed; entering PDF render");
-      await move(STATE.PDF_FAILED, `pdf render failed: ${e.message}`);
+      await move(STATE.PDF_FAILED, `pdf render failed: ${scrubPaths(e.message)}`);
       return finish(null, gates, consult);
     }
     throw e; // unknown contract violation: crash loud, do not misfile it

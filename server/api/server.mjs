@@ -21,7 +21,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { ACTOR, STATE } from "../state/states.mjs";
-import { displayPath } from "../lib/repo-path.mjs";
+import { displayPath, scrubPaths } from "../lib/repo-path.mjs";
 import { LocalStore, TransitionError } from "../state/store.mjs";
 import { runJob } from "../pipeline/run-job.mjs";
 
@@ -388,9 +388,20 @@ export function createApiServer({
       return sendJson(404, { error: `no route: ${req.method} ${url.pathname}` });
     } catch (e) {
       const err = e instanceof URIError ? new HttpError(400, "bad path encoding") : asHttp(e);
-      if (err instanceof HttpError) return sendJson(err.status, { error: err.message });
+      // The single choke point for every error body this API emits, and the
+      // reason the scrub lives here rather than at each throw site: an
+      // unhandled error is by definition one nobody wrote a message for. Node
+      // wrote it, and Node names the absolute path it failed on — a real GET
+      // /api/jobs against a missing jobs dir answered 500 with "ENOENT: ...
+      // scandir '<operator home>\data\jobs'". app/src/lib/api.ts lifts
+      // body.error into ApiError.message and the console renders it, so that
+      // string lands on a judge's screen. Scrubbing keeps the diagnosis
+      // (which call failed, on which relative path) while dropping the
+      // machine identity; a blanket "internal error" would drop both.
+      const message = scrubPaths(err instanceof HttpError ? err.message : (err?.message ?? err));
+      if (err instanceof HttpError) return sendJson(err.status, { error: message });
       ctx.log(JSON.stringify({ ts: new Date().toISOString(), evt: "unhandled", err: String(err?.stack ?? err) }));
-      return sendJson(500, { error: String(err?.message ?? err) });
+      return sendJson(500, { error: message });
     }
   });
 }
