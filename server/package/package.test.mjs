@@ -173,6 +173,33 @@ test("fixture bundle: all files land, hashes recompute, packageHash matches the 
   assert.ok(manifest.warnings.some((w) => w.includes("DRAFT - NOT VERIFIED")));
 });
 
+// The bundle's entire claim is that every number in it was measured. An
+// unmeasured minute count must therefore be legibly absent, not quietly zero:
+// a reader has to be able to tell "nobody measured this" from "it cost nothing."
+test("unmeasured API minutes seal as null with a note — never as a zero posing as a reading", () => {
+  const artifacts = fixtureArtifacts();
+  delete artifacts.apiRun.minutesUsed; // the pipeline supplies no measurement
+  const analysis = analyzeStl(read("source.stl"));
+  const { bundleDir, manifest } = assemblePackage(fakeJob(), artifacts, fixtureGates(analysis), {
+    outRoot: newOut(),
+  });
+
+  assert.strictEqual(manifest.apiRuns.minutesUsed, null);
+  assert.notStrictEqual(manifest.apiRuns.minutesUsed, 0);
+  assert.ok(/NOT MEASURED/.test(manifest.apiRuns.minutesUsedNote), manifest.apiRuns.minutesUsedNote);
+  assert.ok(/FN-031/.test(manifest.apiRuns.minutesUsedNote), "note must cite the field note");
+
+  // the same honesty in the log file the manifest hashes
+  const log = JSON.parse(readFileSync(join(bundleDir, "logs/apiRun.json"), "utf8"));
+  assert.strictEqual(log.minutesUsed, null);
+  assert.ok(/NOT MEASURED/.test(log.minutesUsedNote));
+
+  // and a genuine measurement still ships as a number, unqualified
+  const measured = buildFixtureBundle().manifest;
+  assert.strictEqual(measured.apiRuns.minutesUsed, 1.42);
+  assert.strictEqual(measured.apiRuns.minutesUsedNote, undefined);
+});
+
 test("packageHash is stable: same inputs, two assemblies, identical manifests", () => {
   const a = buildFixtureBundle();
   const b = buildFixtureBundle();

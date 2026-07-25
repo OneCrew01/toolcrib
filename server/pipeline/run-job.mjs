@@ -249,7 +249,14 @@ export async function runJob(requestPath, {
       verification: lk.result.verification,
       ...(lk.result.watermark ? { watermark: lk.result.watermark } : {}),
     })),
-    apiRun: { calls: artifacts.apiRuns ?? [], totalCalls: (artifacts.apiRuns ?? []).length, minutesUsed: 0 },
+    // No minutesUsed key on purpose. This pipeline has no per-run minute
+    // measurement to hand over: backends record client-side wall clock
+    // (backends.mjs `latencyS`), which is not billed minutes, and no Zoo
+    // surface this client exercises returns a per-run minute or cost figure
+    // (FN-031). Omitting the key rather than passing a number keeps the
+    // producer honest at the one place that would have to invent one; the
+    // assembler seals the absence as an explicit null.
+    apiRun: { calls: artifacts.apiRuns ?? [], totalCalls: (artifacts.apiRuns ?? []).length },
     ledger: await store.readLedger(jobId),
     warnings: [...(artifacts.notes ?? []), ...(consult.findings ?? [])],
   };

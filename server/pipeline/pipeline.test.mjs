@@ -115,6 +115,16 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
   assert.ok(present.some((p) => /^cad\/.+\.kcl$/.test(p)), "bundle missing cad KCL");
   assert.ok(present.some((p) => /^exports\/.+\.stl$/.test(p)), "bundle missing stl export");
 
+  // The pipeline measures no per-run API minutes and must not seal a number
+  // saying it did. `0` would be a fabricated measurement inside a bundle whose
+  // whole pitch is that its numbers are real; `null` + note says "unmeasured"
+  // out loud (FN-031).
+  if (!r.pkg.stub) {
+    assert.strictEqual(r.pkg.manifest.apiRuns.minutesUsed, null);
+    assert.notStrictEqual(r.pkg.manifest.apiRuns.minutesUsed, 0);
+    assert.ok(/NOT MEASURED/.test(r.pkg.manifest.apiRuns.minutesUsedNote ?? ""));
+  }
+
   // cross-track audit: the packager's own DoD checker signs off on the bundle
   if (!r.pkg.stub) {
     const { dodCheck } = await import("../package/assemble.mjs");

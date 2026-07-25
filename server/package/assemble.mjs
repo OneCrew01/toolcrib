@@ -52,6 +52,17 @@ export const PDF_SECTIONS = Object.freeze([
 
 const GATE_RESULTS = new Set(["PASS", "FAIL", "SKIPPED"]);
 
+// A number in minutesUsed is a billing claim, and this bundle's whole value is
+// that every number in it was measured. So an absent measurement seals as
+// `null` — never `0`, which a reader takes as "measured, and it cost nothing."
+// The note ships alongside the null so the distinction survives outside this
+// file, in a manifest read by someone who never sees this comment.
+const MINUTES_UNMEASURED_NOTE =
+  "minutesUsed is null because per-run minutes were NOT MEASURED — not because this run consumed zero. " +
+  "No Zoo API surface exercised by this pipeline reports per-run minutes or cost; the only spend signal " +
+  "found is the account-level balance, and a balance delta is campaign-level, not per-run " +
+  "(docs/API_FIELD_NOTES.md FN-031).";
+
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 
 /**
@@ -94,6 +105,9 @@ function statedMeasurements(prompt) {
  *   {kcl (REQUIRED string|Buffer), stl?, step?, png? (Buffers),
  *    partName?, machine?, reference?: [{parameter?, citation?, verification?, watermark?}],
  *    apiRun?: {calls?: [], totalCalls?, minutesUsed?}, ledger?: LedgerRow[], warnings?: string[]}
+ *   minutesUsed is OPTIONAL and must only be supplied when it was actually
+ *   measured. Omit it when it was not: the assembler seals absence as `null`
+ *   plus a note, and a `0` here would read downstream as a measurement.
  * @param {Array}  gates      [{gate, result: PASS|FAIL|SKIPPED, threshold?, measured?, notes?}]
  * @param {object} opts       {outRoot (REQUIRED), expectMesh = true, projectId?, workflowId?, now?}
  * @returns {{bundleDir: string, manifest: object, analysis: object|null}}
@@ -194,10 +208,14 @@ export function assemblePackage(job, artifacts = {}, gates = [], opts = {}) {
     throw new PdfError(`job ${job.jobId}: PDF writer returned invalid bytes`);
   emit("reports/manufacturingPackage.pdf", pdfBytes, "pdf");
 
+  // null, not 0: see MINUTES_UNMEASURED_NOTE. A caller that genuinely measured
+  // minutes passes the number and no note is emitted.
+  const minutesUsed = artifacts.apiRun?.minutesUsed ?? null;
   const apiRun = {
     jobId: job.jobId,
     totalCalls: artifacts.apiRun?.totalCalls ?? artifacts.apiRun?.calls?.length ?? 0,
-    minutesUsed: artifacts.apiRun?.minutesUsed ?? 0,
+    minutesUsed,
+    ...(minutesUsed == null ? { minutesUsedNote: MINUTES_UNMEASURED_NOTE } : {}),
     calls: artifacts.apiRun?.calls ?? [],
     ...(artifacts.apiRun ? {} : { note: "no API activity recorded for this assembly (offline/fixture run)" }),
   };
@@ -225,7 +243,11 @@ export function assemblePackage(job, artifacts = {}, gates = [], opts = {}) {
     packageHash: packageHashOf(files.filter((f) => f.status === "present").map((f) => f.sha256)),
     files,
     validation,
-    apiRuns: { totalCalls: apiRun.totalCalls, minutesUsed: apiRun.minutesUsed },
+    apiRuns: {
+      totalCalls: apiRun.totalCalls,
+      minutesUsed,
+      ...(minutesUsed == null ? { minutesUsedNote: MINUTES_UNMEASURED_NOTE } : {}),
+    },
     warnings,
   };
   writeFileSync(join(bundleDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");

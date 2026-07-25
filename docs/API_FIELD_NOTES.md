@@ -410,6 +410,70 @@ and confirmed to resolve before it was written down.
   authored KCL 2.0 constraint sketches export clean through `export_kcl` — millimeters
   preserved as authored, minimal watertight binary STL.
 
+## FN-031 · Per-run minute accounting is unavailable on every surface we exercised — so the manifest ships `null`, not `0`
+- **Surface:** billing `GET /user/payment/balance` · Agent/ML `GET /user/text-to-cad/{id}` and
+  `GET /async/operations/{id}` · copilot websocket frames · **Date:** 2026-07-25
+- **Type:** measurement gap (doc-gap + self-audit finding)
+- **Expected:** the contest meters entrants in *minutes* (FN-003), so a per-job package ought
+  to be able to state the minutes that job consumed — in the same unit the grant is denominated in.
+- **What we actually measured:** per-run **wall-clock latency, client-side**. The poll loop
+  timestamps itself (`server/lib/zoo.mjs:78-94`) and the live backend records it as
+  `apiRuns[].latencyS` (`server/pipeline/backends.mjs:146`). That is elapsed time observed from
+  our side. It is not billed minutes, and this package never claimed it was.
+- **What we searched, and what each surface returned:**
+  - `GET /user/text-to-cad/{id}` — status, prompt, `code`. No duration, minutes, credits, or cost field.
+  - `GET /async/operations/{id}` — `outputs` (FN-007). Same: nothing about cost.
+  - `GET /user/payment/balance` — the **only** spend signal we found, and it is account-level:
+    `stable_api_credits_remaining_monetary_value` (`server/lib/zoo.mjs:30-33`). Attributing one
+    job's spend means differencing that balance across the job, which requires real spend and is
+    only stable at campaign granularity. That is exactly how FN-017 derived the ≈1 credit /
+    API-second rate — from campaigns c001+c002 as an instrument, never from a per-run field.
+  - copilot websocket — of the frame keys this client classifies
+    (`app/src/lib/zookeeper.ts:64-83`, three live sessions, FN-026…FN-028) not one carries a
+    minutes or cost field. Two near-misses worth naming rather than hiding behind a flat "no":
+    `session_data.api_call_id` is a metering **handle** — an id, not a quantity — and
+    `end_of_stream` does carry server-side `started_at`/`completed_at`
+    (`app/src/lib/zookeeper.ts:159-160`), i.e. a genuine *server-side duration* per turn
+    (FN-028 clocked one at 45.5 s). That is still not billed minutes: converting duration to
+    minutes-charged needs FN-017's ≈1 credit/API-second rate, which is **our arithmetic
+    inference, not a published or returned figure** — and this pipeline generates through
+    text-to-cad, not copilot, so no job it packages has an `end_of_stream` to read anyway.
+    **Caveat, stated rather than papered over:** we
+    deliberately leave four key families unmodelled (`replay`, `files`, `request_attachments`,
+    and the `metrics` family). The spike logged them raw but nobody audited them field-by-field
+    for a cost value, so treat them as **unaudited, not cleared**. The one adjacent datum we do
+    have points away from billing: on the *modeling* socket the metrics traffic is the server
+    *requesting* metrics from the client, answerable empty (FN-014) — telemetry flowing the
+    other way.
+- **What remains UNKNOWN — two things, named:**
+  1. We did **not** enumerate the full OpenAPI document (FN-002, ~1.18 MB at the API root)
+     hunting for a metering or api-call-listing endpoint, and no copy of it is cached in this repo.
+  2. The unmodelled copilot frame families above were never read field-by-field.
+  So the claim this note supports is bounded: **no surface this client exercises exposes per-run
+  minutes** — *not* "no such surface exists." Settling either point takes a live generation to
+  spend against, which this pass deliberately did not do.
+- **Impact — the defect this note exists to record:** `server/pipeline/run-job.mjs` hardcoded
+  `minutesUsed: 0`, which flowed into every sealed `manifest.json` and `logs/apiRun.json`. Nobody
+  measured zero; zero was the default that shipped. In a bundle whose entire pitch is that its
+  numbers are real and hash-sealed, a fabricated measurement is the worst class of defect — it is
+  sealed, tamper-evident, and wrong. **Fixed:** the pipeline omits the key
+  (`server/pipeline/run-job.mjs:252-259`), the assembler seals `minutesUsed: null` plus a
+  `minutesUsedNote` reading NOT MEASURED into both `logs/apiRun.json` and the manifest
+  (`server/package/assemble.mjs:55-64`, `:213-222`, `:246-250`). `null` and `0` are now different
+  statements to a reader who never sees our source.
+- **Deliberately not done:** `latencyS / 60` is a tempting stand-in — FN-017 measured that real
+  generations bill ≈ their runtime — but a derived estimate sitting in a field named `minutesUsed`
+  is the same fabrication with arithmetic in front of it. If that estimate ever ships it ships
+  under its own name, with its basis attached.
+- **Repro:** `npm run demo`, then read
+  `server/pipeline/data/packages/<jobId>/manifest.json` → `apiRuns.minutesUsed` is `null` carrying
+  the note. Before the fix the same field read `0`. Regression-locked in
+  `server/package/package.test.mjs` and `server/pipeline/pipeline.test.mjs`.
+- **Suggested doc edit:** the text-to-cad and async-operation records should carry the billed cost
+  of that call (credits and/or API-seconds), and the balance page should state plainly that
+  per-call cost is not retrievable per call today. FN-003 asked for the grant to be labeled; this
+  is the same gap one level down — an entrant metered in minutes cannot attribute minutes to a job.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)
@@ -516,7 +580,7 @@ documentation only.
 |---|---|---|---|
 | FN-001 | Bearer auth on `GET /user` | [API reference overview](https://zoo.dev/docs/developer-tools/api) | confirms |
 | FN-002 | OpenAPI spec served at API root | [API reference overview](https://zoo.dev/docs/developer-tools/api) | fills — spec location under-advertised |
-| FN-003 · FN-017 | `GET /user/payment/balance` | [Get balance for your user](https://zoo.dev/docs/developer-tools/api/payments/get-balance-for-your-user) | fills — grant not labeled; no credits→minutes mapping |
+| FN-003 · FN-017 · FN-031 | `GET /user/payment/balance` | [Get balance for your user](https://zoo.dev/docs/developer-tools/api/payments/get-balance-for-your-user) | fills — grant not labeled; no credits→minutes mapping; balance is account-level, so no per-call cost attribution |
 | FN-004 · FN-016 | Export formats / DXF path | [Convert CAD file](https://zoo.dev/docs/developer-tools/api/file/convert-cad-file-from-one-format-to-another) | fills — DXF (`OutputFormat2d`/`export2d`) not cross-linked |
 | FN-005 · FN-006 · FN-018 · FN-020 | Text-to-CAD generation | [Generate a CAD model from text](https://zoo.dev/docs/developer-tools/api/ml/generate-a-cad-model-from-text) | contradicts — latency variance + non-determinism undocumented |
 | FN-007 · FN-011 | `outputs` surface split | [Get an async operation](https://zoo.dev/docs/developer-tools/api/api-calls/get-an-async-operation) | fills — outputs live only here; dedupe hits carry no async record |
