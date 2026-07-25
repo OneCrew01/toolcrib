@@ -321,7 +321,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       process.exit(r.finalState === STATE.WAITING_FOR_HUMAN_REVIEW ? 0 : 1);
     })
     .catch((e) => {
-      console.error(`pipeline crashed: ${e.stack ?? e}`);
+      // The demo console is the goal's first-named surface and this is the
+      // cheapest way onto it: one typo in the request path and Node's ENOENT
+      // arrives naming the operator's home directory, followed by a stack of
+      // file:// frames naming the repo location. Measured, from a mistyped
+      // `npm run job` argument. Scrubbing leaves the diagnosis intact and the
+      // frames repo-relative, which is the more readable stack anyway.
+      console.error(`pipeline crashed: ${scrubPaths(e?.stack ?? e)}`);
       process.exit(1);
     });
 }

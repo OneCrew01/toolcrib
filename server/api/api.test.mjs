@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATE, TERMINAL } from "../state/states.mjs";
+import { MACHINE_PATH } from "../lib/repo-path.mjs";
 import { createApiServer } from "./server.mjs";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
@@ -100,9 +101,10 @@ test("create (replay) -> gate -> approve -> DELIVERED, ledger verified throughou
   deliveredJobId = jobId;
 });
 
-// `[A-Za-z]:/(?!/)` deliberately spares "https://" while catching a drive
-// letter followed by a forward slash.
-const MACHINE_PATH = /[A-Za-z]:\\{1,2}|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
+// The leak detector is imported, not re-declared. Three private copies had
+// drifted apart and each had holes the others did not; the shared one lives
+// beside scrubPaths so a shape the scrubber learns about is a shape every
+// suite starts checking for.
 
 // The console UI renders this payload verbatim — ledger reasons, manifest
 // warnings, gate notes. None of it may name the machine the run happened on.
@@ -125,17 +127,32 @@ test("the detail payload the console renders names no filesystem path", async ()
 // /api/jobs with the jobs dir removed answered 500 with an ENOENT naming the
 // operator's home directory. This drives the real uncaught path (readdirSync
 // inside listJobs), not a synthetic throw, so it stays honest about the route.
+// The dataDir deliberately sits under directories WITH SPACES IN THEM, named
+// like a person: a Windows profile directory is "<drive>:\Users\John Doe", and
+// a run whose scrub stopped at the first space rewrote the prefix and printed
+// "Doe\...\jobs" verbatim — the half of the path that carries the name. That
+// remainder has no drive letter and no home root, so every leak regex in this
+// repo called it clean. The name here is invented; it must not appear anywhere
+// in what the browser or the terminal receives.
 test("error responses name no filesystem path, even when Node writes the message", async () => {
-  const scratch = join(mkdtempSync(join(tmpdir(), "toolcrib-api-err-")), "data");
-  const s = createApiServer({ dataDir: scratch, log: () => {} });
+  const scratch = join(mkdtempSync(join(tmpdir(), "toolcrib api err-")), "Jean Voss", "run data", "data");
+  const logged = [];
+  const s = createApiServer({ dataDir: scratch, log: (line) => logged.push(line) });
   await new Promise((r) => s.listen(0, "127.0.0.1", r));
   try {
     rmSync(join(scratch, "jobs"), { recursive: true, force: true }); // the store's constructor made it
     const res = await fetch(`http://127.0.0.1:${s.address().port}/api/jobs`);
     const wire = await res.text(); // exactly the bytes the browser receives
     assert.equal(res.status, 500, `expected the uncaught readdir to surface as a 500, got ${wire}`);
-    assert.doesNotMatch(wire, MACHINE_PATH, `500 body leaks an absolute path: ${wire}`);
-    assert.ok(!wire.includes(REPO.replace(/[\\/]+$/, "")), "500 body leaks the repo location");
+    // Both halves of the handler: the body the console renders, and the log
+    // line `npm start` puts in a terminal beside it. A judge can see either.
+    for (const [label, text] of [["500 body", wire], ["log sink", logged.join("\n")]]) {
+      assert.doesNotMatch(text, MACHINE_PATH, `${label} leaks an absolute path: ${text}`);
+      assert.ok(!text.includes(REPO.replace(/[\\/]+$/, "")), `${label} leaks the repo location`);
+      for (const seg of ["Jean", "Voss", "run data"])
+        assert.ok(!text.includes(seg), `${label} leaks the path segment "${seg}": ${text}`);
+    }
+    assert.ok(logged.some((l) => l.includes("unhandled")), "the unhandled-error log line never fired");
     // Scrubbed, not blanked: a judge-safe error still has to say what broke.
     assert.match(wire, /ENOENT/, `the scrub swallowed the diagnosis: ${wire}`);
     assert.match(wire, /<outside-repo>\/jobs/, `the failing path lost its leaf: ${wire}`);

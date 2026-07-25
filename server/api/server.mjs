@@ -400,7 +400,11 @@ export function createApiServer({
       // machine identity; a blanket "internal error" would drop both.
       const message = scrubPaths(err instanceof HttpError ? err.message : (err?.message ?? err));
       if (err instanceof HttpError) return sendJson(err.status, { error: message });
-      ctx.log(JSON.stringify({ ts: new Date().toISOString(), evt: "unhandled", err: String(err?.stack ?? err) }));
+      // The log sink is judge-visible too: the default is console.log and
+      // README's `npm start` puts it in a terminal beside the browser. An
+      // unscrubbed stack here would hand back the exact path the response body
+      // was just spared, so both halves of this handler get the same treatment.
+      ctx.log(JSON.stringify({ ts: new Date().toISOString(), evt: "unhandled", err: scrubPaths(err?.stack ?? err) }));
       return sendJson(500, { error: message });
     }
   });

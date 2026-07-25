@@ -6,10 +6,12 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATE } from "../state/states.mjs";
+import { MACHINE_PATH } from "../lib/repo-path.mjs";
 import { runJob } from "./run-job.mjs";
 import { analyzeStl, ExportError, PdfError } from "./contract-stubs.mjs";
 
@@ -112,8 +114,10 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
 // in and cannot be edited out later without breaking the chain. Same reasons
 // render in the console UI and PDF section 13; backend notes ride into
 // manifest.warnings and PDF section 9. All of it is judge-visible.
-// `[A-Za-z]:/(?!/)` deliberately spares "https://" while catching "C:/".
-const MACHINE_PATH = /[A-Za-z]:\\|[A-Za-z]:\/(?!\/)|\/(?:home|Users)\//;
+//
+// MACHINE_PATH is imported, not re-declared. The copy that used to live here
+// looked only for a drive letter or a home root, so "/root/<user>/part.stl" or
+// the tail of a path containing a space would have scanned green.
 const REPO_ABS = REPO.replace(/[\\/]+$/, "");
 
 const scan = (label, text) => {
@@ -166,6 +170,30 @@ test("no judge-visible surface names the operator's filesystem", async () => {
   for (const required of ["manifest.json", "notifications.log", "reports/manufacturingPackage.pdf"])
     assert.ok(names.includes(required), `bundle scan never reached ${required}`);
   assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
+});
+
+// The demo console is the goal's first-named surface, and the cheapest route
+// onto it is a typo: README documents `npm run job <request>`, and a request
+// path that does not exist crashes out of readFileSync before any state
+// machine runs. Measured against the previous commit, that printed Node's
+// ENOENT naming the operator's home directory plus a stack of file:// frames
+// naming the repo location. This drives the real CLI, in a child process,
+// because the leak lived in the CLI's own catch — not in runJob.
+test("a mistyped request path crashes without naming the machine", () => {
+  const cli = join(REPO, "server", "pipeline", "run-job.mjs");
+  const r = spawnSync(process.execPath, [cli, "samples/requests/no-such-request.json", "--backend=replay"], {
+    cwd: REPO,
+    encoding: "utf8",
+  });
+  const out = `${r.stdout}${r.stderr}`;
+  assert.equal(r.status, 1, `expected a crash exit, got ${r.status}: ${out}`);
+  assert.match(out, /pipeline crashed/, `not the crash path we think we are testing: ${out}`);
+  scan("CLI crash output", out);
+  // Scrubbed, not blanked — the operator still has to be able to fix the typo,
+  // and the stack still has to point at a file.
+  assert.match(out, /ENOENT/, `the scrub swallowed the diagnosis: ${out}`);
+  assert.match(out, /no-such-request\.json/, `the failing leaf was lost: ${out}`);
+  assert.match(out, /run-job\.mjs/, `the stack lost its frames: ${out}`);
 });
 
 test("invalid request lands in INPUT_ERROR", async () => {
