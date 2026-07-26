@@ -1,6 +1,7 @@
 # Architecture
 
-*Day-1 stub — grows with the build. See DECISION_LOG for the why behind each piece.*
+*Grows with the build; every section below describes code that exists. See
+DECISION_LOG for the why behind each piece.*
 
 ```
         ┌────────────── CAPTURE + DELIVERY WRAPPER ──────────────┐
@@ -24,14 +25,20 @@
 
 ## Components
 
-- **`server/`** — TypeScript/Node backend. Holds the Zoo API token; the only thing that
-  talks to Zoo. Exposes a small HTTP API to the UI.
+- **`server/`** — Node backend, written in plain ESM JavaScript (`.mjs` — there is no
+  TypeScript under `server/`). Every import is a `node:` builtin, so the backend has
+  zero npm dependencies and nothing to install. Holds the Zoo API token; the only
+  *backend* path to Zoo. Exposes a small HTTP API to the UI.
 - **Fastening reference** — typed rules/tables, each value carrying its source citation
   (public-domain FAA acceptable-practice data). Deterministic: no model call is needed
   to look up a rule. AI parses intent; rules compute parameters.
 - **StateStore** — interface; local implementation first (see D-004). Append-only
   transition ledger per job.
-- **`app/`** — thin web client. Never holds a key, never calls Zoo directly.
+- **`app/`** — thin web client: this is where the TypeScript lives (React + Vite,
+  `.ts`/`.tsx`). It holds no key and never calls Zoo — with exactly one deliberate
+  exception, the operator-mode Zookeeper panel, which opens a browser-side websocket
+  to Zoo with a token the operator pastes at runtime (see "The intent layer" below).
+  Nothing else in the app ever leaves the ToolCRIB API.
 
 ## State machine
 

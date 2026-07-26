@@ -102,7 +102,9 @@ cited reference consult → generation (replayed from real prior Zoo outputs) �
 measured geometry gates → a hash-sealed 11-file job package (CAD source, STL/STEP,
 engine-rendered preview, validation report, 13-section manufacturing PDF, tamper-
 evident manifest) — and parks it at the human-review gate with the full transition
-ledger printed and verified. No token needed; no dependencies beyond Node 18+.
+ledger printed and verified. No token needed, and nothing to install: every import
+under `server/` is a `node:` builtin, so the demo has zero npm dependencies and runs
+against an empty `node_modules`. (Node versions below.)
 
 With a Zoo token in `.env` (`cp .env.example .env`), the same pipeline runs live:
 
@@ -112,8 +114,12 @@ TOOLCRIB_ALLOW_LIVE=1 node server/pipeline/run-job.mjs samples/requests/plain-pl
 
 ## Run the review console
 
+The console is the one part of this repo that *does* have dependencies, so it gets one
+install of its own — the demo above stays install-free either way:
+
 ```bash
-npm start                    # API on :8787 — the only process holding a Zoo token
+npm --prefix app install     # console deps (React + Vite); the demo needs none of this
+npm start                    # API on :8787 — the only server process that holds a Zoo token
 npm --prefix app run dev     # console on :5173, dev proxy to the API
 ```
 
@@ -126,11 +132,26 @@ per gate), the package panel (every file with its own sha256 and a download link
 plus the full packageHash), and, once a job reaches the human-review gate, a review
 bar that requires a named human before Approve or Request revision does anything.
 
-If you just want the loop closed, `npm run demo` needs only Node 18+. Running the
-full suite (`npm test`) needs Node ≥22.6, and the console (`npm --prefix app run
-dev`) needs Node 20.19+ or 22.12+ per Vite 8's own engines range (Node 22.6–22.11
-clears the test-suite floor but sits in the gap below Vite's 22.12 cutoff, so it
-runs the tests but not the console).
+## Node versions (declared floor, and the one we actually ran)
+
+The two halves of this repo do not share a floor, so they are stated separately —
+and separately from the version this build has been executed on, which is the only
+number here that comes from a run rather than a manifest.
+
+| | Declared floor | Where that number comes from |
+|---|---|---|
+| `npm run demo` + `npm test` | `>=22.6` | `package.json` `engines`; set by the `--experimental-strip-types` step `npm test` uses for the console self-checks |
+| `npm --prefix app run dev` / `run build` | `^20.19.0 \|\| >=22.12.0` | Vite's own `engines`, read off the installed `vite@8.1.5` |
+
+**Executed:** `npm test` (0 failures), `npm run demo` (exit 0, `ledger verify: OK`),
+and `npm --prefix app run build` (clean) all ran on **Node 24.16.0**. That is the
+runtime this build is verified on. Older runtimes are untested here — including the
+two declared floors above, which are declarations, not measurements. If you need a
+lower floor confirmed, run it and tell us; we won't claim a version we haven't
+executed.
+
+Note the gap the two rows create: Node 22.6–22.11 satisfies `engines` and runs the
+test suite, but sits below Vite's 22.12 cutoff, so it will not run the console.
 
 ## Drafting with Zookeeper (operator mode)
 

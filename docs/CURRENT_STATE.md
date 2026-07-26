@@ -1,19 +1,19 @@
-﻿# Current State
+# Current State
 
 *Updated every working session. What works, what's blocked, the next action.*
 
-## 2026-07-24 Â· Day 5 â€” the live lane survives a real crash; Zookeeper joins the console
+## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
 
 **Works (137 server+app tests + self-checks: 40 passed; app builds clean)**
 - **Console theme tokenized** (`app/src/index.css`): the last hardcoded hex/rgba
   values folded into CSS custom properties (hover shades, on-accent text, corner
   radius, shadow tint). Zero computed-value change, verified by diffing the built
   CSS before/after.
-- **Live lane proven end-to-end â€” including its failure mode:** job 7767ef93
-  (52Ã—52Ã—2 plate, four corner holes) ran a real generation on Zoo (154.2 s); the
+- **Live lane proven end-to-end — including its failure mode:** job 7767ef93
+  (52×52×2 plate, four corner holes) ran a real generation on Zoo (154.2 s); the
   supervising process died mid-poll, so the live lane grew measured recovery for
   exactly that: `--resume-t2c-id` adopts the orphaned generation with no re-spend
-  (prompt-match guarded â€” a resumed record with no prompt at all is refused
+  (prompt-match guarded — a resumed record with no prompt at all is refused
   outright, fail-closed), `--resume-job` re-enters the walk on the stranded job.
   Mass gate: **14.1802 g measured vs 14.1775 g analytic (0.019%)**. Ledger verified,
   dodCheck complete.
@@ -25,41 +25,41 @@
   close clobbering a fresh session, and surfaced backend-shutdown reasons in the
   status strip.
 - **Nothing new closed in `docs/VERIFICATION_LOG.md`:** all 29 rows (10 HED, 10 FMF,
-  9 BC) are still PENDING â€” the operator's red-pen and bench sign-off loop is still
+  9 BC) are still PENDING — the operator's red-pen and bench sign-off loop is still
   open.
 
 **Operator queue (unchanged)**
 1. Print the fit coupons and red-pen the AC 43.13-1B / burn-cert table rows against
-   the printed sources â€” still PENDING across the board in `docs/VERIFICATION_LOG.md`.
+   the printed sources — still PENDING across the board in `docs/VERIFICATION_LOG.md`.
 2. Go/no-go on any FN still queued for filing.
-3. The first live token session in the Zookeeper panel is the operator's to run â€”
+3. The first live token session in the Zookeeper panel is the operator's to run —
    it needs a real Zoo token pasted by a human; nothing in this build can exercise
    operator mode on its own.
 
 **Next (Day 6)**
-- Form-created job click-through + the live-job console click-through â€” the
+- Form-created job click-through + the live-job console click-through — the
   console side of the money demo, done by the controller today.
 - Video prep.
 - Buffer-week submission gates ahead of the August 5 close.
 
 ---
 
-## 2026-07-23 Â· Day 4 â€” the review console is live
+## 2026-07-23 · Day 4 — the review console is live
 
 **Works (96/96 server tests; app builds clean; verified by click-through in a real browser)**
 - **Backend API** (`server/api/`, `npm start`, :8787): jobs create/list/detail with
-  ledger + verification status, named-human decision route (approve â†’ APPROVED â†’
+  ledger + verification status, named-human decision route (approve → APPROVED →
   DELIVERED; revise requires a reason), package files served with traversal
   protection, live backend gated behind TOOLCRIB_ALLOW_LIVE. Shares the CLI's data
-  dir â€” every prior job appears in the console.
-- **Review console** (`app/`, vite :5175 â†’ proxy :8787): job list with live state
-  chips; job detail with the transition ledger as centerpiece ("ledger verified âœ“"
+  dir — every prior job appears in the console.
+- **Review console** (`app/`, vite :5173 → proxy :8787): job list with live state
+  chips; job detail with the transition ledger as centerpiece ("ledger verified ✓"
   badge), gate cards (threshold vs measured), package panel (files + sha256 +
   downloads, engine-rendered preview, full packageHash, DRAFT amber badges), and the
   human-review bar (named actor required, two-click approve, 10 s confirm window).
   Footer states the security property: this app holds no API keys.
-- **Browser-verified end to end:** job 6aabf842 approved through the UI â€”
-  WAITING_FOR_HUMAN_REVIEW â†’ APPROVED â†’ DELIVERED, two HUMAN ledger rows, chain intact.
+- **Browser-verified end to end:** job 6aabf842 approved through the UI —
+  WAITING_FOR_HUMAN_REVIEW → APPROVED → DELIVERED, two HUMAN ledger rows, chain intact.
 
 **Next (Day 5)**
 - Form-created job click-through + one supervised LIVE text-to-cad job through the
@@ -67,38 +67,38 @@
 - web-zookeeper panel (local/operator mode) as the NL intent layer.
 - Docs polish sweep: README run-the-console section; screenshots.
 
-## 2026-07-23 Â· Day 3 â€” the trunk is live; `npm run demo` IS the product
+## 2026-07-23 · Day 3 — the trunk is live; `npm run demo` IS the product
 
 **Works (full suite green; `npm run demo` = judge path)**
-- **Pipeline** (`server/pipeline/`): one request walks DRAFT â†’ â€¦ â†’
+- **Pipeline** (`server/pipeline/`): one request walks DRAFT → … →
   WAITING_FOR_HUMAN_REVIEW; backends replay/flushmount/live behind one interface;
   failures land in the right states with measured values in the ledger reason;
   EXPORT_FAILED + PDF_FAILED added to the machine.
 - **DoD package** (`server/package/`): 11-file bundle, 13-section PDF from a zero-dep
-  PDF writer, manifest + recomputable packageHash, `dodCheck` audit â€” replay bundle
+  PDF writer, manifest + recomputable packageHash, `dodCheck` audit — replay bundle
   audits complete, including the engine-rendered preview PNG.
-- **Local STL analyzer**: volume/watertight/bbox with zero deps â€” reproduces Engine
+- **Local STL analyzer**: volume/watertight/bbox with zero deps — reproduces Engine
   `/file/mass` to every printed digit (FN-021).
-- **Preview route verified** (FN-022): import â†’ zoom_to_fit â†’ take_snapshot, ~2.5 s.
+- **Preview route verified** (FN-022): import → zoom_to_fit → take_snapshot, ~2.5 s.
 - **New bug found** (FN-023, issue-grade, awaiting operator go): the engine cannot
   re-import its own STEP/glTF exports; glTF fixed by stripping Zoo's own extension.
 
 **Operator queue**
-1. Print the fit coupons (unchanged â€” Design Studio export â†’ P1S).
+1. Print the fit coupons (unchanged — Design Studio export → P1S).
 2. Red-pen the AC table rows (unchanged).
 3. Go/no-go: file FN-023 as issue #4 on modeling-api.
-4. Office hours Thu 6:45 AM â€” kit is loaded; add the FN-021 agreement line and the
+4. Office hours Thu 6:45 AM — kit is loaded; add the FN-021 agreement line and the
    live `npm run demo` as the show-and-tell opener.
 
 **Next (Day 4 territory)**
 - Live-backend supervised run (one real text-to-cad job through the trunk).
 - Fold expectedMassG into the request schema (currently read from the raw file).
 - UI first pass: job list + review/approve screen against the backend.
-- C004 candidate: text-to-cad iteration endpoint (`/ml/text-to-cad/iteration`) â€”
+- C004 candidate: text-to-cad iteration endpoint (`/ml/text-to-cad/iteration`) —
   unexplored surface.
 
-**Optional night-team backlog (scope FROZEN â€” only if idle after core is green):**
-Two additive feature specs filed in `docs/backlog/` â€” [BL-001](./backlog/BL-001-uniform-symmetric-apply.md)
+**Optional night-team backlog (scope FROZEN — only if idle after core is green):**
+Two additive feature specs filed in `docs/backlog/` — [BL-001](./backlog/BL-001-uniform-symmetric-apply.md)
 (uniform/symmetric apply, ship candidate) and [BL-002](./backlog/BL-002-color-as-operation.md)
 (color-as-operation, experimental). New files only; do not touch the demo path or the
 core loop; `npm run demo` + `npm test` must stay green. Read `docs/backlog/README.md`
@@ -106,37 +106,37 @@ for the rules of engagement before starting. These are upside, not commitments.
 
 ---
 
-## 2026-07-22 Â· Day 2 night â€” the first tool ships
+## 2026-07-22 · Day 2 night — the first tool ships
 
 **Works**
 - **Flush-mount pair generator** (`server/generators/flushmount.mjs`, 15/15 tests):
-  spec â†’ panel + insert KCL, arithmetic-gated, chamfers built geometrically (corpus
+  spec → panel + insert KCL, arithmetic-gated, chamfers built geometrically (corpus
   has no chamfer stdlib), two colors, optional rear lip; round variant is a single
   revolve. Engine-measured outline validation over the websocket: 3/3 exact bbox.
 - **Fit rules** (`flush-mount-fit`, FMF-001..010, 12/12 tests): FDM clearance classes
   + chamfer/insert formulas, fail-closed, bench-verification procedure in the log.
 - **C003** (7 phrasings, $13.40): 6/7 plausible, 3 phrasings mass-identical and one
-  audited fully correct â€” but the machinist's fit callout failed hard and casual
+  audited fully correct — but the machinist's fit callout failed hard and casual
   phrasings drifted silently (FN-020). FN-019: litterbox can't execute KCL (or
   anything, currently).
 
 **Operator queue (the fun kind)**
-1. **Print the coupon set â€” STLs are READY, no Design Studio step needed:**
+1. **Print the coupon set — STLs are READY, no Design Studio step needed:**
    `samples/flush-mount/coupons/c0.10..c0.25/panel.stl + insert.stl` (exported via the
-   live engine, all 12 sample files execute clean â€” post-Lee websocket lane). Print
+   live engine, all 12 sample files execute clean — post-Lee websocket lane). Print
    panels and inserts in two colors, then the bench sign-off procedure in
    VERIFICATION_LOG (calipers + initials = FMF rules go VERIFIED).
 2. Red-pen session for the AC table rows (unchanged, still waiting on the printed AC).
 3. Go/no-go: FN-024 as issue #5 (the engine's error text literally asks for it).
 
 **Next (Day 3, pre-office-hours 6:45 AM Thu)**
-- Wire trunk end-to-end: request â†’ reference (allowDraft) â†’ generate (flushmount OR
-  text-to-cad) â†’ mass/bbox gate â†’ package stub, all through the state machine.
+- Wire trunk end-to-end: request → reference (allowDraft) → generate (flushmount OR
+  text-to-cad) → mass/bbox gate → package stub, all through the state machine.
 - Add FN-019 litterbox request ids + FN-020 scorecard to the office-hours flow.
 
 ---
 
-## 2026-07-22 Â· Day 2 â€” trunk built, protocol cracked, thesis quantified
+## 2026-07-22 · Day 2 — trunk built, protocol cracked, thesis quantified
 
 **Works (all tested: 21/21 across two suites, `npm test`)**
 - **State machine** (`server/state/`): SYS/HUMAN actor model with a provable human
@@ -150,46 +150,46 @@ for the rules of engagement before starting. These are upside, not commitments.
   (FN-013..016). Three capability rows closed by measurement.
 - **C002 phrasing campaign**: 3.6% mass spread across phrasings of one geometry,
   within-phrasing nondeterminism, dedupe discovery (FN-018, FN-011 root cause).
-- **Metering cracked** (FN-017): 1 credit â‰ˆ 1 API-second; grant â‰ˆ 10,036 minutes.
+- **Metering cracked** (FN-017): 1 credit ≈ 1 API-second; grant ≈ 10,036 minutes.
 
 **Operator queue**
 - VERIFICATION_LOG red-pen session against the printed AC 43.13-1B (10 rules PENDING;
-  Figure 4-5 values additionally need the printed figure â€” unencoded until then).
+  Figure 4-5 values additionally need the printed figure — unencoded until then).
 - ~~GitHub issues~~ **FILED 2026-07-22 (operator-approved):**
-  [modeling-api#1291](https://github.com/KittyCAD/modeling-api/issues/1291) (FN-006) Â·
-  [modeling-api#1292](https://github.com/KittyCAD/modeling-api/issues/1292) (FN-011) Â·
+  [modeling-api#1291](https://github.com/KittyCAD/modeling-api/issues/1291) (FN-006) ·
+  [modeling-api#1292](https://github.com/KittyCAD/modeling-api/issues/1292) (FN-011) ·
   [documentation#957](https://github.com/KittyCAD/documentation/issues/957) (FN-013).
 
 **Next action (Day 3, pre-office-hours)**
-- Harness: tag dedupe hits explicitly (latency < 2 s â‡’ `completed_dedupe_hit`); nonce
+- Harness: tag dedupe hits explicitly (latency < 2 s ⇒ `completed_dedupe_hit`); nonce
   campaign prompts that need real generations.
-- Wire the trunk end-to-end: job intake â†’ reference (allowDraft) â†’ generation â†’
-  mass gate â†’ package stub, driven by the state machine (build pack Day 3 territory).
+- Wire the trunk end-to-end: job intake → reference (allowDraft) → generation →
+  mass gate → package stub, driven by the state machine (build pack Day 3 territory).
 - 6:45 AM Thursday: office hours with the kit + field notes open.
 
 ---
 
-## 2026-07-22 Â· Day 1 (late night) â€” harness live, campaign C001 complete
+## 2026-07-22 · Day 1 (late night) — harness live, campaign C001 complete
 
 **Works**
-- Full thin thread (see morning entry below): intent â†’ KCL â†’ STEP/STL/glTF â†’ mass gate.
+- Full thin thread (see morning entry below): intent → KCL → STEP/STL/glTF → mass gate.
 - **Reliability harness shipped and battle-tested:** modular campaigns
   (`server/harness/campaigns/`), worker pool, budget cap, JSONL ledger, per-run KCL
-  capture, auto-summary â€” plus `recover-run.mjs`, which salvaged an interrupted run
+  capture, auto-summary — plus `recover-run.mjs`, which salvaged an interrupted run
   from ledger ids alone.
 - **Campaign C001 (30 generations, $5.10):** all 30 completed server-side; 6 fully
   mass-validated (analytic agreement ~0.02% on every strict case); 24 hit FN-011
   (outputs stranded) with KCL recovered for all.
 
 **The day's findings ledger (12 field notes, 3 GitHub-issue-grade)**
-1. FN-006 â€” fastening prompts fail non-deterministically under load + internal URL leak.
-2. FN-011 â€” burst-dispatched jobs complete but outputs become permanently unreachable.
-3. FN-007 â€” outputs only on the async-operations surface, unpadded base64.
-Plus: cost $0.17/generation (FN-012), near-deterministic codegen, 6Ã— latency jitter.
+1. FN-006 — fastening prompts fail non-deterministically under load + internal URL leak.
+2. FN-011 — burst-dispatched jobs complete but outputs become permanently unreachable.
+3. FN-007 — outputs only on the async-operations surface, unpadded base64.
+Plus: cost $0.17/generation (FN-012), near-deterministic codegen, 6× latency jitter.
 
 **Blocked / open**
-- Orphaned-outputs re-export path unknown â€” office-hours Q10 (also: `/file/execute/kcl`
-  semantics as a possible server-side KCLâ†’file route).
+- Orphaned-outputs re-export path unknown — office-hours Q10 (also: `/file/execute/kcl`
+  semantics as a possible server-side KCL→file route).
 - Websocket protocol post-upgrade still unexercised (FN-009 = handshake only).
 - GitHub issues for FN-006/FN-011 drafted in the field notes; filing needs operator go.
 
@@ -201,7 +201,7 @@ Plus: cost $0.17/generation (FN-012), near-deterministic codegen, 6Ã— latency
 
 ---
 
-## 2026-07-22 Â· Day 1 (morning) â€” thin thread GREEN
+## 2026-07-22 · Day 1 (morning) — thin thread GREEN
 
 Auth, credits, spec mapped; chain proven end-to-end with 0.02% mass agreement;
 `npm run demo` headless with zero dependencies; artifacts in `samples/`.
