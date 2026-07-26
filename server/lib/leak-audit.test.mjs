@@ -27,13 +27,16 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   runAudit,
+  main,
+  parseArgs,
   shapeFindings,
   parseEolRows,
-  indexEolFindings,
+  gitEolRows,
   trackedCorpus,
   trackedFiles,
   bundleCorpus,
   describeFindings,
+  CONTROL,
   CONTROL_NAME,
   CONTROL_KINDS,
 } from "./leak-audit.mjs";
@@ -63,15 +66,74 @@ const esc = (p, times = 1) => {
 const clean = () => [{ name: "a.md", text: "nothing to see here" }];
 const kinds = (findings) => [...new Set(findings.map((f) => f.kind))].sort();
 
+/** `git ls-files --eol -z` rows for a repo whose blobs are all LF. */
+const LF_ROWS = ["i/lf    w/lf    attr/                 \ta.md", "i/lf    w/lf    attr/text=auto eol=lf \tb.json"].join(
+  "\0",
+);
+
+/**
+ * A scratch git repo OUTSIDE this one, whose index we control byte for byte.
+ *
+ * This repo deliberately contains no CRLF blob and no untracked leak, so the
+ * only honest way to prove what the audit does when it meets one is to build a
+ * repo that has one and point the whole program at it — argv, corpus, git,
+ * verdict, exit code. Planting either defect in the real tree to prove a test
+ * would dirty a tracked file for the duration of the run.
+ */
+function scratchRepo({ crlf = false, untracked = null } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "toolcrib-leak-audit-repo-"));
+  const git = (...args) => {
+    const r = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${args.join(" ")} failed: ${r.stderr}`);
+  };
+  git("init", "-q", ".");
+  writeFileSync(join(dir, "a.md"), "clean text\n");
+  // -c core.autocrlf=false so the CRLF written here is the CRLF git records:
+  // this machine's global core.autocrlf is true and would normalise it away,
+  // which would make the test pass for the wrong reason (no finding, no repo).
+  if (crlf) writeFileSync(join(dir, "bad.md"), "bad\r\nline\r\n");
+  git("-c", "core.autocrlf=false", "add", "-A");
+  // Written AFTER the add, so it is genuinely untracked.
+  if (untracked) writeFileSync(join(dir, untracked.name), untracked.text);
+  return dir;
+}
+
+/** Run the whole program against a repo, capturing what it said. */
+function runMain(argv, repoRoot) {
+  const out = [];
+  const errs = [];
+  const code = main(
+    argv,
+    (s) => out.push(s),
+    (s) => errs.push(s),
+    repoRoot,
+  );
+  return { code, out: out.join("\n"), err: errs.join("\n") };
+}
+
 // --- the control -------------------------------------------------------------
 
 test("the control is reported on every kind before any verdict is emitted", () => {
-  const v = runAudit(clean());
+  const v = runAudit(clean(), LF_ROWS);
   assert.deepEqual(kinds(v.control), [...CONTROL_KINDS].sort());
   for (const f of v.control) assert.equal(f.where, CONTROL_NAME);
   // and it does not contaminate the corpus verdict
   assert.deepEqual(v.findings, []);
   assert.equal(v.entries, 1);
+  assert.equal(v.blobs, 2, "the control's own row must not be counted as a committed blob");
+});
+
+test("CONTROL_KINDS is every kind the audit can report, not a subset of them", () => {
+  // The hole this closes: if a detector's kind is not in CONTROL_KINDS, nothing
+  // proves that detector is alive, and its wiring into the verdict can be
+  // deleted in a refactor with the suite still green. So the two sets are
+  // pinned equal — add a fifth detector without a fifth probe and this fails.
+  const everyKind = new Set([
+    ...kinds(shapeFindings("x", `ï»¿ scandir '${WIN_PATH}'`)), // bom, path
+    "identity",
+    ...kinds(parseEolRows("i/crlf  w/crlf  attr/\tbad.md").findings), // eol
+  ]);
+  assert.deepEqual([...everyKind].sort(), [...CONTROL_KINDS].sort());
 });
 
 test("a control that carries no leak refuses to produce a verdict at all", () => {
@@ -80,7 +142,10 @@ test("a control that carries no leak refuses to produce a verdict at all", () =>
   // exactly like a clean repo, which is how the previous shell-based audit
   // reported a planted leak as CLEAN.
   assert.throws(
-    () => runAudit(clean(), { control: { name: CONTROL_NAME, text: "nothing planted here at all" } }),
+    () =>
+      runAudit(clean(), LF_ROWS, {
+        control: { name: CONTROL_NAME, text: "nothing planted here at all", eolRow: `i/lf  w/lf  attr/\t${CONTROL_NAME}` },
+      }),
     (e) => {
       assert.ok(e instanceof VacuousScanError, `wrong error type: ${e}`);
       for (const k of CONTROL_KINDS) assert.match(e.message, new RegExp(k), `the refusal did not name ${k}`);
@@ -90,21 +155,29 @@ test("a control that carries no leak refuses to produce a verdict at all", () =>
   );
 });
 
-test("one dead rule cannot hide behind the other two — the control is per-kind", () => {
+test("one dead rule cannot hide behind the other three — the control is per-kind", () => {
   // Measured lesson, inherited from identity.mjs: with a single combined probe
   // a dead rule hides behind a live one that matched the same string. So each
   // kind is dropped from the control in turn and the refusal must name it.
+  //
+  // eol is dropped differently from the other three because it arrives
+  // differently — it is a row git reports about a blob, not a byte in one — but
+  // it is dropped, and the refusal must name it just the same.
   const parts = {
     bom: "ï»¿",
     path: ` scandir '${WIN_PATH}' `,
     identity: ` run by ${CONTROL_TOKEN} `,
   };
   for (const dropped of CONTROL_KINDS) {
-    const text = CONTROL_KINDS.filter((k) => k !== dropped)
-      .map((k) => parts[k])
-      .join("");
+    const control = {
+      name: CONTROL_NAME,
+      text: CONTROL_KINDS.filter((k) => k !== dropped && parts[k])
+        .map((k) => parts[k])
+        .join(""),
+      eolRow: dropped === "eol" ? `i/lf  w/lf  attr/\t${CONTROL_NAME}` : CONTROL.eolRow,
+    };
     assert.throws(
-      () => runAudit(clean(), { control: { name: CONTROL_NAME, text } }),
+      () => runAudit(clean(), LF_ROWS, { control }),
       (e) => {
         assert.match(e.message, new RegExp(`NOT reported for: ${dropped}\\b`), `dropping ${dropped} was not noticed`);
         return true;
@@ -128,15 +201,35 @@ test("the audit's own source never spells the control out longhand", () => {
 // --- fail closed --------------------------------------------------------------
 
 test("a sweep of nothing, or of nothing but empty files, refuses to report clean", () => {
-  assert.throws(() => runAudit([]), VacuousScanError);
-  assert.throws(() => runAudit([{ name: "a", text: "" }, { name: "b", text: null }]), VacuousScanError);
+  assert.throws(() => runAudit([], LF_ROWS), VacuousScanError);
+  assert.throws(() => runAudit([{ name: "a", text: "" }, { name: "b", text: null }], LF_ROWS), VacuousScanError);
+});
+
+test("a caller that supplies no line-ending rows is refused, not reported clean", () => {
+  // Half a sweep is not a clean verdict. Without this, a caller that forgot to
+  // fetch the rows checks zero committed blobs and still prints "or CRLF".
+  for (const rows of [undefined, "", "\0\0"])
+    assert.throws(() => runAudit(clean(), rows), (e) => {
+      assert.match(e.message, /not one committed blob was checked/);
+      return true;
+    });
 });
 
 test("a corpus entry cannot impersonate the control and hide behind its findings", () => {
   assert.throws(
-    () => runAudit([{ name: CONTROL_NAME, text: "x" }]),
+    () => runAudit([{ name: CONTROL_NAME, text: "x" }], LF_ROWS),
     (e) => {
       assert.match(e.message, /shadows the control/);
+      return true;
+    },
+  );
+});
+
+test("a committed blob cannot impersonate the control either", () => {
+  assert.throws(
+    () => runAudit(clean(), `i/crlf  w/crlf  attr/\t${CONTROL_NAME}`),
+    (e) => {
+      assert.match(e.message, /a committed blob is named .* shadows the control/s);
       return true;
     },
   );
@@ -214,13 +307,13 @@ test("the committed-file vocabulary is a documented SUBSET, not a second opinion
 
 test("an account uuid in a corpus entry is a finding, via the one identity scanner", () => {
   const stranger = "7c9f2a41-3b8e-4d55-9a12-6ef0c3b7d284";
-  const v = runAudit([{ name: "fixture.json", text: `{"user_id": "${stranger}", "mass": 13.07}` }]);
+  const v = runAudit([{ name: "fixture.json", text: `{"user_id": "${stranger}", "mass": 13.07}` }], LF_ROWS);
   const id = v.findings.filter((f) => f.kind === "identity");
   assert.equal(id.length, 1, `expected one identity finding, got ${JSON.stringify(v.findings)}`);
   assert.equal(id[0].where, "fixture.json");
   assert.ok(!describeFindings(id).includes(stranger), "the finding republished the identifier");
   // A job handle is not a person: the audit must not fire on this repo's own ids.
-  assert.deepEqual(runAudit([{ name: "j.json", text: `{"request_id": "${stranger}"}` }]).findings, []);
+  assert.deepEqual(runAudit([{ name: "j.json", text: `{"request_id": "${stranger}"}` }], LF_ROWS).findings, []);
 });
 
 // --- BOM ----------------------------------------------------------------------
@@ -258,16 +351,29 @@ test("an unparseable EOL row is refused, never skipped", () => {
 });
 
 test("no committed blob in this repo carries CRLF or mixed line endings", () => {
-  const { findings, files } = indexEolFindings();
+  const { findings, files } = parseEolRows(gitEolRows());
   assert.deepEqual(findings, [], `committed blobs carry CRLF:\n${describeFindings(findings)}`);
   assert.ok(files >= 200, `expected the whole repo, checked only ${files} blobs`);
+});
+
+test("an eol finding reaches the verdict, not just the parser", () => {
+  // The wiring, unit-level. parseEolRows and the corpus sweep were both tested
+  // in isolation before; the JOIN between them was not, and deleting it left
+  // the suite green and the CLI printing "CLEAN — no path, identity, BOM or
+  // CRLF finding" while no blob was being checked at all.
+  const v = runAudit(clean(), `i/lf    w/lf    attr/\tok.md\0i/crlf  w/crlf  attr/text=auto eol=lf \tbad.md`);
+  assert.deepEqual(
+    v.findings.map((f) => [f.kind, f.where]),
+    [["eol", "bad.md"]],
+  );
+  assert.equal(v.blobs, 2);
 });
 
 // --- the sweep, and the process contract --------------------------------------
 
 test("no tracked file in this repo carries a path, an identity or a BOM", () => {
   const files = trackedFiles();
-  const v = runAudit(trackedCorpus());
+  const v = runAudit(trackedCorpus(), gitEolRows());
   assert.deepEqual(v.findings, [], `the repo is not clean:\n${describeFindings(v.findings)}`);
 
   // The corpus has to be shown to be the real one: a sweep over three files
@@ -316,4 +422,87 @@ test("a bundle corpus is named so a finding says which bundle file it is in", ()
     .map((e) => e.name)
     .sort();
   assert.deepEqual(names, ["bundle:cad/part.kcl", "bundle:manifest.json"]);
+});
+
+// --- the CRLF half, end to end against a repo that actually has one -----------
+
+test("a CRLF blob in the index reaches the EXIT CODE, through the whole program", () => {
+  // The only check that proves .gitattributes' policy held, proven the only way
+  // it can be: against a repo built to violate it. This repo has no CRLF blob,
+  // so every previous assertion about this kind was made against zero examples.
+  const bad = runMain(["--quiet"], scratchRepo({ crlf: true }));
+  assert.equal(bad.code, 1, `a CRLF blob did not fail the audit:\n${bad.out}\n${bad.err}`);
+  assert.match(bad.err, /eol\s+bad\.md/, bad.err);
+
+  // The negative half: the SAME builder without the CRLF file is clean, so the
+  // red above is the blob and not "scratch repos are always red".
+  const ok = runMain(["--quiet"], scratchRepo());
+  assert.equal(ok.code, 0, `a clean scratch repo was reported dirty:\n${ok.out}\n${ok.err}`);
+});
+
+test("a brand-new file is NOT swept until it is staged — the docstring's limit, pinned", () => {
+  // Measured, not theorised: an untracked file holding a drive-rooted path was
+  // swept straight over and this repo reported CLEAN over 235 entries. The
+  // corpus is `git ls-files`, so that is correct behaviour — but the comment
+  // above trackedFiles used to promise more than that, and a reader who
+  // believed it would read a green audit as "this new file is clean".
+  const dir = scratchRepo({ untracked: { name: "new.md", text: `see ${WIN_PATH}\n` } });
+  const before = runMain(["--quiet"], dir);
+  assert.equal(before.code, 0, `an untracked file was swept — the docstring is now the wrong one:\n${before.err}`);
+
+  const add = spawnSync("git", ["add", "new.md"], { cwd: dir, encoding: "utf8" });
+  assert.equal(add.status, 0, add.stderr);
+  const after = runMain(["--quiet"], dir);
+  assert.equal(after.code, 1, "staging the file did not expose the leak in it");
+  assert.match(after.err, /path\s+new\.md/, after.err);
+});
+
+// --- arguments: nothing is silently ignored -----------------------------------
+
+test("every argument spelling either sweeps or refuses — none is silently ignored", () => {
+  assert.deepEqual(parseArgs([]), { bundle: undefined, quiet: false });
+  assert.deepEqual(parseArgs(["--quiet"]), { bundle: undefined, quiet: true });
+  assert.deepEqual(parseArgs(["--bundle=/x"]), { bundle: "/x", quiet: false });
+  assert.deepEqual(parseArgs(["--bundle", "/x", "--quiet"]), { bundle: "/x", quiet: true });
+
+  // Each of these exited 0 CLEAN on the previous revision while a planted leak
+  // sat unswept in the bundle they named.
+  for (const argv of [
+    ["--bundle"], //            $PKG_DIR unset, space form
+    ["--bundle="], //           $PKG_DIR unset, equals form
+    ["--bundle", "--quiet"], // ditto, with a flag mistaken for the value
+    ["--bundel=/x"], //         a typo
+    ["-b", "/x"], //            a spelling this program does not have
+    ["--bundle=/x", "--bundle=/y"], // two bundles, one of them ignored
+  ])
+    assert.throws(() => parseArgs(argv), VacuousScanError, `silently ignored: ${JSON.stringify(argv)}`);
+});
+
+test("a mangled --bundle exits NON-ZERO instead of reporting the repo clean", () => {
+  const run = (args) => spawnSync(process.execPath, [AUDIT, ...args], { encoding: "utf8", cwd: REPO });
+  const dir = mkdtempSync(join(tmpdir(), "toolcrib-leak-audit-argv-"));
+  mkdirSync(join(dir, "logs"));
+  writeFileSync(join(dir, "logs", "apiRun.json"), JSON.stringify({ note: `scandir '${WIN_PATH}'` }));
+
+  // The space form is a spelling humans type, so it is PARSED, not rejected:
+  // it finds the same planted leak the equals form finds.
+  const spaced = run(["--bundle", dir, "--quiet"]);
+  assert.equal(spaced.status, 1, `the space form did not sweep the bundle:\n${spaced.stdout}${spaced.stderr}`);
+  assert.match(spaced.stderr, /path\s+bundle:logs\/apiRun\.json/, spaced.stderr);
+
+  for (const args of [["--bundle="], ["--bundel=" + dir], ["--bundle"]]) {
+    const r = run([...args, "--quiet"]);
+    assert.equal(r.status, 2, `${JSON.stringify(args)} was ignored and the run reported clean: ${r.stdout}${r.stderr}`);
+  }
+});
+
+test("a refusal is prefixed once, and an internal defect says where it happened", () => {
+  const r = spawnSync(process.execPath, [AUDIT, "--bundel=/nope"], { encoding: "utf8", cwd: REPO });
+  assert.equal(r.status, 2);
+  assert.equal(
+    (r.stderr.match(/leak audit: /g) ?? []).length,
+    1,
+    `the refusal stutters its own prefix, which reads as a formatting bug: ${r.stderr}`,
+  );
+  assert.doesNotMatch(r.stderr, /INTERNAL ERROR/, "a bad argument is a refusal, not a bug in the audit");
 });

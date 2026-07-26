@@ -1,17 +1,28 @@
 #!/usr/bin/env node
 // The leak audit, as a program instead of folklore.
 //
-//   node server/lib/leak-audit.mjs [--bundle=<dir>] [--quiet]
+//   node server/lib/leak-audit.mjs [--bundle=<dir> | --bundle <dir>] [--quiet]
+//
+// Any other argument is a refusal, not a shrug — see parseArgs.
 //
 // It sweeps every file git TRACKS (and, given --bundle, every file in a
-// generated job bundle) for three things a judge must never receive:
+// generated job bundle) for four things a judge must never receive. The list is
+// CONTROL_KINDS, and it is exhaustive: every kind below is planted in the
+// control and must come back reported before any verdict is emitted, so adding
+// a fifth detector without adding a fifth probe fails the suite rather than
+// shipping unproven.
 //
 //   path      an absolute filesystem path that names the machine this was
 //             written on — a drive-rooted path, a UNC share, a home directory.
+//             DELIBERATELY NARROWER than repo-path.mjs's MACHINE_PATH: only the
+//             roots that name a PERSON. A tracked "/var/tmp/scratch" passes.
+//             The trade is measured and argued at repo-path.mjs:117-186.
 //   identity  an account identifier — the operator's Zoo account or email by
 //             fingerprint, or any uuid sitting in a field whose NAME means
 //             "account".
 //   bom       a UTF-8 byte-order mark at the head of a file.
+//   eol       CRLF or mixed line endings in a COMMITTED BLOB — the regression
+//             .gitattributes exists to prevent and cannot itself detect.
 //
 // --- why this is a program and not a shell one-liner ------------------------
 //
@@ -85,18 +96,55 @@ const CONTROL_PATH = ["C", ":", "\\", "Users", "\\", "not-a-real-person", "\\", 
 /** The planted case: one leak of every kind the audit claims to detect. */
 export const CONTROL_TEXT = `${BOM}planted: scandir '${CONTROL_PATH}' on a run by ${CONTROL_TOKEN}`;
 
-/** Every kind the control must come back with before a clean verdict is legal. */
-export const CONTROL_KINDS = ["bom", "path", "identity"];
+// The eol probe cannot ride in CONTROL_TEXT, because a committed blob's line
+// endings are not a property of its bytes on disk — they are what git recorded,
+// and they arrive as a row of `git ls-files --eol` rather than as content. So
+// the control carries a synthetic ROW instead, in the exact shape git emits,
+// and it is prepended to the real rows and parsed by the same parser. That is
+// what makes "eol" a kind the control covers rather than a check bolted on
+// beside the verdict: the mutation that drops the eol findings from the joined
+// list also drops the control's, and the audit refuses instead of printing
+// CLEAN. (Measured on the previous revision, where the join sat outside the
+// control: deleting `...eol.findings` left npm test at 178 pass / 0 fail and
+// the CLI still printed "CLEAN — no path, identity, BOM or CRLF finding".)
+const CONTROL_EOL_ROW = `i/crlf  w/crlf  attr/\t${CONTROL_NAME}`;
+
+/** The planted case in full. Injectable ONLY so a test can prove a broken one refuses. */
+export const CONTROL = { name: CONTROL_NAME, text: CONTROL_TEXT, eolRow: CONTROL_EOL_ROW };
+
+/**
+ * Every kind the audit detects — and therefore every kind the control must come
+ * back with before a clean verdict is legal. Exhaustive by construction: a kind
+ * that is not in here is a kind nothing proves is alive.
+ */
+export const CONTROL_KINDS = ["bom", "path", "identity", "eol"];
 
 // --- corpus ------------------------------------------------------------------
 
 /**
  * Every path git tracks. Not HEAD's trees — the INDEX — and the bytes swept are
- * the ones on disk right now, so a leak written but not yet committed is still
- * caught. That is the only version of this guard that can stop a bad commit
- * instead of reporting one, and it has already earned it: a `git checkout --`
- * of an unstaged fixture silently restored a real account uuid during
- * development, and the sweep went red on the next run.
+ * the ones on disk right now.
+ *
+ * WHAT THAT DOES AND DOES NOT COVER, stated precisely, because an earlier
+ * version of this comment claimed the broader half of it:
+ *
+ *   an EDIT to a tracked file      caught before it is committed, staged or
+ *                                  not, because the bytes read are the working
+ *                                  tree's. Already earned: a `git checkout --`
+ *                                  of an unstaged fixture silently restored a
+ *                                  real account uuid during development and the
+ *                                  sweep went red on the next run.
+ *   a BRAND-NEW file               NOT caught until `git add`. It is not in the
+ *                                  index, so `git ls-files` does not list it and
+ *                                  nothing here reads it. Measured: an untracked
+ *                                  file holding a drive-rooted path was swept
+ *                                  straight over and the audit reported CLEAN
+ *                                  over 235 entries. Pinned by a test.
+ *
+ * So the promise is narrower than "it stops a bad commit": it stops a bad commit
+ * to a file git already knows about, and it catches a NEW file's leak from the
+ * moment that file is staged — still before the commit, but only if the audit
+ * runs between `git add` and `git commit`.
  *
  * Gitignored files are excluded, so a stale local demo bundle under
  * server/pipeline/data/ cannot turn the audit red over something no judge will
@@ -110,7 +158,7 @@ export function trackedFiles(repoRoot = REPO) {
   const r = spawnSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (r.error || r.status !== 0)
     throw new VacuousScanError(
-      `leak audit: git ls-files failed (${r.error?.code ?? `exit ${r.status}`}) — ` +
+      `git ls-files failed (${r.error?.code ?? `exit ${r.status}`}) — ` +
         `the sweep cannot verify what it cannot list.\n${r.stderr ?? ""}`,
     );
   return r.stdout.split("\0").filter(Boolean);
@@ -127,7 +175,7 @@ export function readTracked(f, repoRoot = REPO) {
     return readFileSync(join(repoRoot, f), ENCODING);
   } catch (e) {
     throw new VacuousScanError(
-      `the leak audit could not read the tracked file ${f} (${e.code ?? e.message}). ` +
+      `could not read the tracked file ${f} (${e.code ?? e.message}). ` +
         `This is not a leak and not a flaky test: a path git tracks is missing from the working tree. ` +
         `Restore it (\`git checkout -- ${f}\`) or stage its deletion, then re-run.`,
     );
@@ -149,7 +197,7 @@ const walk = (dir) =>
 export function bundleCorpus(dir) {
   const files = walk(dir);
   if (files.length === 0)
-    throw new VacuousScanError(`leak audit: --bundle pointed at an empty directory — a sweep of nothing is not clean`);
+    throw new VacuousScanError(`--bundle pointed at an empty directory — a sweep of nothing is not clean`);
   return files.map((abs) => ({
     name: `bundle:${relative(dir, abs).split(sep).join("/")}`,
     text: readFileSync(abs, ENCODING),
@@ -195,13 +243,18 @@ export function shapeFindings(name, text) {
 }
 
 /**
- * CRLF that reached the INDEX, which .gitattributes exists to prevent and
- * cannot by itself detect. Asked of git rather than of the working tree on
- * purpose: core.autocrlf is true on the build machine, so the working tree
- * legitimately holds CRLF for text files while the committed blob holds LF.
- * The blob is what a judge clones, so the blob is what is checked.
+ * The raw `git ls-files --eol -z` output, unparsed.
+ *
+ * Split from the parsing on purpose: the control's synthetic row has to be
+ * prepended to these rows and go through the same parser, so the fetch has to
+ * hand back rows rather than a verdict.
+ *
+ * Asked of git rather than of the working tree, also on purpose: core.autocrlf
+ * is true on the build machine, so the working tree legitimately holds CRLF for
+ * text files while the committed blob holds LF. The blob is what a judge
+ * clones, so the blob is what is checked.
  */
-export function indexEolFindings(repoRoot = REPO) {
+export function gitEolRows(repoRoot = REPO) {
   const r = spawnSync("git", ["ls-files", "--eol", "-z"], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -209,10 +262,10 @@ export function indexEolFindings(repoRoot = REPO) {
   });
   if (r.error || r.status !== 0)
     throw new VacuousScanError(
-      `leak audit: git ls-files --eol failed (${r.error?.code ?? `exit ${r.status}`}) — ` +
+      `git ls-files --eol failed (${r.error?.code ?? `exit ${r.status}`}) — ` +
         `the committed line endings cannot be verified.\n${r.stderr ?? ""}`,
     );
-  return parseEolRows(r.stdout);
+  return r.stdout;
 }
 
 /**
@@ -228,11 +281,11 @@ export function indexEolFindings(repoRoot = REPO) {
  */
 export function parseEolRows(stdout) {
   const rows = String(stdout).split("\0").filter(Boolean);
-  if (rows.length === 0) throw new VacuousScanError("leak audit: git listed no files for the line-ending check");
+  if (rows.length === 0) throw new VacuousScanError("git listed no files for the line-ending check");
   const out = [];
   for (const row of rows) {
     const m = /^i\/(\S+)\s+w\/\S+\s+attr\/[^\t]*\t([\s\S]*)$/.exec(row);
-    if (!m) throw new VacuousScanError(`leak audit: could not parse a git ls-files --eol row: ${JSON.stringify(row)}`);
+    if (!m) throw new VacuousScanError(`could not parse a git ls-files --eol row: ${JSON.stringify(row)}`);
     const [, indexEol, path] = m;
     if (indexEol === "crlf" || indexEol === "mixed")
       out.push({
@@ -248,37 +301,58 @@ export function parseEolRows(stdout) {
 // --- the verdict -------------------------------------------------------------
 
 /**
- * Sweep a corpus, or refuse to give it a verdict.
+ * Sweep a corpus AND the committed line endings, or refuse to give a verdict.
  *
- * Fails closed four ways before any caller sees an empty findings list:
+ * Both halves are joined HERE, inside the control's reach, rather than by the
+ * caller. That placement is the guard: the control contributes a finding of
+ * every kind to this one list, so a refactor that drops a finding SOURCE from
+ * the join drops the control's evidence with it and the audit refuses. When the
+ * join lived in main() instead, deleting the eol half was invisible — npm test
+ * 178 pass / 0 fail, exit 0, and a verdict line that still said "or CRLF".
+ *
+ * Fails closed six ways before any caller sees an empty findings list:
  *
  *   empty corpus    -> throw. Zero entries is not zero leaks.
+ *   no eol rows     -> throw. A caller that forgot to fetch them checked no
+ *                      committed blob, and would report it as checked.
  *   zero bytes      -> throw. Entries that all read empty are the same lie.
- *   name collision  -> throw. An entry calling itself the control could hide
- *                      behind the control's own findings.
+ *   name collision  -> throw. A corpus entry calling itself the control could
+ *                      hide behind the control's own findings.
+ *   row collision   -> throw. So could a committed blob.
  *   control missed  -> throw, naming the kind that went blind. scanIdentity()
  *                      additionally runs its own selfTest over the same regexes
  *                      and digest map before it will report anything.
  *
  * @param {Iterable<{name: string, text: unknown}>} entries
- * @param {{control?: {name: string, text: string}}} [opts] the control is
- *        injectable ONLY so the test suite can prove what a broken one does.
- *        The default is the real planted case; nothing in production passes it.
- * @returns {{entries: number, bytes: number, control: Array, findings: Array}}
+ * @param {string} eolRows raw `git ls-files --eol -z` output (see gitEolRows)
+ * @param {{control?: {name: string, text: string, eolRow: string}}} [opts] the
+ *        control is injectable ONLY so the test suite can prove what a broken
+ *        one does. The default is the real planted case; nothing in production
+ *        passes it.
+ * @returns {{entries: number, bytes: number, blobs: number, control: Array, findings: Array}}
  */
-export function runAudit(entries, { control = { name: CONTROL_NAME, text: CONTROL_TEXT } } = {}) {
+export function runAudit(entries, eolRows, { control = CONTROL } = {}) {
   const corpus = [...entries];
-  if (corpus.length === 0)
-    throw new VacuousScanError("leak audit: empty corpus — a sweep of nothing is not a clean verdict");
+  if (corpus.length === 0) throw new VacuousScanError("empty corpus — a sweep of nothing is not a clean verdict");
   for (const e of corpus)
     if (e.name === control.name)
-      throw new VacuousScanError(`leak audit: a corpus entry is named ${control.name}, which shadows the control`);
+      throw new VacuousScanError(`a corpus entry is named ${control.name}, which shadows the control`);
+
+  const realRows = String(eolRows ?? "").split("\0").filter(Boolean);
+  if (realRows.length === 0)
+    throw new VacuousScanError(
+      "no `git ls-files --eol` rows were supplied, so not one committed blob was checked for CRLF — " +
+        "and the committed blobs are what a judge clones",
+    );
+  for (const row of realRows)
+    if (row.endsWith(`\t${control.name}`))
+      throw new VacuousScanError(`a committed blob is named ${control.name}, which shadows the control`);
 
   // Counted over the corpus alone: the control's own bytes prove nothing about
   // whether the corpus was read.
   const bytes = corpus.reduce((n, e) => n + String(e.text ?? "").length, 0);
   if (bytes === 0)
-    throw new VacuousScanError(`leak audit: ${corpus.length} entries and not one byte of content — nothing was read`);
+    throw new VacuousScanError(`${corpus.length} entries and not one byte of content — nothing was read`);
 
   const all = [control, ...corpus];
   const findings = all.flatMap((e) => shapeFindings(e.name, e.text));
@@ -288,17 +362,26 @@ export function runAudit(entries, { control = { name: CONTROL_NAME, text: CONTRO
   for (const h of scanIdentity(all).hits)
     findings.push({ kind: "identity", where: h.where, line: 0, detail: describeHits([h]) });
 
+  // The control's row goes through the real parser, ahead of the real rows.
+  findings.push(...parseEolRows([control.eolRow, ...realRows].join("\0")).findings);
+
   const controlFindings = findings.filter((f) => f.where === control.name);
   const seen = new Set(controlFindings.map((f) => f.kind));
   const blind = CONTROL_KINDS.filter((k) => !seen.has(k));
   if (blind.length)
     throw new VacuousScanError(
-      `leak audit: the control was NOT reported for: ${blind.join(", ")}. ` +
+      `the control was NOT reported for: ${blind.join(", ")}. ` +
         `A scanner that cannot see a planted leak has proven nothing about the leaks it did not report, ` +
         `so no verdict is being emitted. Fix the detector (or the control) before believing any sweep.`,
     );
 
-  return { entries: corpus.length, bytes, control: controlFindings, findings: findings.filter((f) => f.where !== control.name) };
+  return {
+    entries: corpus.length,
+    bytes,
+    blobs: realRows.length,
+    control: controlFindings,
+    findings: findings.filter((f) => f.where !== control.name),
+  };
 }
 
 /**
@@ -312,15 +395,74 @@ export const describeFindings = (findings) =>
 
 // --- CLI ---------------------------------------------------------------------
 
-/** @returns {number} process exit code */
-export function main(argv = [], log = console.log, err = console.error) {
-  const bundle = argv.find((a) => a.startsWith("--bundle="))?.slice("--bundle=".length);
-  const quiet = argv.includes("--quiet");
+export const USAGE = "usage: node server/lib/leak-audit.mjs [--bundle=<dir> | --bundle <dir>] [--quiet]";
 
-  const corpus = [...trackedCorpus(), ...(bundle ? bundleCorpus(bundle) : [])];
-  const verdict = runAudit(corpus);
-  const eol = indexEolFindings();
-  const findings = [...verdict.findings, ...eol.findings];
+/**
+ * Parse argv, or REFUSE. Nothing is silently ignored.
+ *
+ * This is the same failure the rest of this file exists to end, one layer out.
+ * Measured on the previous revision, whose parser was a lone
+ * `argv.find(a => a.startsWith("--bundle="))`, against a bundle holding a
+ * planted drive-rooted path:
+ *
+ *   --bundle=<dir>   exit 1, finding reported   (the only spelling that worked)
+ *   --bundle <dir>   exit 0, CLEAN              (the spelling a human types)
+ *   --bundle=        exit 0, CLEAN              (an unset $DIR expands to this)
+ *   --bundel=<dir>   exit 0, CLEAN              (a typo)
+ *
+ * Three ways to ask for a sweep, three sweeps that never happened, three green
+ * verdicts. So: the space form is PARSED, because it is a spelling humans type
+ * and rejecting a reasonable spelling is its own kind of trap; everything else
+ * is an error. An argument this program does not understand is an argument that
+ * did not do what its author meant, and `--bundle` with nothing usable after it
+ * is exactly what a release step produces when an earlier step failed and left
+ * $PKG_DIR unset.
+ *
+ * @returns {{bundle: string|undefined, quiet: boolean}}
+ */
+export function parseArgs(argv = []) {
+  let bundle;
+  let quiet = false;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--quiet") {
+      quiet = true;
+      continue;
+    }
+    let value;
+    if (a.startsWith("--bundle=")) value = a.slice("--bundle=".length);
+    else if (a === "--bundle") value = argv[++i];
+    else throw new VacuousScanError(`unrecognised argument ${JSON.stringify(a)}. ${USAGE}`);
+
+    if (!value || value.startsWith("--"))
+      throw new VacuousScanError(
+        `--bundle was given no directory to sweep${value ? ` (got ${JSON.stringify(value)})` : ""}. ` +
+          `A bundle sweep that quietly did not happen still exits 0, which is the failure this audit exists to stop. ` +
+          USAGE,
+      );
+    if (bundle !== undefined)
+      throw new VacuousScanError(`--bundle was given twice (${bundle}, then ${value}); one bundle is swept per run`);
+    bundle = value;
+  }
+  return { bundle, quiet };
+}
+
+/**
+ * @param {string[]} argv
+ * @param {(s: string) => void} log
+ * @param {(s: string) => void} err
+ * @param {string} repoRoot which repo to sweep. Threaded rather than fixed so a
+ *        test can point the WHOLE program — argv, corpus, git, verdict, exit
+ *        code — at a scratch repo built to contain a specific defect. That is
+ *        the only honest way to prove a CRLF blob reaches the exit code, since
+ *        this repo deliberately does not have one.
+ * @returns {number} process exit code
+ */
+export function main(argv = [], log = console.log, err = console.error, repoRoot = REPO) {
+  const { bundle, quiet } = parseArgs(argv);
+
+  const corpus = [...trackedCorpus(repoRoot), ...(bundle ? bundleCorpus(bundle) : [])];
+  const verdict = runAudit(corpus, gitEolRows(repoRoot));
 
   // The control proof is printed BEFORE the verdict, always — including on the
   // clean path. A reader must never see "clean" without seeing, on the line
@@ -333,12 +475,14 @@ export function main(argv = [], log = console.log, err = console.error) {
     log(
       `leak audit corpus:  ${verdict.entries} entries, ${verdict.bytes.toLocaleString("en-US")} bytes` +
         `${bundle ? ` (tracked files + bundle ${bundle})` : " (tracked files)"}; ` +
-        `${eol.files} committed blobs checked for CRLF`,
+        `${verdict.blobs} committed blobs checked for CRLF`,
     );
   }
 
-  if (findings.length) {
-    err(`leak audit: ${findings.length} finding(s) — this repo is NOT clean:\n${describeFindings(findings)}`);
+  if (verdict.findings.length) {
+    err(
+      `leak audit: ${verdict.findings.length} finding(s) — this repo is NOT clean:\n${describeFindings(verdict.findings)}`,
+    );
     return 1;
   }
   if (!quiet) log("leak audit: CLEAN — no path, identity, BOM or CRLF finding in the corpus.");
@@ -351,10 +495,26 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } catch (e) {
     // A refusal is not a pass. VacuousScanError means the audit declined to
     // give a verdict at all, and that must exit non-zero just as loudly as a
-    // finding does. Scrubbed on the way out: a bad --bundle argument makes
-    // Node raise an ENOENT with the absolute path embedded in it, and the tool
-    // whose job is to stop paths reaching a console does not get to print one.
-    console.error(`leak audit: ${scrubPaths(e.message)}`);
+    // finding does.
+    //
+    // THIS is where the "leak audit: " prefix is added, and it is added exactly
+    // once — every message raised inside this module is a plain sentence for
+    // that reason. An earlier revision prefixed in both places, so the loudest
+    // output this tool produces read "leak audit: leak audit: the control was
+    // NOT reported for: bom." — a nudge toward reading the one message designed
+    // to stop a human from believing a sweep as a formatting bug instead.
+    //
+    // A refusal gets its message; anything else is a defect in the audit itself
+    // and gets the stack, because "TypeError: x is not a function" with no
+    // location is indistinguishable from a deliberate refusal to whoever is
+    // staring at a red exit 2.
+    //
+    // Both are scrubbed on the way out: a bad --bundle argument makes Node
+    // raise an ENOENT with the absolute path embedded in it, and every frame of
+    // a stack is a path — the tool whose job is to stop paths reaching a
+    // console does not get to print one.
+    const body = e instanceof VacuousScanError ? e.message : `INTERNAL ERROR — this is a bug in the audit.\n${e.stack}`;
+    console.error(`leak audit: ${scrubPaths(body)}`);
     process.exitCode = 2;
   }
 }
