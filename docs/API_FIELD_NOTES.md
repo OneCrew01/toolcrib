@@ -410,21 +410,27 @@ and confirmed to resolve before it was written down.
   authored KCL 2.0 constraint sketches export clean through `export_kcl` — millimeters
   preserved as authored, minimal watertight binary STL.
 
-## FN-031 · Per-run minute accounting is unavailable on every surface we exercised — so the manifest ships `null`, not `0`
+## FN-031 · Per-run minute accounting is unavailable on every surface we exercised — so a package claims 0 minutes only when it counted 0 requests
 - **Surface:** billing `GET /user/payment/balance` · Agent/ML `GET /user/text-to-cad/{id}` and
   `GET /async/operations/{id}` · copilot websocket frames · **Date:** 2026-07-25
 - **Type:** measurement gap (doc-gap + self-audit finding)
 - **Expected:** the contest meters entrants in *minutes* (FN-003), so a per-job package ought
   to be able to state the minutes that job consumed — in the same unit the grant is denominated in.
-- **What we actually measured:** per-run **wall-clock latency, client-side**. The poll loop
-  timestamps itself (`server/lib/zoo.mjs:78-94`) and the live backend records it as
-  `apiRuns[].latencyS` (`server/pipeline/backends.mjs:146`). That is elapsed time observed from
-  our side. It is not billed minutes, and this package never claimed it was.
+- **What we actually measured — two things, and neither of them is minutes:**
+  1. Per-run **wall-clock latency, client-side**. The poll loop timestamps itself
+     (`server/lib/zoo.mjs`, `waitTextToCad`) and the live backend records it as
+     `apiRuns[].latencyS` (`server/pipeline/backends.mjs`, `liveBackend`). That is elapsed time
+     observed from our side. It is not billed minutes, and this package never claimed it was.
+  2. The **count of HTTP requests** a run issues, counted at the one place they all pass through
+     (`server/lib/zoo.mjs`, the `httpRequests` counter on `zooClient`). Also not minutes — but it
+     is the one fact that licenses a package to state `minutesUsed: 0`, because a run that issued
+     zero requests cannot have been billed for any. See the second defect below for why we now
+     count rather than infer this.
 - **What we searched, and what each surface returned:**
   - `GET /user/text-to-cad/{id}` — status, prompt, `code`. No duration, minutes, credits, or cost field.
   - `GET /async/operations/{id}` — `outputs` (FN-007). Same: nothing about cost.
   - `GET /user/payment/balance` — the **only** spend signal we found, and it is account-level:
-    `stable_api_credits_remaining_monetary_value` (`server/lib/zoo.mjs:30-33`). Attributing one
+    `stable_api_credits_remaining_monetary_value` (`server/lib/zoo.mjs`, `balanceUsd`). Attributing one
     job's spend means differencing that balance across the job, which requires real spend and is
     only stable at campaign granularity. That is exactly how FN-017 derived the ≈1 credit /
     API-second rate — from campaigns c001+c002 as an instrument, never from a per-run field.
@@ -452,23 +458,58 @@ and confirmed to resolve before it was written down.
   So the claim this note supports is bounded: **no surface this client exercises exposes per-run
   minutes** — *not* "no such surface exists." Settling either point takes a live generation to
   spend against, which this pass deliberately did not do.
-- **Impact — the defect this note exists to record:** `server/pipeline/run-job.mjs` hardcoded
+- **Impact — defect 1, the one this note was opened for:** `server/pipeline/run-job.mjs` hardcoded
   `minutesUsed: 0`, which flowed into every sealed `manifest.json` and `logs/apiRun.json`. Nobody
   measured zero; zero was the default that shipped. In a bundle whose entire pitch is that its
   numbers are real and hash-sealed, a fabricated measurement is the worst class of defect — it is
-  sealed, tamper-evident, and wrong. **Fixed:** the pipeline omits the key
-  (`server/pipeline/run-job.mjs:252-259`), the assembler seals `minutesUsed: null` plus a
-  `minutesUsedNote` reading NOT MEASURED into both `logs/apiRun.json` and the manifest
-  (`server/package/assemble.mjs:55-64`, `:213-222`, `:246-250`). `null` and `0` are now different
-  statements to a reader who never sees our source.
+  sealed, tamper-evident, and wrong.
+- **Impact — defect 2, found by adversarial review OF THE FIRST FIX, and worse in one respect:**
+  the first fix replaced the fabricated `0` with `null` plus a note reading *"NOT MEASURED — not
+  because this run consumed zero."* That sentence was stamped on **every** run without a supplied
+  measurement, including runs that provably consumed zero. The demo bundle — the artifact a judge
+  actually opens — then contained, in one file, `warnings[0]: "replay backend … zero network"` and
+  an apiRuns note denying that the run consumed zero. A bundle contradicting itself inside the
+  field added to make that exact distinction legible is a worse failure than the number it
+  replaced. Its root cause was a **second fabricated measurement sitting right beside the first**:
+  `apiRuns.totalCalls` was `artifacts.apiRuns.length`, which on replay counts **fixture files read
+  off disk** (the demo sealed `totalCalls: 2` for a run that opened no socket) and on live counts
+  **generations** — sealing `1` for a text-to-cad run that issues a dispatch, a poll every `pollS`,
+  and up to six outputs fetches, i.e. a dozen-odd requests for a 60-second generation. With no
+  honest call count, the assembler had no signal with which to tell a free run from an unpriced one.
+- **Fixed — one counted fact, three distinct states, no fourth:**
+  - `zooClient` counts every request it issues, incremented *before* the await so a request that
+    404s or throws still counts (it was still issued). Backends report that count as a delta
+    across their own generation; replay and flushmount report a literal `0` because no `fetch` is
+    reachable from those code paths (`server/lib/zoo.mjs`, `server/pipeline/backends.mjs`).
+  - The packager (`server/package/assemble.mjs`) seals `totalCalls` as **a count or `null`** —
+    never `?? 0`, and never a length borrowed from an array of something else. It then derives:
+    a caller-supplied number ships bare; `totalCalls === 0` ships `minutesUsed: 0` with a basis
+    note saying the zero is *entailed by the counted request total, not read off a billing
+    surface*; anything else ships `null` with a note saying NOT MEASURED and *"unknown, not free."*
+  - Each array travels under the name of what is in it — `calls` for per-request records,
+    `generations` for text-to-cad runs, `replayedRecords` for fixture provenance — so nothing is
+    counted twice by a reader trusting a field name.
+  - `manifest.json` mirrors `logs/apiRun.json` field for field, notes included; the summary a
+    reviewer reaches for first no longer carries a different account from the log beside it.
+  - When minutes are genuinely unknown, that now reaches **PDF section 9**, the page a human signs.
+    Ordering constraint worth knowing before editing: `warnings` is handed to the PDF builder by
+    reference and rendered during that call, so anything pushed after it lands in
+    `manifest.warnings` and never in the document — the API accounting is computed above the build
+    for exactly that reason.
 - **Deliberately not done:** `latencyS / 60` is a tempting stand-in — FN-017 measured that real
   generations bill ≈ their runtime — but a derived estimate sitting in a field named `minutesUsed`
   is the same fabrication with arithmetic in front of it. If that estimate ever ships it ships
   under its own name, with its basis attached.
-- **Repro:** `npm run demo`, then read
-  `server/pipeline/data/packages/<jobId>/manifest.json` → `apiRuns.minutesUsed` is `null` carrying
-  the note. Before the fix the same field read `0`. Regression-locked in
-  `server/package/package.test.mjs` and `server/pipeline/pipeline.test.mjs`.
+- **Repro:** `npm run demo`, then read `server/pipeline/data/packages/<jobId>/manifest.json` →
+  `apiRuns` is `{totalCalls: 0, minutesUsed: 0, minutesUsedNote: "…issued ZERO requests…"}`, and
+  `logs/apiRun.json` carries the identical account plus the two `replayedRecords`. Before defect 1
+  was fixed the same block read `{totalCalls: 2, minutesUsed: 0}` with nothing marking either as
+  invented; between the two fixes it read `{totalCalls: 2, minutesUsed: null}` with a note denying
+  the run's own zero. A live run instead seals its counted request total with `minutesUsed: null`.
+  Regression-locked in `server/lib/zoo.test.mjs` (the counter, incl. failed requests and poll
+  loops), `server/package/package.test.mjs` (all three states, plus that the unmeasured case
+  reaches the PDF) and `server/pipeline/pipeline.test.mjs` (the demo bundle may not contradict its
+  own zero-network warning; the live seam seals the client's counted delta).
 - **Suggested doc edit:** the text-to-cad and async-operation records should carry the billed cost
   of that call (credits and/or API-seconds), and the balance page should state plainly that
   per-call cost is not retrievable per call today. FN-003 asked for the grant to be labeled; this

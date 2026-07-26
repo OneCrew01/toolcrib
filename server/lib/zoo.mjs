@@ -17,7 +17,17 @@ export function loadToken() {
 export function zooClient(token = loadToken()) {
   const HDRS = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
+  // Every request this client issues, counted where they all pass through.
+  // A packaged run reports its API-call count from this counter and nowhere
+  // else: a count inferred from an array length is a guess wearing a number's
+  // clothes, and that is exactly the defect FN-031 records — `apiRuns.length`
+  // shipped as `totalCalls` while a single generation issued a POST, a dozen
+  // polls and an outputs fetch. Counted BEFORE the await on purpose: a request
+  // that 404s or throws was still issued, and still billed for.
+  let httpRequests = 0;
+
   async function api(path, opts = {}) {
+    httpRequests += 1;
     const res = await fetch(BASE + path, { headers: HDRS, ...opts });
     if (!res.ok) throw new Error(`${opts.method ?? "GET"} ${path} → ${res.status}: ${await res.text()}`);
     return res.json();
@@ -25,6 +35,13 @@ export function zooClient(token = loadToken()) {
 
   return {
     api,
+
+    /**
+     * HTTP requests this client has issued since it was constructed —
+     * poll iterations, 404 retries and failed requests all included.
+     * Read it as a delta across an operation to get that operation's count.
+     */
+    get httpRequests() { return httpRequests; },
 
     /** Remaining stable credits in USD. */
     async balanceUsd() {
@@ -100,6 +117,7 @@ export function zooClient(token = loadToken()) {
 
     /** Mass of a CAD file in grams via the Engine's REST surface (FN-008). */
     async massG(bytes, { densityKgM3 = 2700, srcFormat = "step" } = {}) {
+      httpRequests += 1; // posts raw bytes, so it cannot go through api() — count it here
       const res = await fetch(
         `${BASE}/file/mass?material_density=${densityKgM3}&material_density_unit=kg:m3&src_format=${srcFormat}&output_unit=g`,
         { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: bytes },

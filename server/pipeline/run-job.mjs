@@ -177,6 +177,9 @@ export async function runJob(requestPath, {
     kclBytes: artifacts.kcl?.length ?? 0,
     files: Object.fromEntries(Object.entries(artifacts.files ?? {}).map(([k, v]) => [k, v.length])),
     apiRuns: artifacts.apiRuns,
+    // counted, not inferred — null means the backend did not count (FN-031)
+    httpRequests: typeof artifacts.httpRequests === "number" ? artifacts.httpRequests : null,
+    ...(artifacts.replayedRecords?.length ? { replayedRecords: artifacts.replayedRecords } : {}),
     notes: artifacts.notes,
     ...(artifacts.params ? { params: artifacts.params } : {}),
   };
@@ -249,14 +252,25 @@ export async function runJob(requestPath, {
       verification: lk.result.verification,
       ...(lk.result.watermark ? { watermark: lk.result.watermark } : {}),
     })),
-    // No minutesUsed key on purpose. This pipeline has no per-run minute
-    // measurement to hand over: backends record client-side wall clock
-    // (backends.mjs `latencyS`), which is not billed minutes, and no Zoo
-    // surface this client exercises returns a per-run minute or cost figure
-    // (FN-031). Omitting the key rather than passing a number keeps the
-    // producer honest at the one place that would have to invent one; the
-    // assembler seals the absence as an explicit null.
-    apiRun: { calls: artifacts.apiRuns ?? [], totalCalls: (artifacts.apiRuns ?? []).length },
+    // Every key here is what its name says, because the packager seals it and
+    // a sealed wrong number is the worst thing this bundle can carry (FN-031).
+    //
+    // totalCalls is the backend's COUNTED request total — 0 when it provably
+    // dispatched nothing, null when nobody counted. It used to be
+    // `apiRuns.length`, which counted fixture files on replay (2, for a run
+    // that opened no socket) and generations on live (1, for a dozen-odd
+    // requests). Each array now travels under the name of what is in it, and
+    // no minutesUsed key is passed at all: backends time client-side wall
+    // clock (`latencyS`), which is not billed minutes, and no Zoo surface this
+    // client exercises returns a per-run minute or cost figure. The assembler
+    // decides between "zero, because zero requests" and "unmeasured" from
+    // totalCalls — so handing it a fake count would corrupt that call too.
+    apiRun: {
+      calls: [], // no per-request records are kept; totalCalls is the counted total
+      totalCalls: typeof artifacts.httpRequests === "number" ? artifacts.httpRequests : null,
+      ...(artifacts.apiRuns?.length ? { generations: artifacts.apiRuns } : {}),
+      ...(artifacts.replayedRecords?.length ? { replayedRecords: artifacts.replayedRecords } : {}),
+    },
     ledger: await store.readLedger(jobId),
     warnings: [...(artifacts.notes ?? []), ...(consult.findings ?? [])],
   };

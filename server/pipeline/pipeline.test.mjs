@@ -115,14 +115,29 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
   assert.ok(present.some((p) => /^cad\/.+\.kcl$/.test(p)), "bundle missing cad KCL");
   assert.ok(present.some((p) => /^exports\/.+\.stl$/.test(p)), "bundle missing stl export");
 
-  // The pipeline measures no per-run API minutes and must not seal a number
-  // saying it did. `0` would be a fabricated measurement inside a bundle whose
-  // whole pitch is that its numbers are real; `null` + note says "unmeasured"
-  // out loud (FN-031).
+  // API accounting: the sealed bundle may not contradict itself. This run
+  // reads fixtures off disk and dispatches nothing, so its request total is a
+  // counted 0 and its minutes are 0 with the basis attached. Both halves were
+  // wrong before FN-031 — `totalCalls: 2` counted fixture FILES as API calls,
+  // and the minutes note denied a zero the same manifest asserts in warnings[0].
   if (!r.pkg.stub) {
-    assert.strictEqual(r.pkg.manifest.apiRuns.minutesUsed, null);
-    assert.notStrictEqual(r.pkg.manifest.apiRuns.minutesUsed, 0);
-    assert.ok(/NOT MEASURED/.test(r.pkg.manifest.apiRuns.minutesUsedNote ?? ""));
+    const acct = r.pkg.manifest.apiRuns;
+    assert.strictEqual(acct.totalCalls, 0, "replay dispatched nothing; anything but 0 is invented");
+    assert.strictEqual(acct.minutesUsed, 0);
+    assert.match(acct.minutesUsedNote, /issued ZERO/);
+    assert.doesNotMatch(acct.minutesUsedNote, /NOT MEASURED/);
+    // the contradiction, asserted directly: a bundle that warns "zero network"
+    // may not also report calls or deny that it consumed zero.
+    const zeroNetwork = r.pkg.manifest.warnings.some((w) => /zero network/.test(w));
+    assert.ok(zeroNetwork, "replay bundle lost its zero-network warning");
+    assert.doesNotMatch(JSON.stringify(acct), /not because this run consumed zero|NOT MEASURED/);
+
+    // the two replayed fixture records still ship as evidence — under the name
+    // of what they are, so nobody counts them as calls again
+    const log = JSON.parse(readFileSync(join(bundleDir, "logs/apiRun.json"), "utf8"));
+    assert.deepEqual(log.calls, []);
+    assert.equal(log.replayedRecords.length, 2);
+    assert.deepEqual(log.replayedRecords.map((x) => x.replayedFrom).sort(), ["intent.json", "validation.json"]);
   }
 
   // cross-track audit: the packager's own DoD checker signs off on the bundle
@@ -378,6 +393,51 @@ test("live resume: matching prompt adopts the generation and walks to the gate",
   assert.match(genRow.reason, /resumed text-to-cad t2c-resume-ok, no new dispatch/);
   assert.equal(r.job.artifacts.generation.apiRuns[0].resumed, true);
   assert.equal(r.verify.ok, true);
+
+  // This stub keeps no request counter, so the count is genuinely unknown —
+  // and unknown seals as null, not as the 1 that `apiRuns.length` used to
+  // report for a generation that really issues a dispatch plus a poll per
+  // pollS plus an outputs fetch (FN-031).
+  if (!r.pkg.stub) {
+    assert.strictEqual(r.pkg.manifest.apiRuns.totalCalls, null);
+    assert.match(r.pkg.manifest.apiRuns.totalCallsNote, /NOT a claim that it issued none/);
+    assert.strictEqual(r.pkg.manifest.apiRuns.minutesUsed, null);
+    assert.match(r.pkg.manifest.apiRuns.minutesUsedNote, /NOT MEASURED/);
+    // one generation record, filed as a generation and not as a call
+    assert.equal(r.pkg.manifest.apiRuns.totalCalls, null);
+    const log = JSON.parse(readFileSync(join(r.pkg.bundleDir, "logs/apiRun.json"), "utf8"));
+    assert.deepEqual(log.calls, []);
+    assert.equal(log.generations.length, 1);
+    assert.equal(log.generations[0].resumed, true);
+  }
+});
+
+// The counting seam end to end: what the client counted is what the manifest
+// states — a delta across this generation, with no array length anywhere in
+// the path, and a request total above zero forfeits any claim of zero minutes.
+test("live lane: the client's counted request total is what gets sealed", async () => {
+  const { dataDir, outRoot, root } = dirs("resume-counted");
+  const requestPath = writeJson(root, "request.json", cubeRequest());
+  const base = stubZoo({ recordPrompt: cubeRequest().prompt });
+  let issued = 4; // this client had already spent four requests before this job
+  const zoo = {
+    get httpRequests() { return issued; },
+    startTextToCad: base.startTextToCad,
+    async waitTextToCad(...a) { issued += 6; return base.waitTextToCad(...a); }, // poll loop
+    async fetchOutputs(...a) { issued += 1; return base.fetchOutputs(...a); },
+    decodeOutput: base.decodeOutput,
+  };
+  const r = await runJob(requestPath, {
+    backend: "live", resumeT2cId: "t2c-counted", client: zoo, dataDir, outRoot, ...quiet,
+  });
+  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  assert.equal(r.job.artifacts.generation.httpRequests, 7); // the delta, not the raw 11
+  if (!r.pkg.stub) {
+    assert.strictEqual(r.pkg.manifest.apiRuns.totalCalls, 7);
+    assert.strictEqual(r.pkg.manifest.apiRuns.totalCallsNote, undefined);
+    assert.strictEqual(r.pkg.manifest.apiRuns.minutesUsed, null);
+    assert.match(r.pkg.manifest.apiRuns.minutesUsedNote, /NOT MEASURED/);
+  }
 });
 
 test("live resume: mismatched record prompt is refused — no foreign geometry", async () => {

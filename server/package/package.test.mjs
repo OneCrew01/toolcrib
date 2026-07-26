@@ -176,28 +176,94 @@ test("fixture bundle: all files land, hashes recompute, packageHash matches the 
 // The bundle's entire claim is that every number in it was measured. An
 // unmeasured minute count must therefore be legibly absent, not quietly zero:
 // a reader has to be able to tell "nobody measured this" from "it cost nothing."
-test("unmeasured API minutes seal as null with a note — never as a zero posing as a reading", () => {
+const assembleWith = (apiRun) => {
   const artifacts = fixtureArtifacts();
-  delete artifacts.apiRun.minutesUsed; // the pipeline supplies no measurement
+  if (apiRun === undefined) delete artifacts.apiRun;
+  else artifacts.apiRun = apiRun;
   const analysis = analyzeStl(read("source.stl"));
-  const { bundleDir, manifest } = assemblePackage(fakeJob(), artifacts, fixtureGates(analysis), {
-    outRoot: newOut(),
-  });
+  return assemblePackage(fakeJob(), artifacts, fixtureGates(analysis), { outRoot: newOut() });
+};
+
+test("a run that issued API calls but measured no minutes seals null — and says so in the PDF too", () => {
+  const { bundleDir, manifest } = assembleWith({ totalCalls: 3, calls: [] });
 
   assert.strictEqual(manifest.apiRuns.minutesUsed, null);
-  assert.notStrictEqual(manifest.apiRuns.minutesUsed, 0);
-  assert.ok(/NOT MEASURED/.test(manifest.apiRuns.minutesUsedNote), manifest.apiRuns.minutesUsedNote);
-  assert.ok(/FN-031/.test(manifest.apiRuns.minutesUsedNote), "note must cite the field note");
+  assert.strictEqual(manifest.apiRuns.totalCalls, 3);
+  assert.match(manifest.apiRuns.minutesUsedNote, /NOT MEASURED/);
+  assert.match(manifest.apiRuns.minutesUsedNote, /FN-031/, "note must cite the field note");
+  // It may not claim the run was free — that is the sentence this whole
+  // three-state split exists to keep off runs that did spend.
+  assert.doesNotMatch(manifest.apiRuns.minutesUsedNote, /issued ZERO/);
 
-  // the same honesty in the log file the manifest hashes
+  // the same account in the log file the manifest hashes
   const log = JSON.parse(readFileSync(join(bundleDir, "logs/apiRun.json"), "utf8"));
   assert.strictEqual(log.minutesUsed, null);
-  assert.ok(/NOT MEASURED/.test(log.minutesUsedNote));
+  assert.strictEqual(log.totalCalls, 3);
+  assert.strictEqual(log.minutesUsedNote, manifest.apiRuns.minutesUsedNote);
 
-  // and a genuine measurement still ships as a number, unqualified
+  // ...and in section 9 of the document a human signs. This assertion is the
+  // regression lock on ORDERING: warnings is passed to the PDF builder by
+  // reference and rendered during that call, so computing the minutes account
+  // after the build would leave the PDF silent while the manifest warned.
+  const warning = manifest.warnings.find((w) => /API minutes/.test(w));
+  assert.ok(warning, `no unmeasured-minutes warning in ${JSON.stringify(manifest.warnings)}`);
+  assert.match(warning, /Unknown, not zero/);
+  // matched on single tokens: the renderer word-wraps, so "NOT MEASURED" can
+  // legitimately straddle a line break while every word survives intact.
+  const pdf = readFileSync(join(bundleDir, "reports/manufacturingPackage.pdf")).toString("latin1");
+  assert.ok(pdf.includes("MEASURED"), "unmeasured minutes never reached the signed PDF");
+  assert.ok(pdf.includes("FN-031"), "signed PDF states the fact without citing where it is documented");
+
+  // and a genuine measurement still ships as a number, unqualified and unwarned
   const measured = buildFixtureBundle().manifest;
   assert.strictEqual(measured.apiRuns.minutesUsed, 1.42);
   assert.strictEqual(measured.apiRuns.minutesUsedNote, undefined);
+  assert.strictEqual(measured.warnings.find((w) => /API minutes/.test(w)), undefined);
+});
+
+// The other half of the same honesty: a run that provably dispatched nothing
+// consumed nothing, and a bundle that stamps "not because this run consumed
+// zero" onto it is asserting something false — in the very field added to make
+// the distinction legible, three lines from a warning saying "zero network".
+test("a zero-request run seals 0 with its basis — the bundle never denies its own zero", () => {
+  const { bundleDir, manifest } = assembleWith({ totalCalls: 0, calls: [] });
+
+  assert.strictEqual(manifest.apiRuns.totalCalls, 0);
+  assert.strictEqual(manifest.apiRuns.minutesUsed, 0);
+  assert.match(manifest.apiRuns.minutesUsedNote, /issued ZERO/);
+  assert.match(manifest.apiRuns.minutesUsedNote, /FN-031/);
+  // 0 here is entailed by a counted fact, not read off a billing surface, and
+  // the note has to keep those apart rather than posing as a meter reading.
+  assert.match(manifest.apiRuns.minutesUsedNote, /NOT read off a billing surface/);
+  assert.doesNotMatch(manifest.apiRuns.minutesUsedNote, /NOT MEASURED/);
+
+  const log = JSON.parse(readFileSync(join(bundleDir, "logs/apiRun.json"), "utf8"));
+  assert.strictEqual(log.minutesUsed, 0);
+  assert.strictEqual(log.minutesUsedNote, manifest.apiRuns.minutesUsedNote);
+  // nothing to disclose, so no warning noise on the signed document
+  assert.strictEqual(manifest.warnings.find((w) => /API minutes/.test(w)), undefined);
+});
+
+// 0 is licensed by a COUNT of zero and by nothing else. A caller that never
+// counted gets null — not the length of some array that happens to be nearby,
+// which is how `totalCalls: 2` came to describe a run that opened no socket.
+test("an uncounted run seals totalCalls null — never a zero, never an array length", () => {
+  const { manifest } = assembleWith({
+    calls: [{ path: "/a", method: "GET" }, { path: "/b", method: "GET" }],
+  });
+
+  assert.strictEqual(manifest.apiRuns.totalCalls, null);
+  assert.match(manifest.apiRuns.totalCallsNote, /NOT a claim that it issued none/);
+  // an uncounted run must not inherit the zero-request licence for minutes
+  assert.strictEqual(manifest.apiRuns.minutesUsed, null);
+  assert.match(manifest.apiRuns.minutesUsedNote, /NOT MEASURED/);
+
+  // no apiRun at all: same answer, plus the "nothing was recorded" note that
+  // logs/apiRun.json carries — both sealed surfaces, one story.
+  const bare = assembleWith(undefined).manifest;
+  assert.strictEqual(bare.apiRuns.totalCalls, null);
+  assert.strictEqual(bare.apiRuns.minutesUsed, null);
+  assert.match(bare.apiRuns.note, /no API activity recorded/);
 });
 
 test("packageHash is stable: same inputs, two assemblies, identical manifests", () => {

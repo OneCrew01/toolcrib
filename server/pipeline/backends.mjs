@@ -1,6 +1,13 @@
 // Three ways to turn a validated request into artifacts, one interface:
 //   makeBackend(name, opts) -> { name, generate(job) -> artifacts }
-//   artifacts = { kcl, files: {stl?, step?, gltf?, png?}, apiRuns: [], notes: [] }
+//   artifacts = { kcl, files: {stl?, step?, gltf?, png?}, apiRuns: [],
+//                 httpRequests: number|null, replayedRecords?: [], notes: [] }
+//
+// httpRequests is how many HTTP requests THIS generation issued to the Zoo
+// API. It is load-bearing, not decorative: the packager uses `0` — meaning
+// provably no request, therefore no billable minute — to tell a free run apart
+// from a run whose cost nobody could read (FN-031). `null` means "not counted",
+// which is a different statement from zero and must never be rounded to it.
 //
 //   replay     — samples/plain-plate-stl fixtures, zero network. Judge/demo path.
 //   flushmount — deterministic KCL pair from generateFlushMountPair; no mesh,
@@ -55,15 +62,21 @@ function replayBackend({ fixturesDir = join(REPO, "samples", "plain-plate-stl") 
       // engine-rendered preview (ws take_snapshot route, FN-022) if the fixture exists
       const previewPath = join(fixturesDir, "preview.png");
       if (existsSync(previewPath)) files.png = readFileSync(previewPath);
-      const apiRuns = [];
+      // Prior Zoo outputs read off disk. These are NOT calls this run issued —
+      // shipping their count as an API-call total is how the sealed manifest
+      // came to claim 2 calls for a run that opened no socket (FN-031). They
+      // travel under their own name; apiRuns stays empty because it is empty.
+      const replayedRecords = [];
       for (const f of ["intent.json", "validation.json"])
         if (existsSync(join(fixturesDir, f)))
-          apiRuns.push({ replayedFrom: f, record: JSON.parse(read(f).toString("utf8")) });
+          replayedRecords.push({ replayedFrom: f, record: JSON.parse(read(f).toString("utf8")) });
 
       return {
         kcl: read("part.kcl").toString("utf8"),
         files,
-        apiRuns,
+        apiRuns: [],
+        replayedRecords,
+        httpRequests: 0, // every byte above came from disk; nothing was dispatched
         // notes ride through to manifest.warnings, PDF section 9 and the API's
         // warnings field — every one of them judge-visible.
         notes: [`replay backend: artifacts read from ${displayPath(fixturesDir)} — zero network, real prior Zoo outputs`],
@@ -105,6 +118,7 @@ function flushmountBackend() {
         files: {}, // no mesh: nothing server-side executes KCL today
         meshExpected: false, // packager parks a mesh-less bundle, loudly incomplete
         apiRuns: [],
+        httpRequests: 0, // generated in-process from the spec; no network reachable from here
         params: pair.params,
         notes: [
           "flushmount backend: KCL pair generated deterministically, zero network",
@@ -127,6 +141,14 @@ function liveBackend({ format = "stl", timeoutMin = 20, client, resumeId } = {})
 
       const { zooClient } = await import("../lib/zoo.mjs");
       const zoo = client ?? zooClient();
+      // What this generation costs in requests, counted rather than guessed:
+      // one dispatch + a poll every pollS until terminal + up to six outputs
+      // fetches is a dozen-odd requests, and `apiRuns.length` called it 1
+      // (FN-031). An injected client (the offline test seam) need not carry the
+      // counter — when it does not, the count is UNKNOWN, and unknown seals as
+      // null downstream rather than as a zero nobody measured.
+      const counted = typeof zoo.httpRequests === "number";
+      const requestsBefore = counted ? zoo.httpRequests : 0;
       const notes = [];
       // Resume-by-id: adopt a generation that is already running (or done)
       // server-side instead of dispatching a new one. The measured need: a
@@ -188,7 +210,13 @@ function liveBackend({ format = "stl", timeoutMin = 20, client, resumeId } = {})
       }
       notes.push(`live backend: text-to-cad ${id} completed in ${run.latencyS}s, ${Object.keys(files).length} output file(s)`);
 
-      return { kcl: wait.record?.code ?? "", files, apiRuns: [run], notes };
+      return {
+        kcl: wait.record?.code ?? "",
+        files,
+        apiRuns: [run], // one generation record — NOT one per HTTP request
+        httpRequests: counted ? zoo.httpRequests - requestsBefore : null,
+        notes,
+      };
     },
   };
 }
