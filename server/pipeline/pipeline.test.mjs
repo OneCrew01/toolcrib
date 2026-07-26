@@ -12,6 +12,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATE } from "../state/states.mjs";
 import { MACHINE_PATH } from "../lib/repo-path.mjs";
+import { scanIdentity, describeHits, NIL_UUID } from "../lib/identity.mjs";
 import { runJob } from "./run-job.mjs";
 import { analyzeStl, ExportError, PdfError } from "./contract-stubs.mjs";
 
@@ -208,6 +209,46 @@ test("no judge-visible surface names the operator's filesystem", async () => {
   for (const required of ["manifest.json", "notifications.log", "reports/manufacturingPackage.pdf"])
     assert.ok(names.includes(required), `bundle scan never reached ${required}`);
   assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
+});
+
+// The other identity a bundle can carry: not WHERE it ran, WHO ran it. The
+// replay backend reads samples/plain-plate-stl/*.json off disk and ships both
+// records into logs/apiRun.json as replayedRecords, so whatever account handle
+// those captured Zoo responses carry travels into every generated bundle and
+// out through the API's job-detail payload. Measured: the operator's real Zoo
+// user_id did exactly that, and every path scan above stayed green over it,
+// because a bare account uuid has no root and no separators for MACHINE_PATH to
+// match. Hence a second detector, and this second scan.
+test("no judge-visible surface names the operator's account", async () => {
+  const { dataDir, outRoot } = dirs("noidentity");
+  const r = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, ...quiet });
+  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+
+  const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
+  const rel = (abs) => relative(bundleDir, abs).split(sep).join("/");
+  const bundleFiles = walk(bundleDir);
+  // Every bundle file as bytes, plus the two surfaces that never touch disk:
+  // the hash-chained ledger reasons and the manifest warnings, both of which
+  // render in the console UI, the PDF and the API response.
+  const verdict = scanIdentity([
+    ...bundleFiles.map((abs) => ({ name: rel(abs), text: readFileSync(abs, "latin1") })),
+    ...r.ledger.map((row) => ({ name: `ledger -> ${row.to}`, text: row.reason })),
+    ...(r.pkg.manifest.warnings ?? []).map((w, i) => ({ name: `manifest.warnings[${i}]`, text: w })),
+  ]);
+  assert.deepEqual(verdict.hits, [], `the generated bundle carries account identity:\n${describeHits(verdict.hits)}`);
+
+  // scanIdentity refuses an empty corpus outright; this pins that the corpus is
+  // the RIGHT one — the file the leak was measured in, and the bundle entire.
+  const names = bundleFiles.map(rel);
+  for (const required of ["logs/apiRun.json", "manifest.json", "reports/manufacturingPackage.pdf"])
+    assert.ok(names.includes(required), `bundle identity scan never reached ${required}`);
+  assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
+
+  // And the replayed records really are still in there — the scan has to be
+  // passing over the payload that carried the leak, not over its absence.
+  const log = JSON.parse(readFileSync(join(bundleDir, "logs/apiRun.json"), "utf8"));
+  assert.equal(log.replayedRecords.length, 2);
+  assert.equal(log.replayedRecords.find((x) => x.replayedFrom === "validation.json").record.user_id, NIL_UUID);
 });
 
 // The demo console is the goal's first-named surface, and the cheapest route
