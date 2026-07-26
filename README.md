@@ -126,13 +126,19 @@ first, and refuses to report *clean* unless all four come back reported.
 **If you downloaded the ZIP instead of cloning, six tests will fail — and that is them
 doing their job.** Six of the checks look for personal data accidentally left in this
 repo's own files, and they ask `git` for the list of files to look through. A ZIP
-download has no `git` information inside it, so those six stop with
+download has no `git` information inside it, so five of the six stop with
 
 ```
 git ls-files failed (exit 128) — the sweep cannot verify what it cannot list.
 ```
 
-instead of reporting all-clear over a list they never got. A check that cannot see what
+and the sixth, which checks line endings, makes the same complaint in its own words:
+
+```
+git ls-files --eol failed (exit 128) — the committed line endings cannot be verified.
+```
+
+Neither one reports all-clear over a list it never got. A check that cannot see what
 it is checking should say so out loud, not pass quietly. Nothing else is affected —
 `npm run demo` still exits 0 in a ZIP. To get a fully green `npm test`, take the code
 with `git clone` rather than the ZIP button, and run it again.
