@@ -20,7 +20,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,6 +39,8 @@ import {
   CONTROL,
   CONTROL_NAME,
   CONTROL_KINDS,
+  declaredKinds,
+  unprovenKinds,
 } from "./leak-audit.mjs";
 import { COMMITTED_PATH, MACHINE_PATH } from "./repo-path.mjs";
 import { VacuousScanError, CONTROL_TOKEN } from "./identity.mjs";
@@ -123,17 +125,60 @@ test("the control is reported on every kind before any verdict is emitted", () =
   assert.equal(v.blobs, 2, "the control's own row must not be counted as a committed blob");
 });
 
-test("CONTROL_KINDS is every kind the audit can report, not a subset of them", () => {
-  // The hole this closes: if a detector's kind is not in CONTROL_KINDS, nothing
-  // proves that detector is alive, and its wiring into the verdict can be
-  // deleted in a refactor with the suite still green. So the two sets are
-  // pinned equal — add a fifth detector without a fifth probe and this fails.
-  const everyKind = new Set([
-    ...kinds(shapeFindings("x", `ï»¿ scandir '${WIN_PATH}'`)), // bom, path
-    "identity",
-    ...kinds(parseEolRows("i/crlf  w/crlf  attr/\tbad.md").findings), // eol
-  ]);
-  assert.deepEqual([...everyKind].sort(), [...CONTROL_KINDS].sort());
+test("CONTROL_KINDS is read out of the audit's own source, not typed beside it", () => {
+  // What this replaces, and why: the previous version of this test built its
+  // expected set BY HAND — two literal probe strings plus a hardcoded
+  // "identity" — and asserted it equal to a hand-typed CONTROL_KINDS. Two
+  // hand-written lists agreeing with each other proves only that one person
+  // wrote both, so it could fail in one direction (a kind REMOVED) and never in
+  // the one the header promised. Measured on that version: a fifth detector was
+  // added to shapeFindings, CONTROL_KINDS was left alone, and this file stayed
+  // at 27 pass / 0 fail while the CLI printed its four-kind control line and
+  // then CLEAN at exit 0.
+  assert.deepEqual(CONTROL_KINDS, declaredKinds(readFileSync(AUDIT, "utf8")), "CONTROL_KINDS is not derived");
+
+  // The floor, from outside the module: derivation can only ever ADD, so this
+  // catches the other direction — a documented detector deleted or renamed.
+  assert.deepEqual([...CONTROL_KINDS].sort(), ["bom", "eol", "identity", "path"]);
+
+  // And it is a derivation rather than a coincidence: hand the scan a fifth
+  // detector written the way the other four are, and five come back. That is
+  // the link the old test was missing — CONTROL_KINDS GROWS, the control has no
+  // probe for the new kind, and runAudit's blind check refuses. That refusal is
+  // proven per-kind by the two tests above this one.
+  const fifth = declaredKinds(`${readFileSync(AUDIT, "utf8")}\nout.push({ kind: "secret", where: name, line: 1 });\n`);
+  assert.deepEqual(fifth, [...CONTROL_KINDS, "secret"]);
+});
+
+test("a kind scan that comes back short stops the audit instead of shrinking it", () => {
+  // The failure mode deriving the list introduces, closed at import. A scan
+  // that matched nothing would hand back an empty CONTROL_KINDS, the control
+  // would be satisfied by reporting nothing, and the audit would print CLEAN
+  // having proven not one detector alive — this file's own defect, arriving
+  // through the fix for it.
+  for (const source of ["", "// a file with no detectors in it at all", 'out.push({ kind: "bom" });'])
+    assert.throws(() => declaredKinds(source), VacuousScanError, `a short scan was accepted: ${source}`);
+});
+
+test("a finding under a kind nothing proved is refused, not printed beside the proven ones", () => {
+  // The half a source scan cannot see: a detector that ASSEMBLES its kind
+  // instead of spelling it is invisible to declaredKinds. So the verdict checks
+  // again on the way out.
+  assert.deepEqual(unprovenKinds([{ kind: "bom" }, { kind: "path" }]), []);
+  assert.deepEqual(unprovenKinds([{ kind: "bom" }, { kind: "sec" + "ret" }]), ["secret"]);
+
+  // Wired into the verdict, not merely exported beside it — the same join this
+  // file learned to test the hard way. With "identity" dropped from the proven
+  // list, the blind check is satisfied by the three that remain and the control's
+  // own identity finding is what trips the refusal.
+  assert.throws(
+    () => runAudit(clean(), LF_ROWS, { kinds: ["bom", "path", "eol"] }),
+    (e) => {
+      assert.ok(e instanceof VacuousScanError, `wrong error type: ${e}`);
+      assert.match(e.message, /never proved alive: identity/);
+      return true;
+    },
+  );
 });
 
 test("a control that carries no leak refuses to produce a verdict at all", () => {

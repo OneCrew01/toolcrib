@@ -7,10 +7,28 @@
 //
 // It sweeps every file git TRACKS (and, given --bundle, every file in a
 // generated job bundle) for four things a judge must never receive. The list is
-// CONTROL_KINDS, and it is exhaustive: every kind below is planted in the
-// control and must come back reported before any verdict is emitted, so adding
-// a fifth detector without adding a fifth probe fails the suite rather than
-// shipping unproven.
+// CONTROL_KINDS, and it is NOT TYPED — it is read out of this file's own source
+// by declaredKinds(), which is the whole reason "exhaustive" is a fact here and
+// not a wish. Every kind it finds must be planted in the control and come back
+// reported before any verdict is emitted, so a fifth detector added below grows
+// CONTROL_KINDS on the next import, finds no fifth probe waiting for it, and
+// makes the audit REFUSE — suite red, CLI red — rather than ship unproven.
+//
+// That paragraph used to make exactly this promise while nothing enforced it.
+// CONTROL_KINDS was a hand-typed array, and the test that "pinned" it built its
+// expected set by hand too — two literal probes plus a hardcoded "identity" — so
+// it could only ever fail in the reverse direction. Measured before the fix: a
+// fifth detector was added to shapeFindings with CONTROL_KINDS left alone, and
+// the suite stayed at 27 pass / 0 fail while the CLI printed its four-kind
+// control line and then CLEAN at exit 0. A guard whose own header is wrong is
+// worse than no guard, because it is believed.
+//
+// The scan reads kinds spelled as string literals, which is how all four below
+// are written and how a fifth would be. A kind ASSEMBLED at runtime is invisible
+// to it, so runAudit checks a second time on the way out: a finding carrying a
+// kind that is not in CONTROL_KINDS is a refusal, not a finding. That half is
+// caught when the detector first fires rather than at import — said plainly
+// because it is the honest residual, not because it is comfortable.
 //
 //   path      an absolute filesystem path that names the machine this was
 //             written on — a drive-rooted path, a UNC share, a home directory.
@@ -112,12 +130,70 @@ const CONTROL_EOL_ROW = `i/crlf  w/crlf  attr/\t${CONTROL_NAME}`;
 /** The planted case in full. Injectable ONLY so a test can prove a broken one refuses. */
 export const CONTROL = { name: CONTROL_NAME, text: CONTROL_TEXT, eolRow: CONTROL_EOL_ROW };
 
+// --- the kind vocabulary, derived rather than declared -------------------------
+
+/** This file, as a path, so it can be read as text. See declaredKinds. */
+const SOURCE = fileURLToPath(import.meta.url);
+
+// The shape a finding's kind is written in. Deliberately the ORDINARY spelling
+// rather than a marker comment: a marker only works if whoever adds the fifth
+// detector remembers to add the marker, which is the same forgetting this is
+// meant to survive. (It does not match its own definition — after the colon
+// comes a backslash, not a quote — so scanning this file does not invent a
+// kind out of the scanner.)
+const KIND_LITERAL = /\bkind:\s*"([a-z][a-z-]*)"/g;
+
+/**
+ * The four kinds the header documents. A FLOOR, not the list.
+ *
+ * Without it, the derivation has a failure mode of exactly the sort this file
+ * exists to refuse: a scan that matched NOTHING would hand back an empty
+ * CONTROL_KINDS, the control would be trivially satisfied by reporting nothing,
+ * and the audit would print CLEAN having proven not one detector alive. So a
+ * derived list that has lost a documented kind is a refusal at import.
+ */
+const DOCUMENTED_KINDS = ["bom", "path", "identity", "eol"];
+
+/**
+ * Every kind this file constructs, read out of this file's own source.
+ *
+ * @param {string} [source] defaulted to this module's text. Injectable ONLY so a
+ *        test can prove what a source with a fifth detector — or with none —
+ *        does, which cannot be shown by editing the real one.
+ * @returns {string[]} in source order, deduplicated
+ */
+export function declaredKinds(source = readFileSync(SOURCE, "utf8")) {
+  const found = [...new Set([...String(source).matchAll(KIND_LITERAL)].map((m) => m[1]))];
+  const lost = DOCUMENTED_KINDS.filter((k) => !found.includes(k));
+  if (lost.length)
+    throw new VacuousScanError(
+      `the kind scan did not find the documented detector(s): ${lost.join(", ")} ` +
+        `(it found ${found.length ? found.join(", ") : "nothing at all"}). ` +
+        `CONTROL_KINDS is derived from this file's source, so a scan that comes back short ` +
+        `does not shrink the audit — it stops it, because a control with fewer probes than ` +
+        `there are detectors is a control that proves less than it appears to.`,
+    );
+  return found;
+}
+
 /**
  * Every kind the audit detects — and therefore every kind the control must come
- * back with before a clean verdict is legal. Exhaustive by construction: a kind
- * that is not in here is a kind nothing proves is alive.
+ * back with before a clean verdict is legal. Exhaustive BY CONSTRUCTION, in the
+ * literal sense: nobody types this list, so nobody can forget to extend it.
  */
-export const CONTROL_KINDS = ["bom", "path", "identity", "eol"];
+export const CONTROL_KINDS = declaredKinds();
+
+/**
+ * The kinds among `findings` that CONTROL_KINDS never proved alive.
+ *
+ * The second half of the guarantee, for the case the source scan cannot see: a
+ * detector that assembles its kind instead of spelling it. Split out as its own
+ * function so a test can hand it a finding of a kind that does not exist, which
+ * is not something the real detectors can be made to produce.
+ */
+export const unprovenKinds = (findings, kinds = CONTROL_KINDS) => [
+  ...new Set(findings.map((f) => f.kind).filter((k) => !kinds.includes(k))),
+];
 
 // --- corpus ------------------------------------------------------------------
 
@@ -310,7 +386,7 @@ export function parseEolRows(stdout) {
  * join lived in main() instead, deleting the eol half was invisible — npm test
  * 178 pass / 0 fail, exit 0, and a verdict line that still said "or CRLF".
  *
- * Fails closed six ways before any caller sees an empty findings list:
+ * Fails closed seven ways before any caller sees an empty findings list:
  *
  *   empty corpus    -> throw. Zero entries is not zero leaks.
  *   no eol rows     -> throw. A caller that forgot to fetch them checked no
@@ -322,16 +398,21 @@ export function parseEolRows(stdout) {
  *   control missed  -> throw, naming the kind that went blind. scanIdentity()
  *                      additionally runs its own selfTest over the same regexes
  *                      and digest map before it will report anything.
+ *   unproven kind   -> throw, naming it. A finding of a kind the control never
+ *                      demonstrated is a finding from a detector nothing tested;
+ *                      reporting it beside four proven ones lends it a
+ *                      credibility no probe ever earned it.
  *
  * @param {Iterable<{name: string, text: unknown}>} entries
  * @param {string} eolRows raw `git ls-files --eol -z` output (see gitEolRows)
- * @param {{control?: {name: string, text: string, eolRow: string}}} [opts] the
- *        control is injectable ONLY so the test suite can prove what a broken
- *        one does. The default is the real planted case; nothing in production
- *        passes it.
+ * @param {{control?: {name: string, text: string, eolRow: string}, kinds?: string[]}} [opts]
+ *        both are injectable ONLY so the test suite can prove what a broken one
+ *        does — a control carrying no leak, and a kind list that does not cover
+ *        the findings. The defaults are the real planted case and the real
+ *        derived vocabulary; nothing in production passes either.
  * @returns {{entries: number, bytes: number, blobs: number, control: Array, findings: Array}}
  */
-export function runAudit(entries, eolRows, { control = CONTROL } = {}) {
+export function runAudit(entries, eolRows, { control = CONTROL, kinds = CONTROL_KINDS } = {}) {
   const corpus = [...entries];
   if (corpus.length === 0) throw new VacuousScanError("empty corpus — a sweep of nothing is not a clean verdict");
   for (const e of corpus)
@@ -367,12 +448,21 @@ export function runAudit(entries, eolRows, { control = CONTROL } = {}) {
 
   const controlFindings = findings.filter((f) => f.where === control.name);
   const seen = new Set(controlFindings.map((f) => f.kind));
-  const blind = CONTROL_KINDS.filter((k) => !seen.has(k));
+  const blind = kinds.filter((k) => !seen.has(k));
   if (blind.length)
     throw new VacuousScanError(
       `the control was NOT reported for: ${blind.join(", ")}. ` +
         `A scanner that cannot see a planted leak has proven nothing about the leaks it did not report, ` +
         `so no verdict is being emitted. Fix the detector (or the control) before believing any sweep.`,
+    );
+
+  const unproven = unprovenKinds(findings, kinds);
+  if (unproven.length)
+    throw new VacuousScanError(
+      `a finding was reported under a kind the control never proved alive: ${unproven.join(", ")}. ` +
+        `CONTROL_KINDS is derived from this file's own source, so a kind missing from it belongs to a ` +
+        `detector that assembles its kind rather than spelling it. Spell it, and plant a probe for it ` +
+        `in the control, so it is proven like the other ${kinds.length} before anything it says is believed.`,
     );
 
   return {
