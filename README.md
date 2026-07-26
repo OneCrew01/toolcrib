@@ -116,6 +116,11 @@ line, appended *after* the seal by `server/pipeline/run-job.mjs`, so it is delib
 outside the hash and is not a manifest entry. Nothing inside the seal can change without
 `dodCheck` catching it.
 
+`npm run leak-audit` (also the last step of `npm test`) sweeps every tracked file — and,
+with `--bundle=<dir>`, a generated job bundle — for absolute filesystem paths, account
+identifiers, BOMs and committed CRLF; it plants a control leak in its own corpus first and
+refuses to report *clean* unless that control comes back reported.
+
 With a Zoo token in `.env` (`cp .env.example .env`), the same pipeline runs live:
 
 ```bash

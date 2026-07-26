@@ -9,10 +9,13 @@
 //   displayPath(<abs>/toolcrib/samples/requests/plain-plate.json)
 //     -> "samples/requests/plain-plate.json"
 //
-// (No literal drive-letter prefix is spelled out anywhere in this file, on
-// purpose. The standing audit for a leak greps the tracked files for one, and
-// an example that trips that grep teaches the next auditor to wave off their
-// own alarm. Same reason the illustration above elides the chain as <abs>.)
+// (No literal machine root — drive letter, UNC authority or home directory —
+// is spelled out anywhere in this file, on purpose. The standing audit for a
+// leak sweeps the tracked files for one, and an example that trips that sweep
+// teaches the next auditor to wave off their own alarm. Same reason the
+// illustration above elides the chain as <abs>. One example below did spell a
+// UNC authority out longhand, and it was the single hit COMMITTED_PATH found
+// across all 232 tracked files; it now reads "<host>\<share>".)
 //
 // Two rules, no configuration:
 //
@@ -115,6 +118,84 @@ const ANY_ROOT = ROOTS.join("|");
  */
 export const MACHINE_PATH = new RegExp(ANY_ROOT);
 
+// --- the same question, asked of a COMMITTED FILE instead of a message ------
+//
+// MACHINE_PATH answers "does this MESSAGE still name a machine?". It runs over
+// one line this process is about to print, where a false positive costs
+// nothing: the scrubber rewrites the run and the line stays readable.
+//
+// COMMITTED_PATH answers a different question — "does this tracked FILE
+// contain a path that names the machine it was written on?" — and there a
+// false positive costs everything, because an audit that fires on the repo's
+// own fixtures is an audit somebody switches off. It is used by
+// server/lib/leak-audit.mjs, which sweeps every tracked file.
+//
+// Measured over all 232 tracked files at HEAD: MACHINE_PATH produces 31 hits,
+// and every one of them is a legitimate comment or fixture in the three files
+// whose job is to define and test the scrubber — a `/tmp/toolcrib-x/…` temp
+// dir in a displayPath case, a `"/root/"` entry in a list of roots, the source
+// of UNC_ROOT itself. None names a human or a machine. So the committed-file
+// vocabulary is the HOME-ROOTED subset:
+//
+//   drive root     a drive letter, a separator, and a real path segment.
+//   UNC authority  two backslashes, a host, a separator, a share — but only
+//                  where the pair does not continue a word, so the escaped
+//                  `Users\\someone` inside a JS string fixture is not read as
+//                  a network share.
+//   home root      the two POSIX roots that name a PERSON. tmp, var, opt, srv,
+//                  media, private and root are deliberately absent: they are
+//                  machine-rooted but they name nobody, they appear as
+//                  literals in this repo's own fixtures, and the WSL and macOS
+//                  mount forms are already caught by the home root sitting
+//                  inside them.
+//
+// That is a narrower claim than MACHINE_PATH's, stated rather than hidden: a
+// tracked file holding "/var/tmp/scratch" passes this audit. It names no
+// machine. A tracked file holding a home directory does not.
+//
+// --- escaping, which is how the previous audit was fooled -------------------
+//
+// A Windows path that has been JSON-stringified once carries two separators
+// where it carried one, and twice (a PDF content stream, a record stringified
+// into a message that is itself stringified) carries four. The first draft of
+// this vocabulary accepted exactly one, and measurably read a once-escaped
+// drive path as clean — the same class of miss as the shell-quoting failure
+// that started all this. So SEP accepts a run.
+//
+// The UNC rule pays for that generosity with a stricter lookbehind. Its
+// authority is itself a run of backslashes, so "up to four" and "starts
+// anywhere" together would read the ESCAPED fixture `Users\\someone\\tmp` in
+// a JS string as a share called "someone" — and that fixture is exactly what
+// repo-path.test.mjs and leak-audit.test.mjs are full of. Requiring the run to
+// begin at something that is neither alphanumeric nor a backslash keeps a real
+// authority (which follows a quote, a space or a line start) and drops a
+// mid-token escape (which follows a letter, and whose later backslashes follow
+// a backslash). Both directions are pinned in server/lib/leak-audit.test.mjs.
+//
+// Percent-encoding DOES hide all three ("file:///C%3A/Users/…"), and that is
+// not covered — said out loud rather than left for the next auditor to find.
+const PATH_SEG = String.raw`[A-Za-z0-9._$~-]`;
+const SEP = String.raw`[\\/]{1,4}`;
+const COMMITTED_DRIVE = String.raw`(?<![A-Za-z0-9])[A-Za-z]:${SEP}${PATH_SEG}`;
+const COMMITTED_UNC = String.raw`(?<![A-Za-z0-9\\])\\{2,4}${PATH_SEG}+${SEP}${PATH_SEG}`;
+// No lookbehind on the home rule, unlike POSIX_ROOT above, and the difference
+// is deliberate. POSIX_ROOT has to tolerate prose and URLs because it matches
+// eleven roots including /var and /tmp, so "example.com/var/log" would be a
+// false positive. This rule matches exactly the two roots that name a PERSON,
+// and suppressing it after a word character cost more than it saved: it went
+// blind to the WSL and macOS mount forms — /mnt/c/Users/<name> and
+// /Volumes/<disk>/Users/<name> — where the home root is preceded by the mount
+// segment. Measured over all 234 tracked files with the lookbehind removed: 0
+// hits. A docs link to a URL path literally named /Users/ would now make a
+// human look, which for a leak audit is the correct default.
+const COMMITTED_HOME = String.raw`\/(?:home|Users)\/${PATH_SEG}`;
+
+/** Vocabulary source, so a caller can build the /g copy a sweep needs. */
+export const COMMITTED_PATH_SOURCE = [COMMITTED_DRIVE, COMMITTED_UNC, COMMITTED_HOME].join("|");
+
+/** Non-global on purpose: a /g regex carries lastIndex between .test() calls. */
+export const COMMITTED_PATH = new RegExp(COMMITTED_PATH_SOURCE);
+
 // displayPath covers the paths this codebase interpolates itself. It cannot
 // cover the other way a path reaches a judge: a message we did not author,
 // forwarded verbatim. Node's fs errors embed the absolute path they failed on
@@ -174,7 +255,7 @@ export function scrubPaths(text, opts = {}) {
     // platform wrote the message.
     if (sep !== "\\" && WINDOWS_ROOTED.test(run)) {
       const segs = run.split(/[\\/]/).filter(Boolean);
-      // Drop the drive, or the whole "\\server\share" authority: a host name
+      // Drop the drive, or the whole "<host>\<share>" authority: a host name
       // is machine identity too.
       const chain = segs.slice(run.startsWith("\\\\") ? 2 : 1);
       return chain.length ? `${OUTSIDE_REPO}/${chain.at(-1)}` : OUTSIDE_REPO;

@@ -1,0 +1,36 @@
+# Line endings and encoding are repo policy, not a property of whoever's
+# machine last touched the file.
+#
+# Why this file exists: `git config core.autocrlf` is true on the build
+# machine, so the working tree legitimately holds CRLF while the committed
+# blobs hold LF. That works right up until it doesn't — a BOM reached a
+# committed JSON once this way, and `git archive` on this checkout emitted CRLF
+# into the tarball a judge would download. Neither of those is visible in a
+# normal diff.
+#
+# text=auto  git decides text vs binary per file by content (the same detection
+#            core.autocrlf already used, so declaring it changes nothing about
+#            what is currently committed) and normalises text to LF on the way
+#            INTO the repo.
+# eol=lf     text files come back OUT as LF — on checkout, and in `git archive`.
+#            This is the half core.autocrlf was overriding.
+#
+# Deliberately NOT here: a blanket `*.stl -text`. 15 of the 16 tracked STLs are
+# ASCII, one is binary, and pinning the extension either way would misclassify
+# the rest. Content detection gets every one of them right; it was measured
+# (`git ls-files --eol`) before this file was written.
+#
+# What this file cannot do is detect. It sets policy going forward; the guard
+# that checks the policy held is `npm run leak-audit`, which fails on any
+# committed blob with CRLF and on any file that starts with a UTF-8 BOM.
+#
+# NOTE: this was added WITHOUT `git add --renormalize`. The 230 blobs committed
+# before it were already verified LF-only and BOM-free, and rewriting them to
+# prove a point they already satisfy would have buried the real history of this
+# build under a whole-repo whitespace commit.
+
+* text=auto eol=lf
+
+# The three files content detection already calls binary, pinned so a future
+# edit to one of them cannot be re-detected as text and normalised.
+*.png binary

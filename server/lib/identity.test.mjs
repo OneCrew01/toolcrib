@@ -12,7 +12,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -28,6 +27,7 @@ import {
   VacuousScanError,
 } from "./identity.mjs";
 import { MACHINE_PATH } from "./repo-path.mjs";
+import { trackedFiles, readTracked } from "./leak-audit.mjs";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -197,11 +197,18 @@ test("the path detector is blind to account identity, which is why this file exi
 
 // --- the sweep --------------------------------------------------------------
 
-// `git ls-files` lists the paths git TRACKS — it reads the index, not HEAD's
-// trees — and the contents scanned below are the ones on disk right now. So
-// what this sweep actually checks is: the working-tree contents of every
-// tracked path. That is neither "HEAD" nor a plain directory walk, and the
-// difference is deliberate in both directions.
+// The corpus builder is IMPORTED, not restated. `trackedFiles` and
+// `readTracked` used to live here as private copies; they now live in
+// server/lib/leak-audit.mjs, which is the script that runs this same sweep
+// outside the test runner. Two copies of "what the corpus is" is how one of
+// them quietly stops covering a directory the other still covers — the exact
+// drift the path detector already recorded across three suites.
+//
+// What that shared builder guarantees, and why: `git ls-files` lists the paths
+// git TRACKS — it reads the index, not HEAD's trees — and the contents scanned
+// are the ones on disk right now. So this sweep checks the working-tree
+// contents of every tracked path. That is neither "HEAD" nor a plain directory
+// walk, and the difference is deliberate in both directions.
 //
 // Against HEAD: a leak that has been written but not yet committed is still
 // caught, which is the only version of this guard that can stop a bad commit
@@ -216,35 +223,6 @@ test("the path detector is blind to account identity, which is why this file exi
 // README's setup step is `git clone`, so git is present on the supported path;
 // if it is not, the claim cannot be checked and the honest outcome is a loud
 // failure rather than a green light over an unknown corpus.
-function trackedFiles() {
-  const r = spawnSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  assert.equal(
-    r.status,
-    0,
-    `git ls-files failed (${r.status}): the tracked-file sweep cannot verify what it cannot list.\n${r.stderr ?? ""}`,
-  );
-  return r.stdout.split("\0").filter(Boolean);
-}
-
-// A tracked path deleted from the working tree makes readFileSync throw a bare
-// ENOENT that names neither this guard nor the reason — and prints an absolute
-// machine path into the test output while doing it. That reads as "the leak
-// test is flaky", which is step one toward deleting a leak test. Say what
-// happened, in this guard's own words, with a repo-relative path.
-function readTracked(f) {
-  try {
-    // latin1 so binaries (stl, png, gltf, pdf) are scanned as bytes rather
-    // than skipped — a scan that silently drops the unreadable half of the
-    // repo is the vacuous verdict this guard exists to refuse.
-    return readFileSync(join(REPO, f), "latin1");
-  } catch (e) {
-    assert.fail(
-      `the identity sweep could not read the tracked file ${f} (${e.code ?? e.message}). ` +
-        `This is not a leak and not a flaky test: a path git tracks is missing from the working tree. ` +
-        `Restore it (\`git checkout -- ${f}\`) or stage its deletion, then re-run.`,
-    );
-  }
-}
 
 test("no tracked file carries the operator's account identity", () => {
   const files = trackedFiles();

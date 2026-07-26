@@ -11,8 +11,8 @@ was last counted.
 
 ## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
 
-**Works (`npm test` on 2026-07-26: 160 server tests + `self-checks: 40 passed`, 0
-failures; app builds clean)**
+**Works (`npm test` on 2026-07-26: 178 server tests + `self-checks: 40 passed` +
+`leak audit: CLEAN`, 0 failures; app builds clean)**
 - **Console theme tokenized** (`app/src/index.css`): the last hardcoded hex/rgba
   values folded into CSS custom properties (hover shades, on-accent text, corner
   radius, shadow tint). Zero computed-value change, verified by diffing the built
