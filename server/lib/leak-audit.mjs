@@ -6,29 +6,42 @@
 // Any other argument is a refusal, not a shrug — see parseArgs.
 //
 // It sweeps every file git TRACKS (and, given --bundle, every file in a
-// generated job bundle) for four things a judge must never receive. The list is
-// CONTROL_KINDS, and it is NOT TYPED — it is read out of this file's own source
-// by declaredKinds(), which is the whole reason "exhaustive" is a fact here and
-// not a wish. Every kind it finds must be planted in the control and come back
-// reported before any verdict is emitted, so a fifth detector added below grows
-// CONTROL_KINDS on the next import, finds no fifth probe waiting for it, and
-// makes the audit REFUSE — suite red, CLI red — rather than ship unproven.
+// generated job bundle) for four things a judge must never receive. That list
+// is NOT TYPED anywhere: controlKinds() reads it out of this file's own source,
+// which is the whole reason "exhaustive" is a fact here rather than a wish.
+// Every kind it finds must be planted in the control and come back reported
+// before any verdict is emitted, so a fifth detector added below grows the list
+// on the next run, finds no fifth probe waiting for it, and makes the audit
+// REFUSE — suite red, CLI red — instead of shipping unproven.
 //
-// That paragraph used to make exactly this promise while nothing enforced it.
-// CONTROL_KINDS was a hand-typed array, and the test that "pinned" it built its
-// expected set by hand too — two literal probes plus a hardcoded "identity" — so
-// it could only ever fail in the reverse direction. Measured before the fix: a
-// fifth detector was added to shapeFindings with CONTROL_KINDS left alone, and
-// the suite stayed at 27 pass / 0 fail while the CLI printed its four-kind
-// control line and then CLEAN at exit 0. A guard whose own header is wrong is
-// worse than no guard, because it is believed.
+// This paragraph has been FALSE TWICE, which is why it now points at the thing
+// to check instead of asking to be believed:
 //
-// The scan reads kinds spelled as string literals, which is how all four below
-// are written and how a fifth would be. A kind ASSEMBLED at runtime is invisible
-// to it, so runAudit checks a second time on the way out: a finding carrying a
-// kind that is not in CONTROL_KINDS is a refusal, not a finding. That half is
-// caught when the detector first fires rather than at import — said plainly
-// because it is the honest residual, not because it is comfortable.
+//   1. It was folklore. The list was a hand-typed array, and the test that
+//      "pinned" it built its expected set by hand as well — two literal probes
+//      plus a hardcoded fourth — so it could only ever fail when a kind was
+//      REMOVED. Measured: a fifth detector added to shapeFindings with the list
+//      left alone -> suite 27 pass / 0 fail, and the CLI printed its four-kind
+//      control line and then CLEAN at exit 0.
+//   2. The derivation that replaced it read DOUBLE-QUOTED kinds only. Measured:
+//      that same fifth detector, spelled with single quotes instead -> derived
+//      list still four, suite 29 pass / 0 fail, CLI CLEAN at exit 0. One
+//      keystroke and the guarantee was a lie again. Nothing in this repo pins a
+//      quote style — there is no prettier, eslint or editorconfig config in it
+//      — so KIND_LITERAL reads every spelling a detector can carry rather than
+//      the one the four below happen to be written in today.
+//
+// A guard whose own header is wrong is worse than no guard, because it is
+// believed. Twice is enough that this prose is not the evidence: KIND_LITERAL
+// is, and so are the tests under "the control" in leak-audit.test.mjs.
+//
+// What the scan sees is a kind spelled as a quoted literal beside its key. What
+// it cannot see is a kind not written that way at all — assembled from pieces,
+// held in a variable, handed in by another module. So runAudit checks a SECOND
+// time on the way out: a finding carrying a kind the control never proved is a
+// refusal, not a finding. That half fires when the detector first fires rather
+// than when the list is derived — said plainly because it is the honest
+// residual, not because it is comfortable.
 //
 //   path      an absolute filesystem path that names the machine this was
 //             written on — a drive-rooted path, a UNC share, a home directory.
@@ -138,19 +151,33 @@ const SOURCE = fileURLToPath(import.meta.url);
 // The shape a finding's kind is written in. Deliberately the ORDINARY spelling
 // rather than a marker comment: a marker only works if whoever adds the fifth
 // detector remembers to add the marker, which is the same forgetting this is
-// meant to survive. (It does not match its own definition — after the colon
-// comes a backslash, not a quote — so scanning this file does not invent a
-// kind out of the scanner.)
-const KIND_LITERAL = /\bkind:\s*"([a-z][a-z-]*)"/g;
+// meant to survive.
+//
+// EVERY quote character, on both the key and the value, with the closing quote
+// required to match the opening one (\1). The first version of this pattern
+// took double quotes only, and a reviewer falsified the header above by adding
+// a fifth detector spelled with single quotes: the derived list stayed at four,
+// the suite stayed at 29 pass / 0 fail, and the CLI still said CLEAN at exit 0.
+// A guarantee that a quote character can switch off is not a guarantee, and
+// nothing in this repo enforces a quote style — there is no prettier, eslint or
+// editorconfig config here to appeal to.
+//
+// It does not match its own definition: where this line spells the key, what
+// follows the key is a bracket rather than a colon, so scanning this file
+// cannot invent a kind out of the scanner. It DOES match a mention of that
+// exact shape in a comment, which would add a kind the control has no probe for
+// and turn the audit red until somebody looks — loud and closed, which is the
+// direction this file errs in on purpose.
+const KIND_LITERAL = /\b["'`]?kind["'`]?:\s*(["'`])([a-z][a-z-]*)\1/g;
 
 /**
  * The four kinds the header documents. A FLOOR, not the list.
  *
  * Without it, the derivation has a failure mode of exactly the sort this file
- * exists to refuse: a scan that matched NOTHING would hand back an empty
- * CONTROL_KINDS, the control would be trivially satisfied by reporting nothing,
- * and the audit would print CLEAN having proven not one detector alive. So a
- * derived list that has lost a documented kind is a refusal at import.
+ * exists to refuse: a scan that matched NOTHING would hand back an empty kind
+ * list, the control would be trivially satisfied by reporting nothing, and the
+ * audit would print CLEAN having proven not one detector alive. So a derived
+ * list that has lost a documented kind stops the audit.
  */
 const DOCUMENTED_KINDS = ["bom", "path", "identity", "eol"];
 
@@ -163,13 +190,13 @@ const DOCUMENTED_KINDS = ["bom", "path", "identity", "eol"];
  * @returns {string[]} in source order, deduplicated
  */
 export function declaredKinds(source = readFileSync(SOURCE, "utf8")) {
-  const found = [...new Set([...String(source).matchAll(KIND_LITERAL)].map((m) => m[1]))];
+  const found = [...new Set([...String(source).matchAll(KIND_LITERAL)].map((m) => m[2]))];
   const lost = DOCUMENTED_KINDS.filter((k) => !found.includes(k));
   if (lost.length)
     throw new VacuousScanError(
       `the kind scan did not find the documented detector(s): ${lost.join(", ")} ` +
         `(it found ${found.length ? found.join(", ") : "nothing at all"}). ` +
-        `CONTROL_KINDS is derived from this file's source, so a scan that comes back short ` +
+        `The kind list is derived from this file's source, so a scan that comes back short ` +
         `does not shrink the audit — it stops it, because a control with fewer probes than ` +
         `there are detectors is a control that proves less than it appears to.`,
     );
@@ -180,18 +207,29 @@ export function declaredKinds(source = readFileSync(SOURCE, "utf8")) {
  * Every kind the audit detects — and therefore every kind the control must come
  * back with before a clean verdict is legal. Exhaustive BY CONSTRUCTION, in the
  * literal sense: nobody types this list, so nobody can forget to extend it.
+ *
+ * A memoised FUNCTION rather than a const computed at import, and that shape is
+ * itself a fix. When the derivation ran at module scope, the refusal above
+ * escaped as an unhandled ESM load error, which Node prints as a raw stack —
+ * measured in a scratch clone: six frames, five of them carrying this file's
+ * absolute path, straight past the scrubber the CLI's own catch exists to
+ * apply. The tool whose job is to stop paths reaching a console does not get to
+ * print one, so the derivation now happens on first use: inside runAudit,
+ * inside main, inside that catch.
  */
-export const CONTROL_KINDS = declaredKinds();
+let derived;
+export const controlKinds = () => (derived ??= declaredKinds());
 
 /**
- * The kinds among `findings` that CONTROL_KINDS never proved alive.
+ * The kinds among `findings` that the control never proved alive.
  *
  * The second half of the guarantee, for the case the source scan cannot see: a
- * detector that assembles its kind instead of spelling it. Split out as its own
- * function so a test can hand it a finding of a kind that does not exist, which
- * is not something the real detectors can be made to produce.
+ * detector whose kind is not written as a literal beside its key at all —
+ * assembled from pieces, held in a variable, handed in from elsewhere. Split
+ * out as its own function so a test can hand it a finding of a kind that does
+ * not exist, which is not something the real detectors can be made to produce.
  */
-export const unprovenKinds = (findings, kinds = CONTROL_KINDS) => [
+export const unprovenKinds = (findings, kinds = controlKinds()) => [
   ...new Set(findings.map((f) => f.kind).filter((k) => !kinds.includes(k))),
 ];
 
@@ -412,7 +450,7 @@ export function parseEolRows(stdout) {
  *        derived vocabulary; nothing in production passes either.
  * @returns {{entries: number, bytes: number, blobs: number, control: Array, findings: Array}}
  */
-export function runAudit(entries, eolRows, { control = CONTROL, kinds = CONTROL_KINDS } = {}) {
+export function runAudit(entries, eolRows, { control = CONTROL, kinds = controlKinds() } = {}) {
   const corpus = [...entries];
   if (corpus.length === 0) throw new VacuousScanError("empty corpus — a sweep of nothing is not a clean verdict");
   for (const e of corpus)
@@ -460,8 +498,8 @@ export function runAudit(entries, eolRows, { control = CONTROL, kinds = CONTROL_
   if (unproven.length)
     throw new VacuousScanError(
       `a finding was reported under a kind the control never proved alive: ${unproven.join(", ")}. ` +
-        `CONTROL_KINDS is derived from this file's own source, so a kind missing from it belongs to a ` +
-        `detector that assembles its kind rather than spelling it. Spell it, and plant a probe for it ` +
+        `The kind list is derived from this file's own source, so a kind missing from it belongs to a ` +
+        `detector that does not spell its kind as a literal beside its key. Spell it, and plant a probe for it ` +
         `in the control, so it is proven like the other ${kinds.length} before anything it says is believed.`,
     );
 
@@ -560,7 +598,7 @@ export function main(argv = [], log = console.log, err = console.error, repoRoot
   if (!quiet) {
     log(
       `leak audit control: ${verdict.control.length} finding(s) on the planted case ` +
-        `(${CONTROL_KINDS.join(", ")}) — the scanner can see a leak it is shown`,
+        `(${controlKinds().join(", ")}) — the scanner can see a leak it is shown`,
     );
     log(
       `leak audit corpus:  ${verdict.entries} entries, ${verdict.bytes.toLocaleString("en-US")} bytes` +

@@ -38,7 +38,7 @@ import {
   describeFindings,
   CONTROL,
   CONTROL_NAME,
-  CONTROL_KINDS,
+  controlKinds,
   declaredKinds,
   unprovenKinds,
 } from "./leak-audit.mjs";
@@ -117,7 +117,7 @@ function runMain(argv, repoRoot) {
 
 test("the control is reported on every kind before any verdict is emitted", () => {
   const v = runAudit(clean(), LF_ROWS);
-  assert.deepEqual(kinds(v.control), [...CONTROL_KINDS].sort());
+  assert.deepEqual(kinds(v.control), [...controlKinds()].sort());
   for (const f of v.control) assert.equal(f.where, CONTROL_NAME);
   // and it does not contaminate the corpus verdict
   assert.deepEqual(v.findings, []);
@@ -125,45 +125,106 @@ test("the control is reported on every kind before any verdict is emitted", () =
   assert.equal(v.blobs, 2, "the control's own row must not be counted as a committed blob");
 });
 
-test("CONTROL_KINDS is read out of the audit's own source, not typed beside it", () => {
+test("the kind list is read out of the audit's own source, not typed beside it", () => {
   // What this replaces, and why: the previous version of this test built its
   // expected set BY HAND — two literal probe strings plus a hardcoded
-  // "identity" — and asserted it equal to a hand-typed CONTROL_KINDS. Two
-  // hand-written lists agreeing with each other proves only that one person
-  // wrote both, so it could fail in one direction (a kind REMOVED) and never in
-  // the one the header promised. Measured on that version: a fifth detector was
-  // added to shapeFindings, CONTROL_KINDS was left alone, and this file stayed
-  // at 27 pass / 0 fail while the CLI printed its four-kind control line and
-  // then CLEAN at exit 0.
-  assert.deepEqual(CONTROL_KINDS, declaredKinds(readFileSync(AUDIT, "utf8")), "CONTROL_KINDS is not derived");
+  // "identity" — and asserted it equal to a hand-typed list. Two hand-written
+  // lists agreeing with each other proves only that one person wrote both, so
+  // it could fail in one direction (a kind REMOVED) and never in the one the
+  // header promised. Measured on that version: a fifth detector was added to
+  // shapeFindings, the list was left alone, and this file stayed at 27 pass /
+  // 0 fail while the CLI printed its four-kind control line and then CLEAN at
+  // exit 0.
+  assert.deepEqual(controlKinds(), declaredKinds(readFileSync(AUDIT, "utf8")), "the kind list is not derived");
 
   // The floor, from outside the module: derivation can only ever ADD, so this
   // catches the other direction — a documented detector deleted or renamed.
-  assert.deepEqual([...CONTROL_KINDS].sort(), ["bom", "eol", "identity", "path"]);
+  assert.deepEqual([...controlKinds()].sort(), ["bom", "eol", "identity", "path"]);
 
   // And it is a derivation rather than a coincidence: hand the scan a fifth
   // detector written the way the other four are, and five come back. That is
-  // the link the old test was missing — CONTROL_KINDS GROWS, the control has no
+  // the link the old test was missing — the list GROWS, the control has no
   // probe for the new kind, and runAudit's blind check refuses. That refusal is
-  // proven per-kind by the two tests above this one.
+  // proven per-kind by "one dead rule cannot hide behind the other three" below.
   const fifth = declaredKinds(`${readFileSync(AUDIT, "utf8")}\nout.push({ kind: "secret", where: name, line: 1 });\n`);
-  assert.deepEqual(fifth, [...CONTROL_KINDS, "secret"]);
+  assert.deepEqual(fifth, [...controlKinds(), "secret"]);
+});
+
+test("a fifth detector is found however its kind is quoted — one keystroke cannot switch this off", () => {
+  // Measured, and the reason this test exists: the first derivation read
+  // DOUBLE-QUOTED kinds only. A reviewer added the fifth detector below with
+  // SINGLE quotes and nothing else changed — the derived list came back four,
+  // this suite ran 29 pass / 0 fail, and `node server/lib/leak-audit.mjs`
+  // printed its four-kind control line and then CLEAN at exit 0. A guarantee a
+  // quote character can turn off is not a guarantee, and no formatter, linter
+  // or editorconfig in this repo pins which quote gets typed.
+  const src = readFileSync(AUDIT, "utf8");
+  const spellings = {
+    double: 'out.push({ kind: "secret", where: name, line: 1 });',
+    single: "out.push({ kind: 'secret', where: name, line: 1 });",
+    backtick: "out.push({ kind: `secret`, where: name, line: 1 });",
+    "quoted key": 'out.push({ "kind": "secret", where: name, line: 1 });',
+    "no spaces": 'out.push({kind:"secret"});',
+  };
+  for (const [label, line] of Object.entries(spellings))
+    assert.deepEqual(
+      declaredKinds(`${src}\n${line}\n`),
+      [...controlKinds(), "secret"],
+      `a fifth detector spelled with ${label} quotes was invisible to the scan`,
+    );
+
+  // The other direction, so this is a matcher and not a wildcard, and so the
+  // residual the header admits to is pinned rather than assumed: a kind that is
+  // NOT a literal beside its key — here a variable — stays invisible to the
+  // scan. That is the case unprovenKinds covers on the way out instead, when
+  // the detector first fires.
+  assert.deepEqual(declaredKinds(`${src}\nout.push({ kind: whateverItIs, where: name });\n`), controlKinds());
 });
 
 test("a kind scan that comes back short stops the audit instead of shrinking it", () => {
-  // The failure mode deriving the list introduces, closed at import. A scan
-  // that matched nothing would hand back an empty CONTROL_KINDS, the control
-  // would be satisfied by reporting nothing, and the audit would print CLEAN
-  // having proven not one detector alive — this file's own defect, arriving
-  // through the fix for it.
+  // The failure mode deriving the list introduces. A scan that matched nothing
+  // would hand back an empty kind list, the control would be satisfied by
+  // reporting nothing, and the audit would print CLEAN having proven not one
+  // detector alive — this file's own defect, arriving through the fix for it.
   for (const source of ["", "// a file with no detectors in it at all", 'out.push({ kind: "bom" });'])
     assert.throws(() => declaredKinds(source), VacuousScanError, `a short scan was accepted: ${source}`);
 });
 
+test("a broken kind scan refuses through the scrubber, not as a raw stack full of paths", () => {
+  // WHY THIS IS A TEST AND NOT A COMMENT: the derivation used to run at module
+  // scope, so the refusal above escaped as an unhandled ESM load error before
+  // main() existed to catch it. Measured in a scratch clone with one documented
+  // kind assembled instead of spelled: Node printed the VacuousScanError plus
+  // six stack frames, five of them carrying the absolute path of the audit —
+  // the leak audit printing the operator's home directory to a console while
+  // refusing, which is the one thing scrubPaths is in the catch to prevent.
+  //
+  // Proven the only honest way: a COPY of the audit, mutated so its own kind
+  // scan comes back short, run as a program in a scratch repo of its own.
+  const dir = mkdtempSync(join(tmpdir(), "toolcrib-leak-audit-kindscan-"));
+  mkdirSync(join(dir, "server", "lib"), { recursive: true });
+  for (const f of ["identity.mjs", "repo-path.mjs"])
+    writeFileSync(join(dir, "server", "lib", f), readFileSync(join(REPO, "server", "lib", f), "utf8"));
+  const broken = readFileSync(AUDIT, "utf8").replace('{ kind: "bom", where: name', '{ kind: "b" + "om", where: name');
+  assert.notEqual(broken, readFileSync(AUDIT, "utf8"), "the mutation did not apply — this test proves nothing");
+  const copy = join(dir, "server", "lib", "leak-audit.mjs");
+  writeFileSync(copy, broken);
+  for (const args of [["init", "-q", "."], ["add", "-A"]])
+    assert.equal(spawnSync("git", args, { cwd: dir, encoding: "utf8" }).status, 0, `git ${args[0]} failed`);
+
+  const r = spawnSync(process.execPath, [copy, "--quiet"], { encoding: "utf8", cwd: dir });
+  const said = `${r.stdout}${r.stderr}`;
+  assert.equal(r.status, 2, `a broken kind scan did not exit as a refusal:\n${said}`);
+  assert.match(said, /the kind scan did not find the documented detector\(s\): bom/);
+  assert.equal((said.match(/leak audit: /g) ?? []).length, 1, `the refusal was not the CLI's own message:\n${said}`);
+  assert.doesNotMatch(said, /\n\s+at /, `the refusal printed a stack — every frame of one is a path:\n${said}`);
+  assert.ok(!said.includes(dir), `the refusal printed its own absolute path:\n${said}`);
+});
+
 test("a finding under a kind nothing proved is refused, not printed beside the proven ones", () => {
-  // The half a source scan cannot see: a detector that ASSEMBLES its kind
-  // instead of spelling it is invisible to declaredKinds. So the verdict checks
-  // again on the way out.
+  // The half a source scan cannot see: a detector whose kind is not a literal
+  // beside its key at all — held in a variable, handed in from elsewhere — is
+  // invisible to declaredKinds. So the verdict checks again on the way out.
   assert.deepEqual(unprovenKinds([{ kind: "bom" }, { kind: "path" }]), []);
   assert.deepEqual(unprovenKinds([{ kind: "bom" }, { kind: "sec" + "ret" }]), ["secret"]);
 
@@ -193,7 +254,7 @@ test("a control that carries no leak refuses to produce a verdict at all", () =>
       }),
     (e) => {
       assert.ok(e instanceof VacuousScanError, `wrong error type: ${e}`);
-      for (const k of CONTROL_KINDS) assert.match(e.message, new RegExp(k), `the refusal did not name ${k}`);
+      for (const k of controlKinds()) assert.match(e.message, new RegExp(k), `the refusal did not name ${k}`);
       assert.match(e.message, /no verdict is being emitted/);
       return true;
     },
@@ -213,10 +274,11 @@ test("one dead rule cannot hide behind the other three — the control is per-ki
     path: ` scandir '${WIN_PATH}' `,
     identity: ` run by ${CONTROL_TOKEN} `,
   };
-  for (const dropped of CONTROL_KINDS) {
+  for (const dropped of controlKinds()) {
     const control = {
       name: CONTROL_NAME,
-      text: CONTROL_KINDS.filter((k) => k !== dropped && parts[k])
+      text: controlKinds()
+        .filter((k) => k !== dropped && parts[k])
         .map((k) => parts[k])
         .join(""),
       eolRow: dropped === "eol" ? `i/lf  w/lf  attr/\t${CONTROL_NAME}` : CONTROL.eolRow,
