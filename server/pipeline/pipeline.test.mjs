@@ -172,10 +172,57 @@ const walk = (dir) =>
     return statSync(p).isDirectory() ? walk(p) : [p];
   });
 
-test("no judge-visible surface names the operator's filesystem", async () => {
-  const { dataDir, outRoot } = dirs("nopaths");
+// ONE definition of "everything a judge can see", built once and shared by
+// every detector below.
+//
+// It used to be two: two adjacent tests each ran a full runJob, each walked the
+// resulting bundle, and each re-stated its own near-identical corpus floor,
+// differing only in which detector received the bytes. That is the same drift
+// api.test.mjs already records for the path detector — three private copies,
+// each with holes the others did not have. A surface added here now reaches
+// every detector at once, and cannot reach only one of them.
+//
+// The corpus floor lives in here too, stated once. A walk that quietly matches
+// nothing passes vacuously, so the surface list has to prove it really holds
+// the files a judge opens before any detector is allowed to call it clean.
+let sharedSurfaces = null;
+async function judgeVisibleSurfaces() {
+  if (sharedSurfaces) return sharedSurfaces;
+  const { dataDir, outRoot } = dirs("judge-visible");
   const r = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, ...quiet });
   assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+
+  // EVERY file in the bundle, not a filtered subset of manifest.files. The bar
+  // is "the generated bundle contains none", and manifest.files does not list
+  // manifest.json itself, so an extension filter over it skipped the manifest,
+  // both exports and the preview — 6 of the 12 files actually written. Read as
+  // latin1 so binaries are scanned as bytes rather than skipped.
+  const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
+  const rel = (abs) => relative(bundleDir, abs).split(sep).join("/");
+  const names = walk(bundleDir).map(rel);
+  for (const required of [
+    "manifest.json",
+    "notifications.log",
+    "logs/apiRun.json",
+    "reports/manufacturingPackage.pdf",
+  ])
+    assert.ok(names.includes(required), `the judge-visible surface list never reached ${required}`);
+  assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
+
+  // Plus the two surfaces that never touch disk: the hash-chained ledger
+  // reasons and the manifest warnings, both of which render in the console UI,
+  // the PDF and the API response.
+  const surfaces = [
+    ...names.map((n) => ({ name: n, text: readFileSync(join(bundleDir, n), "latin1") })),
+    ...r.ledger.map((row) => ({ name: `ledger -> ${row.to}`, text: row.reason })),
+    ...(r.pkg.manifest.warnings ?? []).map((w, i) => ({ name: `manifest.warnings[${i}]`, text: w })),
+  ];
+  sharedSurfaces = { r, bundleDir, names, surfaces };
+  return sharedSurfaces;
+}
+
+test("no judge-visible surface names the operator's filesystem", async () => {
+  const { r, surfaces } = await judgeVisibleSurfaces();
 
   // The two lines a judge reads first, pinned byte-for-byte: repo-relative,
   // POSIX separators, identical on Windows and Linux.
@@ -188,64 +235,29 @@ test("no judge-visible surface names the operator's filesystem", async () => {
     /^replay backend: artifacts read from samples\/plain-plate-stl /,
   );
 
-  for (const row of r.ledger) scan(`ledger row -> ${row.to}`, row.reason);
-  for (const w of r.pkg.manifest.warnings ?? []) scan("manifest warning", w);
-
-  // EVERY file in the bundle, not a filtered subset of manifest.files. The bar
-  // is "the generated bundle contains none", and manifest.files does not list
-  // manifest.json itself, so an extension filter over it skipped the manifest,
-  // both exports and the preview — 6 of the 12 files actually written. Read as
-  // latin1 so binaries are scanned as bytes rather than skipped, and unescape
-  // "\\" first: PDF content streams and JSON both escape a backslash, so a
-  // leaked Windows path would otherwise slip past with doubled separators.
-  const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
-  const bundleFiles = walk(bundleDir);
-  const rel = (abs) => relative(bundleDir, abs).split(sep).join("/");
-  for (const abs of bundleFiles) scan(rel(abs), readFileSync(abs, "latin1").replaceAll("\\\\", "\\"));
-
-  // A filter that quietly matches nothing passes vacuously, so the scan has to
-  // prove it actually looked at the files a judge opens.
-  const names = bundleFiles.map(rel);
-  for (const required of ["manifest.json", "notifications.log", "reports/manufacturingPackage.pdf"])
-    assert.ok(names.includes(required), `bundle scan never reached ${required}`);
-  assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
+  // Unescape "\\" first: PDF content streams and JSON both escape a backslash,
+  // so a leaked Windows path would otherwise slip past with doubled separators.
+  for (const { name, text } of surfaces) scan(name, String(text).replaceAll("\\\\", "\\"));
 });
 
 // The other identity a bundle can carry: not WHERE it ran, WHO ran it. The
 // replay backend reads samples/plain-plate-stl/*.json off disk and ships both
 // records into logs/apiRun.json as replayedRecords, so whatever account handle
-// those captured Zoo responses carry travels into every generated bundle and
-// out through the API's job-detail payload. Measured: the operator's real Zoo
-// user_id did exactly that, and every path scan above stayed green over it,
-// because a bare account uuid has no root and no separators for MACHINE_PATH to
-// match. Hence a second detector, and this second scan.
+// those captured Zoo responses carry travels into every generated bundle — and
+// out to a browser through GET /api/jobs/:id/files/logs/apiRun.json, which
+// serves bundle files verbatim. (NOT through the job-detail payload: that
+// composes job/ledger/gates/manifest/warnings and was measured at 0
+// occurrences with the uuid planted. api.test.mjs drives both.) Measured: the
+// operator's real Zoo user_id rode exactly that path, and every path scan above
+// stayed green over it, because a bare account uuid has no root and no
+// separators for MACHINE_PATH to match. Hence a second detector.
 test("no judge-visible surface names the operator's account", async () => {
-  const { dataDir, outRoot } = dirs("noidentity");
-  const r = await runJob(PLAIN_PLATE, { backend: "replay", dataDir, outRoot, ...quiet });
-  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
-
-  const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
-  const rel = (abs) => relative(bundleDir, abs).split(sep).join("/");
-  const bundleFiles = walk(bundleDir);
-  // Every bundle file as bytes, plus the two surfaces that never touch disk:
-  // the hash-chained ledger reasons and the manifest warnings, both of which
-  // render in the console UI, the PDF and the API response.
-  const verdict = scanIdentity([
-    ...bundleFiles.map((abs) => ({ name: rel(abs), text: readFileSync(abs, "latin1") })),
-    ...r.ledger.map((row) => ({ name: `ledger -> ${row.to}`, text: row.reason })),
-    ...(r.pkg.manifest.warnings ?? []).map((w, i) => ({ name: `manifest.warnings[${i}]`, text: w })),
-  ]);
+  const { bundleDir, surfaces } = await judgeVisibleSurfaces();
+  const verdict = scanIdentity(surfaces);
   assert.deepEqual(verdict.hits, [], `the generated bundle carries account identity:\n${describeHits(verdict.hits)}`);
 
-  // scanIdentity refuses an empty corpus outright; this pins that the corpus is
-  // the RIGHT one — the file the leak was measured in, and the bundle entire.
-  const names = bundleFiles.map(rel);
-  for (const required of ["logs/apiRun.json", "manifest.json", "reports/manufacturingPackage.pdf"])
-    assert.ok(names.includes(required), `bundle identity scan never reached ${required}`);
-  assert.ok(names.length >= 10, `expected a full bundle to scan, walked only ${names.length} files`);
-
-  // And the replayed records really are still in there — the scan has to be
-  // passing over the payload that carried the leak, not over its absence.
+  // The replayed records really are still in there — the scan has to be passing
+  // over the payload that carried the leak, not over its absence.
   const log = JSON.parse(readFileSync(join(bundleDir, "logs/apiRun.json"), "utf8"));
   assert.equal(log.replayedRecords.length, 2);
   assert.equal(log.replayedRecords.find((x) => x.replayedFrom === "validation.json").record.user_id, NIL_UUID);

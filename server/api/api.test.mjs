@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATE, TERMINAL } from "../state/states.mjs";
 import { MACHINE_PATH } from "../lib/repo-path.mjs";
+import { scanIdentity, describeHits, NIL_UUID } from "../lib/identity.mjs";
 import { createApiServer } from "./server.mjs";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
@@ -117,6 +118,63 @@ test("the detail payload the console renders names no filesystem path", async ()
   assert.match(
     body.ledger.find((r) => r.to === STATE.VALIDATING).reason,
     /^request file: <outside-repo>\/[0-9a-f-]+\.json$/,
+  );
+});
+
+// The path detector had a test on this payload and the identity detector did
+// not, so the two covered different surface sets on the one surface the brief
+// named. Both now scan the same bytes.
+//
+// And the bytes are only half the story here, because the brief's claim about
+// WHICH channel carries account identity was wrong, and the code says so. With
+// a synthetic uuid planted in samples/plain-plate-stl/validation.json:
+//
+//   GET /api/jobs/:id                        7,929 bytes, 0 occurrences
+//   GET /api/jobs/:id/files/logs/apiRun.json 200, 1,520 bytes, 1 occurrence
+//
+// The detail payload composes job/ledger/gates/manifest/warnings and never
+// touches replayedRecords. serveFile streams bundle files verbatim, and the
+// manifest.files list the detail payload DOES carry names logs/apiRun.json, so
+// the file route is one click away in the console. That route is the real
+// channel, so it is the one this test drives — the detail payload is checked
+// too, but as the negative it was measured to be.
+test("neither the detail payload nor the files route names the operator's account", async () => {
+  const { body } = await api(`/api/jobs/${deliveredJobId}`);
+  const wire = JSON.stringify(body); // exactly the bytes the browser receives
+  const detailVerdict = scanIdentity([{ name: "GET /api/jobs/:id", text: wire }]);
+  assert.deepEqual(
+    detailVerdict.hits,
+    [],
+    `the detail payload carries account identity:\n${describeHits(detailVerdict.hits)}`,
+  );
+
+  // The channel that actually carries the fixture. manifest.files is where a
+  // reader learns the route exists, so walk exactly that list rather than a
+  // hand-picked file — a new bundle file is covered the day it is added.
+  const files = (body.manifest?.files ?? []).map((f) => f.path ?? f.name ?? f);
+  assert.ok(files.includes("logs/apiRun.json"), `manifest.files no longer advertises the file that carried the leak: ${files}`);
+
+  const served = [];
+  for (const rel of files) {
+    const res = await fetch(`${BASE}/api/jobs/${deliveredJobId}/files/${rel}`);
+    assert.equal(res.status, 200, `manifest.files advertises ${rel} but the route answered ${res.status}`);
+    served.push({ name: `GET /files/${rel}`, text: Buffer.from(await res.arrayBuffer()).toString("latin1") });
+  }
+  const fileVerdict = scanIdentity(served);
+  assert.deepEqual(
+    fileVerdict.hits,
+    [],
+    `a file the API serves carries account identity:\n${describeHits(fileVerdict.hits)}`,
+  );
+
+  // scanIdentity refuses an empty corpus outright; this pins that the corpus is
+  // the right one, and that the payload the leak rode in on is really in it.
+  assert.ok(served.length >= 10, `expected the whole advertised bundle, served only ${served.length}`);
+  const apiRun = JSON.parse(served.find((s) => s.name.endsWith("logs/apiRun.json")).text);
+  assert.equal(apiRun.replayedRecords.length, 2, "the served log no longer carries the replayed records");
+  assert.equal(
+    apiRun.replayedRecords.find((x) => x.replayedFrom === "validation.json").record.user_id,
+    NIL_UUID,
   );
 });
 

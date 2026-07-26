@@ -21,6 +21,7 @@ import {
   selfTest,
   describeHits,
   fingerprint,
+  hintFor,
   CONTROL_TOKEN,
   CONTROL_DIGEST,
   NIL_UUID,
@@ -95,6 +96,56 @@ test("an account uuid nobody has fingerprinted is still caught, by the field it 
   }
 });
 
+test("the shape rule reads the key, not the punctuation around it", () => {
+  // Measured against the first version of this rule, which anchored on the
+  // opening quote: of these ten serialisations it caught two. Each one is a
+  // shape this repo can actually emit — escaped JSON is what a captured record
+  // looks like once it has been stringified into a ledger reason or a manifest
+  // warning, and the unquoted form is what a field note or a YAML snippet uses.
+  const stranger = "7c9f2a41-3b8e-4d55-9a12-6ef0c3b7d284";
+  const forms = {
+    json: `{"user_id": "${stranger}"}`,
+    "escaped json": JSON.stringify(JSON.stringify({ user_id: stranger })),
+    "double-escaped (pdf content stream)": `{\\\\"account_id\\\\":\\\\"${stranger}\\\\"}`,
+    "unquoted key": `user_id: ${stranger}`,
+    yaml: `user_id: "${stranger}"`,
+    "single-quoted js": `{'user_id': '${stranger}'}`,
+    hyphenated: `{"org-id": "${stranger}"}`,
+    "dotted path": `user.id = ${stranger}`,
+    "nested object": `{"user":{"id":"${stranger}"}}`,
+    prefixed: `{"end_user_id": "${stranger}"}`,
+    "vendor-prefixed": `{"zoo_user_id": "${stranger}"}`,
+    "bare account word": `{"owner": "${stranger}"}`,
+  };
+  for (const [label, text] of Object.entries(forms)) {
+    const hits = identityHits(text).filter((h) => h.kind === "account-field");
+    assert.equal(hits.length, 1, `the shape rule is blind to ${label}: ${text}`);
+    assert.equal(hits[0].digest, fingerprint(stranger));
+  }
+});
+
+test("an email hint withholds the address; a uuid hint keeps its grep handle", () => {
+  // The two token types get different treatment on purpose. 8 hex of a uuid
+  // locates it and identifies nobody; 8 characters of an email is most of the
+  // local part, and a red CI log on a public repo is one more place it lives.
+  const stranger = "7c9f2a41-3b8e-4d55-9a12-6ef0c3b7d284";
+  const uuidHit = identityHits(`{"user_id": "${stranger}"}`)[0];
+  assert.equal(uuidHit.hint, "7c9f2a41…");
+  assert.ok(stranger.startsWith(uuidHit.hint.slice(0, 8)), "the uuid hint must stay greppable");
+
+  // The same function the two email entries in KNOWN would render through.
+  const address = "not.a.real.person@example.invalid";
+  const line = describeHits([
+    { where: "some/file.json", why: "an operator email address", hint: hintFor(address), digest: fingerprint(address) },
+  ]);
+  assert.ok(!line.includes("not.a.real"), `the hint republished the local part: ${line}`);
+  assert.ok(!line.includes(address), `the hint republished the address: ${line}`);
+  assert.match(line, /withheld/);
+  // Still locatable: the file, and the digest that says which known identifier fired.
+  assert.match(line, /some\/file\.json/, "the failure must still say which file to look in");
+  assert.ok(line.includes(fingerprint(address).slice(0, 12)), "the digest prefix must survive");
+});
+
 test("job, run and metering handles are artifact ids, not people — no false alarm", () => {
   // Every one of these is a real shape this repo carries in tracked files. If
   // the detector fired on them it would be switched off within a day.
@@ -107,6 +158,16 @@ test("job, run and metering handles are artifact ids, not people — no false al
     '{"requester": "shop-floor@example.com"}',
     "email makeathon@zoo.dev for top-offs",
     "job 4cf9b809-15ca-4287-8547-d09373605a78 parked at WAITING_FOR_HUMAN_REVIEW",
+    '{"t2cId": "289cec14-f654-4afe-92dc-734c63e52896"}',
+    // Walking backwards from a uuid is what makes the shape rule see through
+    // escaping, and prose is the cost it has to not pay. A comma, a period or a
+    // newline ends the walk, so an account word loose in a sentence cannot
+    // reach forward and claim the next uuid it happens to precede.
+    '{"note": "belongs to no owner", "id": "848cc603-623b-4620-acf8-75d5aea15f10"}',
+    "belongs to no owner. Job 848cc603-623b-4620-acf8-75d5aea15f10 is unassigned",
+    "the user who owns this job 848cc603-623b-4620-acf8-75d5aea15f10 was notified",
+    // The account word has to BE the key, not merely start it.
+    '{"org_name": "848cc603-623b-4620-acf8-75d5aea15f10"}',
   ])
     assert.deepEqual(identityHits(clean), [], `the detector cried wolf on: ${clean}`);
 });
@@ -136,11 +197,25 @@ test("the path detector is blind to account identity, which is why this file exi
 
 // --- the sweep --------------------------------------------------------------
 
-// git ls-files IS the definition of "tracked at HEAD", which is exactly the
-// claim this test makes. README's setup step is `git clone`, so git is present
-// on the supported path; if it is not, the claim cannot be checked and the
-// honest outcome is a loud failure rather than a green light over an unknown
-// corpus.
+// `git ls-files` lists the paths git TRACKS — it reads the index, not HEAD's
+// trees — and the contents scanned below are the ones on disk right now. So
+// what this sweep actually checks is: the working-tree contents of every
+// tracked path. That is neither "HEAD" nor a plain directory walk, and the
+// difference is deliberate in both directions.
+//
+// Against HEAD: a leak that has been written but not yet committed is still
+// caught, which is the only version of this guard that can stop a bad commit
+// rather than report one. It has already earned that — a `git checkout --` of
+// an unstaged fixture silently restored the real uuid during development, and
+// this test went red on the next run.
+//
+// Against a directory walk: gitignored files are excluded, so a stale local
+// demo bundle under server/pipeline/data/ cannot turn the suite red for
+// something that will never reach a judge.
+//
+// README's setup step is `git clone`, so git is present on the supported path;
+// if it is not, the claim cannot be checked and the honest outcome is a loud
+// failure rather than a green light over an unknown corpus.
 function trackedFiles() {
   const r = spawnSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   assert.equal(
@@ -151,12 +226,29 @@ function trackedFiles() {
   return r.stdout.split("\0").filter(Boolean);
 }
 
-test("no tracked file at HEAD carries the operator's account identity", () => {
+// A tracked path deleted from the working tree makes readFileSync throw a bare
+// ENOENT that names neither this guard nor the reason — and prints an absolute
+// machine path into the test output while doing it. That reads as "the leak
+// test is flaky", which is step one toward deleting a leak test. Say what
+// happened, in this guard's own words, with a repo-relative path.
+function readTracked(f) {
+  try {
+    // latin1 so binaries (stl, png, gltf, pdf) are scanned as bytes rather
+    // than skipped — a scan that silently drops the unreadable half of the
+    // repo is the vacuous verdict this guard exists to refuse.
+    return readFileSync(join(REPO, f), "latin1");
+  } catch (e) {
+    assert.fail(
+      `the identity sweep could not read the tracked file ${f} (${e.code ?? e.message}). ` +
+        `This is not a leak and not a flaky test: a path git tracks is missing from the working tree. ` +
+        `Restore it (\`git checkout -- ${f}\`) or stage its deletion, then re-run.`,
+    );
+  }
+}
+
+test("no tracked file carries the operator's account identity", () => {
   const files = trackedFiles();
-  // Read as latin1 so binaries (stl, png, gltf, pdf) are scanned as bytes
-  // rather than skipped — a scan that silently drops the unreadable half of
-  // the repo is the vacuous verdict this guard exists to refuse.
-  const verdict = scanIdentity(files.map((f) => ({ name: f, text: readFileSync(join(REPO, f), "latin1") })));
+  const verdict = scanIdentity(files.map((f) => ({ name: f, text: readTracked(f) })));
 
   assert.deepEqual(verdict.hits, [], `tracked files carry account identity:\n${describeHits(verdict.hits)}`);
 

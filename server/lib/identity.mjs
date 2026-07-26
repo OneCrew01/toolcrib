@@ -6,8 +6,25 @@
 // blindness was measured, not assumed. The operator's real Zoo account uuid sat
 // in samples/plain-plate/validation.json and samples/plain-plate-stl/
 // validation.json, the replay backend read both fixtures into every generated
-// bundle (logs/apiRun.json, via replayedRecords) and into the API's job-detail
-// payload, and every path scan in the repo stayed green over all of it.
+// bundle (logs/apiRun.json, via replayedRecords), and every path scan in the
+// repo stayed green over all of it.
+//
+// The HTTP channel is the FILES route, not the detail payload — measured, with
+// a synthetic uuid planted in samples/plain-plate-stl/validation.json and the
+// real API driven end to end:
+//
+//   GET /api/jobs/:id                        7,929 bytes, 0 occurrences.
+//                                            Keys: job, ledger, ledgerVerified,
+//                                            gates, manifest, warnings — none of
+//                                            which carries replayedRecords.
+//   GET /api/jobs/:id/files/logs/apiRun.json 200, 1,520 bytes, 1 occurrence.
+//
+// and manifest.files (which the detail payload DOES carry) lists
+// "logs/apiRun.json", so the route is one click from the console. server/api/
+// server.mjs:288 serveFile streams any file inside the bundle dir verbatim: no
+// scrub, no filter. An earlier version of this comment named the detail payload
+// instead, inherited from the task brief and never checked. Both are pinned by
+// tests in server/api/api.test.mjs now, so the correction cannot rot back.
 //
 // This file is the detector for the other kind of identity: WHO ran it, not
 // WHERE. Two rules, because there are two ways an account handle arrives.
@@ -73,7 +90,21 @@ const EMAIL = String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`;
 // Non-global by construction at the module level: /g regexes carry lastIndex
 // between calls, so each scan builds its own.
 const tokenRe = () => new RegExp(`${UUID}|${EMAIL}`, "g");
-const IS_UUID = new RegExp(`^${UUID}$`);
+const uuidRe = () => new RegExp(UUID, "g");
+
+/**
+ * Enough of an identifier to LOCATE the leak, never enough to republish it —
+ * a failing CI log on a public repo is one more place the value would live.
+ *
+ * The rule is not uniform, because the two token types are not. A uuid's first
+ * 8 hex characters are 1/4 of a 122-bit random value: `git grep <hint>` finds
+ * it, and the prefix alone identifies nobody. An email's first 8 characters are
+ * most of the local part — the identifying half — so an address is withheld
+ * entirely. Nothing is lost by that: `where` names the file and the digest
+ * pins which known identifier fired, and
+ * `git grep -nE '[A-Za-z0-9._%+-]+@' <file>` closes the last step.
+ */
+export const hintFor = (v) => (v.includes("@") ? "<an email address — withheld>" : `${v.slice(0, 8)}…`);
 
 // RFC 9562's Nil UUID: "no such entity". This is the placeholder the two replay
 // fixtures now carry in place of the real account, so the shape rule must not
@@ -88,40 +119,70 @@ export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 // api_call_id is the one worth stating out loud, because it is described as a
 // "metering/billing handle" (FN-028) and metering sounds like billing identity.
 // It is not: it identifies one Zookeeper turn, and a new one is minted per turn.
+const ACCOUNT_KEY = /(user|org|organisation|organization|account|customer|billing|owner)(id|uuid|guid)?$/;
+
+// This rule does NOT match a key/value pair as written. It walks BACKWARDS from
+// each uuid over the characters that can legally sit between a field name and
+// its value, then strips the punctuation and asks what the key was.
 //
-// The anchor is the opening quote, so this matches "user_id"/"userId" and not
-// "end_user_id". Stated rather than hidden — a nested variant is a gap, and a
-// gap named in one place is one edit to close.
-const accountFieldRe = () =>
-  /"(user|org|organization|account|customer|billing|owner)_?id"\s*:\s*"([^"]*)"/gi;
+// The reason is measured. The first version anchored on the opening quote —
+// /"(user|org|...)_?id"\s*:\s*"([^"]*)"/ — and of ten serialisations probed it
+// caught two. It missed escaped JSON (\"user_id\":\"…\", the shape a ledger
+// reason or a manifest warning takes when a captured record is stringified into
+// an error message), the unquoted key a field note or YAML snippet uses, the
+// single-quoted JS form, hyphenated "org-id", nested {"user":{"id":…}}, and
+// every prefixed variant such as "end_user_id" or "zoo_user_id". The old
+// comment named ONE of those gaps ("end_user_id") and called a named gap one
+// edit to close; it was six gaps, and the escaped-JSON one is the same lesson
+// the path scan next door already learned the hard way (a backslash-escaped
+// leak reads clean), which is why it normalises before scanning.
+//
+// Walking back collapses all six into one rule, because after the punctuation
+// is stripped every one of those forms produces the same trail: "userid".
+//
+// The set below is what may sit between name and value: the characters a key is
+// made of, the quotes of any of the three serialisations, the colon or equals
+// that binds a pair, the brace of a nested object, the backslash of a string
+// that was itself stringified, and whitespace. A comma or a newline is NOT in
+// it, and that is what keeps prose out: `"note": "no owner", "id": "<uuid>"`
+// stops the walk at the comma and reads "id", clean.
+const KEY_TRAIL = /[0-9A-Za-z_.\-"'\\:= \t{]*$/;
+
+// 48 characters is enough for the longest real nesting here
+// (`{"session_data":{"api_call_id":"` is 32) and short enough that a run-on
+// sentence cannot reach back to an unrelated word.
+const TRAIL_WINDOW = 48;
+
+/** The key a uuid at `index` is the value of, punctuation stripped — "" if none. */
+function keyBefore(s, index) {
+  const before = s.slice(Math.max(0, index - TRAIL_WINDOW), index);
+  return (before.match(KEY_TRAIL)?.[0] ?? "").replace(/[^0-9A-Za-z]/g, "").toLowerCase();
+}
 
 /**
  * Every account identifier this text still carries.
  * @param {unknown} text  file contents, a payload, a ledger reason — anything
  * @returns {Array<{kind: "known"|"account-field", digest: string, hint: string, why: string}>}
- *          `hint` is a truncated prefix, never the whole identifier: a failing
- *          CI log must locate the leak (`git grep <hint>`) without republishing
- *          the value the failure exists to keep private.
  */
 export function identityHits(text) {
   const s = typeof text === "string" ? text : String(text ?? "");
   const hits = [];
-  const hint = (v) => `${v.slice(0, 8)}…`;
 
   for (const [token] of s.matchAll(tokenRe())) {
     const digest = fingerprint(token);
     const why = KNOWN.get(digest);
-    if (why) hits.push({ kind: "known", digest, hint: hint(token), why });
+    if (why) hits.push({ kind: "known", digest, hint: hintFor(token), why });
   }
 
-  for (const [, field, value] of s.matchAll(accountFieldRe())) {
-    if (!IS_UUID.test(value)) continue; // a non-uuid value is not an account handle
-    if (value.toLowerCase() === NIL_UUID) continue; // the deliberate placeholder
+  for (const m of s.matchAll(uuidRe())) {
+    if (m[0].toLowerCase() === NIL_UUID) continue; // the deliberate placeholder
+    const key = keyBefore(s, m.index);
+    if (!ACCOUNT_KEY.test(key)) continue;
     hits.push({
       kind: "account-field",
-      digest: fingerprint(value),
-      hint: hint(value),
-      why: `"${field}_id" carries a live-looking account uuid`,
+      digest: fingerprint(m[0]),
+      hint: hintFor(m[0]),
+      why: `a field reading "…${key}" carries a live-looking account uuid`,
     });
   }
   return hits;

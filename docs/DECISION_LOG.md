@@ -72,9 +72,20 @@ The two replay fixtures (`samples/plain-plate/validation.json`,
 `samples/plain-plate-stl/validation.json`) are captured `GET /file/mass` responses, and a
 captured response carries the account that made the call: `user_id` held the operator's
 real Zoo account uuid. The replay backend reads both files into `replayedRecords`, so the
-value travelled into every generated bundle (`logs/apiRun.json`) and out through the API's
-job-detail payload — and every path-leak scan in the repo stayed green over it, because
-`MACHINE_PATH` (server/lib/repo-path.mjs) knows path *shapes* and an account uuid has none.
+value travelled into every generated bundle (`logs/apiRun.json`) and out to a browser
+through `GET /api/jobs/:id/files/logs/apiRun.json`, which streams bundle files verbatim —
+and every path-leak scan in the repo stayed green over it, because `MACHINE_PATH`
+(server/lib/repo-path.mjs) knows path *shapes* and an account uuid has none.
+
+The HTTP channel is stated precisely because the first version of this entry got it wrong.
+It said the value went out "through the API's job-detail payload", a claim inherited from
+the task brief and never checked. Measured, with a synthetic uuid planted in the fixture
+and the real API driven end to end: `GET /api/jobs/:id` returned 7,929 bytes with **zero**
+occurrences — it composes `job`/`ledger`/`ledgerVerified`/`gates`/`manifest`/`warnings` and
+never touches `replayedRecords` — while `GET /api/jobs/:id/files/logs/apiRun.json` returned
+1,520 bytes with one. The detail payload does carry `manifest.files`, which advertises
+`logs/apiRun.json`, so the file route is one click from the console. Both channels are now
+pinned by a test (server/api/api.test.mjs) rather than by a sentence.
 
 Three decisions:
 
@@ -94,12 +105,28 @@ nobody has ever fingerprinted. Job, run and metering handles (`id`, `request_id`
 `conversation_id`, `api_call_id`, `textToCadId`) are deliberately NOT account fields —
 they name an artifact, not a person.
 
+That rule reads the *key*, not the punctuation around it: it walks backwards from each
+uuid and strips the separators, so all of `"user_id":"…"`, the escaped `\"user_id\":\"…\"`
+a stringified record takes inside a ledger reason, the unquoted `user_id: …` of a YAML or
+field-note snippet, `'user_id'`, `org-id`, `user.id`, `{"user":{"id":…}}` and prefixed
+forms like `end_user_id` collapse to the same trail. The first version anchored on the
+opening quote and caught two of those ten; the widening is measured, and the walk stops at
+a comma or a newline so an account word loose in prose cannot claim the next uuid it
+happens to precede.
+
 **Fingerprints, never literals.** A detector that spells out the identifier it hunts has
 republished it, and the detector is itself a tracked file inside the corpus it sweeps. So
 identity.mjs stores one-way SHA-256 commitments; a uuid's ~122 bits make the digest a
 check and not a copy. The same reasoning drives the control token being assembled from
 pieces rather than written out. Every `scanIdentity()` call runs a three-probe self-test —
 one probe per rule plus a negative — and refuses to return a verdict at all on an empty
-corpus, a zero-byte corpus, or a scanner that fails its own probes. Wired into `npm test`
-in two places: every tracked file at HEAD (server/lib/identity.test.mjs) and every file of
-a freshly generated bundle (server/pipeline/pipeline.test.mjs).
+corpus, a zero-byte corpus, or a scanner that fails its own probes. Failure messages carry
+a locator, not the value: 8 hex of a uuid is greppable and identifies nobody, but 8
+characters of an email is most of the local part, so an address is withheld outright and
+the file name plus the digest prefix do the locating instead.
+
+Wired into `npm test` in three places: the working-tree contents of every git-tracked path
+(server/lib/identity.test.mjs — the index, not HEAD, so an uncommitted leak is caught while
+it can still be stopped), every file of a freshly generated bundle plus its ledger reasons
+and manifest warnings (server/pipeline/pipeline.test.mjs), and both HTTP channels
+(server/api/api.test.mjs).
