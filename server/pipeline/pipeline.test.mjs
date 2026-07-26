@@ -341,6 +341,88 @@ test("mass gate: enforced when the request states a range, skipped out loud when
   assert.equal(none.gates.skipped, true); // and the package must carry the warning
 });
 
+// --- the demo console's gate-detail block ---
+//
+// The ledger's PACKAGING reason is a summary and nothing more: "gates:
+// envelope=pass, watertight=pass, mass=pass; measured {...}". The
+// computed-vs-expected sentence — the arithmetic behind the verdict — reaches
+// exactly one surface, the block run-job.mjs prints to the demo console, and
+// nothing asserted it. Measured: deleting both executable lines of that block
+// left the whole suite green. Every pipeline test above injects the silencing
+// `quiet`, so the bytes it emits had no witness. These two inject a CAPTURING
+// log instead, the same seam api.test.mjs already uses.
+
+const capturing = () => {
+  const lines = [];
+  return { lines, log: (...a) => lines.push(a.map(String).join(" ")) };
+};
+
+// The rows of the gate block: the indented lines under its header, up to the
+// first line that is not one (the park line on the green path, the ledger
+// header on the red one). Absent header = the block was deleted or moved.
+function gateBlock(lines) {
+  const i = lines.findIndex((l) => l.includes("--- geometry gates ---"));
+  assert.notEqual(i, -1, `the demo console never printed the gate-detail block:\n${lines.join("\n")}`);
+  const ledgerAt = lines.findIndex((l) => l.includes("--- ledger for job "));
+  assert.ok(i < ledgerAt, `gate detail printed after the ledger dump:\n${lines.join("\n")}`);
+  const end = lines.findIndex((l, k) => k > i && !/^ {2}\S/.test(l));
+  return lines.slice(i + 1, end === -1 ? undefined : end);
+}
+
+test("the demo console shows each gate's arithmetic, on pass AND on fail", async () => {
+  const { dataDir, outRoot, root } = dirs("gate-console");
+  const fixturesDir = cubeFixtures(10); // 1000 mm3 x 2700 kg/m3 = 2.7 g
+
+  const okPath = writeJson(root, "in-range.json", cubeRequest({ expectedMassG: { minG: 2.5, maxG: 2.9 } }));
+  const green = capturing();
+  const ok = await runJob(okPath, { backend: "replay", dataDir, outRoot, fixturesDir, log: green.log });
+  assert.equal(ok.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  const okRows = gateBlock(green.lines);
+  assert.equal(okRows.length, 3, `expected one row per gate:\n${okRows.join("\n")}`);
+  assert.match(okRows[0], /^ {2}envelope +pass +part 10x10x10mm vs /);
+  assert.match(okRows[1], /^ {2}watertight +pass +mesh of 12 triangles is a closed 2-manifold$/);
+  assert.match(okRows[2], /^ {2}mass +pass +computed 2\.7g \(1000mm3 x 2700kg\/m3\) vs expected 2\.5-2\.9g$/);
+
+  // The red path is the reason the block sits BEFORE the ok/fail branch: a
+  // gate that just went red is exactly when the operator needs the number, and
+  // GEOMETRY_INVALID returns without ever reaching the park line. A bare
+  // verdict here — "mass fail", no measurement — is the defect.
+  const failPath = writeJson(root, "too-light.json", cubeRequest({ expectedMassG: { minG: 5, maxG: 6 } }));
+  const red = capturing();
+  const bad = await runJob(failPath, { backend: "replay", dataDir, outRoot, fixturesDir, log: red.log });
+  assert.equal(bad.finalState, STATE.GEOMETRY_INVALID);
+  const badRows = gateBlock(red.lines);
+  assert.equal(badRows.length, 3, `expected one row per gate:\n${badRows.join("\n")}`);
+  assert.match(badRows[2], /^ {2}mass +fail +computed 2\.7g \(1000mm3 x 2700kg\/m3\) vs expected 5-6g$/);
+});
+
+test("the gate console column is computed, so a long status cannot break it", async () => {
+  const { dataDir, outRoot, root } = dirs("gate-column");
+  // A machine profile with no buildVolumeMm produces "skipped:no-machine-profile",
+  // 26 characters. The status column used to be a hardcoded padEnd(22), tuned to
+  // the longest status that existed when it was written ("skipped:no-expectation",
+  // 22) — this profile overruns it and shoves one detail four columns right of
+  // the other two.
+  const machinePath = writeJson(root, "no-envelope-machine.json", { id: "test-no-envelope" });
+  const requestPath = writeJson(root, "request.json", cubeRequest()); // no range -> skipped:no-expectation
+  const cap = capturing();
+  const r = await runJob(requestPath, {
+    backend: "replay", dataDir, outRoot, machinePath,
+    fixturesDir: cubeFixtures(10), log: cap.log,
+  });
+  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  const rows = gateBlock(cap.lines);
+  assert.ok(rows.some((l) => l.includes("skipped:no-machine-profile")), `the 26-char status never ran:\n${rows.join("\n")}`);
+  assert.ok(rows.some((l) => l.includes("skipped:no-expectation")), `the 22-char status never ran:\n${rows.join("\n")}`);
+
+  const detailStarts = rows.map((l) => {
+    const m = /^ {2}\S+ +\S+ +(?=\S)/.exec(l);
+    assert.ok(m, `unparseable gate row: ${JSON.stringify(l)}`);
+    return m[0].length;
+  });
+  assert.equal(new Set(detailStarts).size, 1, `gate detail column is ragged:\n${rows.join("\n")}`);
+});
+
 test("backend failure lands in GENERATION_FAILED", async () => {
   const { dataDir, outRoot, root } = dirs("genfail");
   const empty = join(root, "empty-fixtures");

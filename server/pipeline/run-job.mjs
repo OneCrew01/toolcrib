@@ -214,8 +214,15 @@ export async function runJob(requestPath, {
   // and the demo console is the goal's first-named surface, so print it here.
   // Before the ok/fail branch on purpose: a gate that just went red is exactly
   // when the operator needs the measurement, not just the verdict.
+  // Column widths come from the rows in hand. They used to be constants tuned
+  // to the longest name and status that existed when the block was written
+  // (10 = "watertight", 22 = "skipped:no-expectation"), so the one status
+  // longer than either — "skipped:no-machine-profile", 26 — overran its column
+  // and shoved its detail four characters right of the rest.
+  const widest = (key) => Math.max(...gates.results.map((g) => String(g[key]).length));
+  const [gateW, statusW] = [widest("gate"), widest("status")];
   log("\n--- geometry gates ---");
-  for (const g of gates.results) log(`  ${g.gate.padEnd(10)} ${g.status.padEnd(22)} ${g.detail}`);
+  for (const g of gates.results) log(`  ${g.gate.padEnd(gateW)} ${g.status.padEnd(statusW)} ${g.detail}`);
   if (!gates.ok) {
     const failed = gates.results.filter((r) => r.status === "fail");
     await move(
