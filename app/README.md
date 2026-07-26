@@ -42,11 +42,14 @@ over relative paths — the footer says so on screen. Say it that way, not "the 
 the only Zoo client": this is a single bundle, so `zookeeper.ts` and the literal
 `wss://api.zoo.dev/ws/ml/copilot` are shipped to the browser on *every* view, and a judge
 grepping `dist/` will find them. What is true on every view is that no key is baked into
-the build and that only one screen can reach Zoo. The single exception is the
-Zookeeper panel (operator mode): there the operator pastes a Zoo token at runtime, it
-lives in that tab's memory only, it is sent once in the auth frame straight from the
-browser to Zoo, and it is wiped the instant that frame is on the wire and again on
-disconnect. The backend is never in that path and there is no proxy — on purpose. The
+the build and that only one screen's *browser* connects to Zoo. Keep that scope too: the
+New Job form offers backend `live`, and choosing it makes the **server** call Zoo
+(`server/pipeline/backends.mjs`, `liveBackend`), so "the only screen that reaches Zoo" is
+a claim the New Job screen falsifies while the footer is visible on it. The single
+browser-side exception is the Zookeeper panel (operator mode): there the operator pastes
+a Zoo token at runtime, it lives in that tab's memory only, it is sent once in the auth
+frame straight from the browser to Zoo, and it is wiped the instant that frame is on the
+wire and again on disconnect. The backend is never in that path and there is no proxy — on purpose. The
 footer swaps to say the stronger thing on that screen.
 
 There is also a hosting policy — a public deployment stays replay-only, no token field,
@@ -71,5 +74,7 @@ The other two checks are manual — nothing in CI runs them, because there is no
 - `npm --prefix app run build` (`tsc -b && vite build`) is what catches type errors.
 - `npm --prefix app run lint` (`oxlint`) is the third script in `app/package.json` and
   is easy to miss. It currently exits 0 with one known warning —
-  `DraftPanel.tsx:22 react(only-export-components)`, a fast-refresh nicety about a
-  non-component export sharing the file. Warning, not error; left alone deliberately.
+  `react(only-export-components)` on `DraftPanel.tsx`'s `composeDesignIntent` export, a
+  fast-refresh nicety about a non-component export sharing the file. Warning, not error;
+  left alone deliberately. (Cited by symbol, not line: the line number moves whenever
+  anything above it in the file is edited, and a stale one is a false claim.)

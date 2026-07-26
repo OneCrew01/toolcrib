@@ -308,7 +308,13 @@ and confirmed to resolve before it was written down.
   plate render: 42.7 KB PNG in ~2.3 s wall. `import_files` works fine as plain JSON
   text frames at ~450 KB despite the spec's binary/bson note. Caveat: `bounding_box`
   returns null dimensions for *imported* objects (works for path-built solids).
-- All eleven DoD bundle artifact types are now producible.
+- Every DoD bundle artifact type is now producible: **10** of them (8 required + 2
+  optional, `server/package/assemble.mjs`), which with `manifest.json` make the 11 sealed
+  files inside a 12-file bundle. *(Correction 2026-07-26 — this line read "all eleven DoD
+  bundle artifact types". Eleven is the sealed-**file** count, not the artifact-type
+  count: `git show 2a4dcef:server/package/assemble.mjs` shows the DoD list was already
+  8+2 on the day this note was filed, so the miscount was in the note, never in the code.
+  README and CURRENT_STATE now spell out the same 12-files/11-sealed/10-artifact split.)*
 
 ## FN-023 · The engine cannot re-import its own exports
 - **API:** Engine websocket `import_files` · **Date:** 2026-07-23 · repro: spike `--fmt step|gltf`

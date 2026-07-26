@@ -106,12 +106,15 @@ ledger printed and verified. No token needed, and nothing to install: every impo
 under `server/` is a `node:` builtin, so the demo has zero npm dependencies and runs
 against an empty `node_modules`. (Node versions below.)
 
-Count the bundle directory and you get **12 files, 11 of them sealed**: `manifest.json`
-hashes the 10 artifacts beside it (`manifest.files`) into one recomputable
-`packageHash`, and is the eleventh file. The twelfth is `notifications.log` — the
-parked-for-review line, appended *after* the seal by `server/pipeline/run-job.mjs`, so
-it is deliberately outside the hash and is not a manifest entry. Nothing inside the
-seal can change without `dodCheck` catching it.
+The bundle is a nested directory, so count it recursively — `find <bundle> -type f` gives
+**12 files across six subdirectories, 11 of them sealed**. (A plain `ls` of the top level
+shows 10 entries: four files and those six directories.) `manifest.json` hashes the 10
+artifacts in `manifest.files` — two beside it, the other eight under `cad/`, `exports/`,
+`previews/`, `reports/`, `logs/` and `approvals/` — into one recomputable `packageHash`,
+and is the eleventh file. The twelfth is `notifications.log` — the parked-for-review
+line, appended *after* the seal by `server/pipeline/run-job.mjs`, so it is deliberately
+outside the hash and is not a manifest entry. Nothing inside the seal can change without
+`dodCheck` catching it.
 
 With a Zoo token in `.env` (`cp .env.example .env`), the same pipeline runs live:
 

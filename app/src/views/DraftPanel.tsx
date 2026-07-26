@@ -5,8 +5,12 @@
 //
 // Token boundary (doctrine): the token is entered at runtime, held in
 // component/client memory ONLY — never localStorage/sessionStorage, never
-// logged, never sent anywhere except Zoo's wss endpoint. The backend has zero
-// involvement. Disconnecting (or leaving this view) wipes it.
+// logged, never sent anywhere except Zoo's wss endpoint. The backend is never
+// in the TOKEN's path. Say it that way, not "the backend has zero involvement"
+// — App.tsx polls /health every 5 s on this view too (usePoll has no view
+// gate), so the page does talk to the backend while this panel is open. The
+// narrow claim is the one the code guarantees and the one the on-screen strings
+// below make. Disconnecting (or leaving this view) wipes the token.
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -189,7 +193,7 @@ export function DraftPanelView({
             </span>
             <span
               className="muted"
-              title="One Zoo API call per turn (FN-028) — this id is the metering handle for the current turn, not a cost figure; no copilot frame carries minutes or price (FN-031)"
+              title="One Zoo API call per turn (FN-028) — this id is the metering handle for the current turn, not a cost figure. Of the frame keys this client classifies, none carries minutes or price; four key families are unaudited, not cleared (FN-031)"
             >
               api_call_id{" "}
               <span className="mono">{agg.apiCallId ?? "—"}</span>

@@ -2,6 +2,13 @@
 
 *Updated every working session. What works, what's blocked, the next action.*
 
+**Read the dates before you read the numbers.** Every `##` block below is a snapshot
+written on the date in its heading and then left standing, so a count inside a block is
+as-of that date and is not maintained afterwards — Day 2 night's "15/15 tests" for the
+flush-mount generator was exact when written and that suite runs 16 today. The one
+figure kept current is the suite total in the newest block, and it carries the date it
+was last counted.
+
 ## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
 
 **Works (`npm test` on 2026-07-26: 160 server tests + `self-checks: 40 passed`, 0
@@ -59,8 +66,10 @@ failures; app builds clean)**
   downloads, engine-rendered preview, full packageHash, DRAFT amber badges), and the
   human-review bar (named actor required, two-click approve, 10 s confirm window).
   Footer states the credential boundary: no API key is baked into the build, and these
-  screens talk only to the ToolCRIB backend — the one screen that reaches Zoo is the
-  Zookeeper panel, with a token the operator pastes (`app/src/App.tsx`).
+  screens talk only to the ToolCRIB backend — the one screen whose *browser* connects to
+  Zoo is the Zookeeper panel, with a token the operator pastes (`app/src/App.tsx`). Not
+  "the one screen that reaches Zoo": the New Job form's `live` backend makes the *server*
+  call Zoo, so the browser scope is the part that is true on every view.
 - **Browser-verified end to end:** job 6aabf842 approved through the UI —
   WAITING_FOR_HUMAN_REVIEW → APPROVED → DELIVERED, two HUMAN ledger rows, chain intact.
 
