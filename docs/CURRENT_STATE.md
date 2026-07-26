@@ -4,7 +4,8 @@
 
 ## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
 
-**Works (137 server+app tests + self-checks: 40 passed; app builds clean)**
+**Works (`npm test` on 2026-07-26: 160 server tests + `self-checks: 40 passed`, 0
+failures; app builds clean)**
 - **Console theme tokenized** (`app/src/index.css`): the last hardcoded hex/rgba
   values folded into CSS custom properties (hover shades, on-accent text, corner
   radius, shadow tint). Zero computed-value change, verified by diffing the built
@@ -57,7 +58,9 @@
   badge), gate cards (threshold vs measured), package panel (files + sha256 +
   downloads, engine-rendered preview, full packageHash, DRAFT amber badges), and the
   human-review bar (named actor required, two-click approve, 10 s confirm window).
-  Footer states the security property: this app holds no API keys.
+  Footer states the credential boundary: no API key is baked into the build, and these
+  screens talk only to the ToolCRIB backend — the one screen that reaches Zoo is the
+  Zookeeper panel, with a token the operator pastes (`app/src/App.tsx`).
 - **Browser-verified end to end:** job 6aabf842 approved through the UI —
   WAITING_FOR_HUMAN_REVIEW → APPROVED → DELIVERED, two HUMAN ledger rows, chain intact.
 
@@ -74,7 +77,9 @@
   WAITING_FOR_HUMAN_REVIEW; backends replay/flushmount/live behind one interface;
   failures land in the right states with measured values in the ledger reason;
   EXPORT_FAILED + PDF_FAILED added to the machine.
-- **DoD package** (`server/package/`): 11-file bundle, 13-section PDF from a zero-dep
+- **DoD package** (`server/package/`): 11-file sealed bundle (10 artifacts +
+  `manifest.json`; the pipeline appends an unsealed `notifications.log` afterwards, so
+  the directory holds 12), 13-section PDF from a zero-dep
   PDF writer, manifest + recomputable packageHash, `dodCheck` audit — replay bundle
   audits complete, including the engine-rendered preview PNG.
 - **Local STL analyzer**: volume/watertight/bbox with zero deps — reproduces Engine

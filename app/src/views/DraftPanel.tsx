@@ -127,8 +127,8 @@ export function DraftPanelView({
               panel opens a websocket from <em>your browser</em> to{" "}
               <span className="mono">wss://api.zoo.dev/ws/ml/copilot</span>. The
               token is sent once, inside that connection's auth frame, and
-              nowhere else. Nothing touches localStorage, cookies, logs, or the
-              ToolCRIB backend.
+              nowhere else — never into localStorage, never a cookie, never a
+              log line, never the ToolCRIB backend.
             </p>
             <p>
               <span className="draft-explain-k">Where to get a token</span> —
@@ -189,7 +189,7 @@ export function DraftPanelView({
             </span>
             <span
               className="muted"
-              title="Zoo bills one API call per turn — this id is the billing record for the current turn"
+              title="One Zoo API call per turn (FN-028) — this id is the metering handle for the current turn, not a cost figure; no copilot frame carries minutes or price (FN-031)"
             >
               api_call_id{" "}
               <span className="mono">{agg.apiCallId ?? "—"}</span>

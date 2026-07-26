@@ -42,10 +42,29 @@ and is the part carried forward. What each half is actually verified on is in th
 README's "Node versions" section, which keeps declared floors and executed runtime
 visibly apart, because they are not the same kind of claim.
 
-## D-004 · 2026-07-22 · Local state first
-`StateStore` interface with a local JSON/SQLite implementation as the headline store, so
-a judge reproduces everything with zero third-party setup. Cloud sheet storage is an
-optional integration behind the same interface, not the architecture.
+## D-004 · 2026-07-22 · Local state first *(amended 2026-07-26)*
+`StateStore` interface with a **flat-file** local implementation as the headline store, so
+a judge reproduces everything with zero third-party setup. Cloud sheet storage stays
+possible behind the same interface and deliberately unbuilt — it is not the architecture.
+
+*Amendment (2026-07-26).* The body above was rewritten on this date. The 2026-07-22 entry
+read, in full and verbatim (`git show d4adfb4:docs/DECISION_LOG.md`):
+
+> ## D-004 · 2026-07-22 · Local state first
+> `StateStore` interface with a local JSON/SQLite implementation as the headline store, so
+> a judge reproduces everything with zero third-party setup. Cloud sheet storage is an
+> optional integration behind the same interface, not the architecture.
+
+"JSON/**SQLite**" did not survive the build, and nothing ever moved toward it: no SQLite
+file, schema, or driver import exists anywhere in the repo, and after this amendment,
+every hit `grep -rni sqlite` finds across `docs/`, `server/`, `app/src` and
+`package.json` is inside this D-004 entry. The shipped store is flat files only: one JSON
+snapshot per job at `<dataDir>/jobs/<jobId>.json` plus one append-only, hash-chained JSONL
+ledger at `<dataDir>/jobs/<jobId>.ledger.jsonl` (`server/state/store.mjs:99-102`). The rest
+of the entry held. The interface is real (`StateStore` typedef,
+`server/state/store.mjs:43-51`) and `LocalStore` is the only implementation of it in the
+repo — the second sentence is now written as the design position it always was, rather than
+present tense that could be read as a shipped integration.
 
 ## D-005 · 2026-07-22 · Async generation is mandatory
 Measured text-to-CAD latency spread (~5 s trivial solid → minutes for fastening

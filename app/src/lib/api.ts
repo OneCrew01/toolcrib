@@ -1,8 +1,11 @@
 // Typed client for the ToolCRIB backend HTTP API.
 //
 // All paths are relative (/api/..., /health): the vite dev server proxies them
-// to the backend (vite.config.ts). This app holds no API keys — the backend is
-// the only Zoo client.
+// to the backend (vite.config.ts). No API key is baked into this build, and
+// nothing in this module ever talks to Zoo — every call here goes to the
+// ToolCRIB backend, which is the only Zoo client on the *server* side. The one
+// place in `app/` that opens a connection to Zoo is `lib/zookeeper.ts` (the
+// operator-mode Zookeeper panel), using a token the operator pastes at runtime.
 
 export type Backend = "replay" | "flushmount" | "live";
 

@@ -99,12 +99,19 @@ npm run demo   # full loop, zero network, zero API minutes, no install step
 
 `npm run demo` walks one real request through the entire machine — validation →
 cited reference consult → generation (replayed from real prior Zoo outputs) →
-measured geometry gates → a hash-sealed 11-file job package (CAD source, STL/STEP,
+measured geometry gates → a hash-sealed job package (CAD source, STL/STEP,
 engine-rendered preview, validation report, 13-section manufacturing PDF, tamper-
 evident manifest) — and parks it at the human-review gate with the full transition
 ledger printed and verified. No token needed, and nothing to install: every import
 under `server/` is a `node:` builtin, so the demo has zero npm dependencies and runs
 against an empty `node_modules`. (Node versions below.)
+
+Count the bundle directory and you get **12 files, 11 of them sealed**: `manifest.json`
+hashes the 10 artifacts beside it (`manifest.files`) into one recomputable
+`packageHash`, and is the eleventh file. The twelfth is `notifications.log` — the
+parked-for-review line, appended *after* the seal by `server/pipeline/run-job.mjs`, so
+it is deliberately outside the hash and is not a manifest entry. Nothing inside the
+seal can change without `dodCheck` catching it.
 
 With a Zoo token in `.env` (`cp .env.example .env`), the same pipeline runs live:
 

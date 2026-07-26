@@ -93,10 +93,18 @@ export default function App() {
         )}
       </main>
 
+      {/* Footer claims are load-bearing and judge-facing, so both halves are
+          scoped to what the code actually does. NOT "the backend is the only
+          Zoo client": lib/zookeeper.ts opens a browser→Zoo websocket and ships
+          in the bundle on every view. What IS true everywhere is that no key is
+          baked in, and that only the Zookeeper panel can reach Zoo — and only
+          with a token a human pastes. On the draft view the backend is out of
+          the TOKEN's path, not out of the page (the health poll in this
+          component keeps running there). See app/README.md "credential rule". */}
       <footer className="footbar">
         {view.name === "draft"
-          ? "operator mode — your Zoo token lives in this tab's memory only and talks straight to Zoo; the backend is never involved"
-          : "this app holds no API keys — the backend is the only Zoo client"}
+          ? "operator mode — your Zoo token lives in this tab's memory only and goes straight to Zoo; the backend is never in that path"
+          : "no API key is baked into this build — these screens talk only to the ToolCRIB backend; the one screen that reaches Zoo is the Zookeeper panel, with a token you paste"}
       </footer>
     </div>
   );
