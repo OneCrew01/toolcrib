@@ -25,13 +25,22 @@ nothing but `node:` builtins, so `npm run demo` runs from a fresh clone with no 
 step at all. TypeScript is used where it pays — the `app/` console (React + Vite) — and
 nowhere under `server/`.
 
-*Amendment.* As written on 2026-07-22 this entry said "TypeScript/Node backend — one
-language across backend and web UI" and cited a "Node 18+" floor. Neither claim
-survived the build, so the entry is corrected rather than left standing: `server/`
-shipped as `.mjs` with no `.ts` file in it, and the repo's declared floor is
-`engines: {"node": ">=22.6"}` (`package.json`). What the two halves are actually
-verified on is stated in the README's "Node versions" section — declared floors and
-executed runtime kept visibly apart, because they are not the same kind of claim.
+*Amendment (2026-07-25).* Both the heading and the body above were rewritten on this
+date. The 2026-07-22 entry read, in full and verbatim (`git show
+d4adfb4:docs/DECISION_LOG.md`):
+
+> ## D-003 · 2026-07-22 · TypeScript/Node backend, dependency-light
+> One language across backend and web UI. The day-1 thin thread is plain Node 18+ fetch
+> with zero npm dependencies so `npm run demo` works from a fresh clone with no install.
+
+Two of those claims did not survive the build. "TypeScript/Node backend … one language
+across backend and web UI": `server/` shipped as `.mjs` with no `.ts` file in it, so the
+repo runs two languages, not one. "Node 18+": the repo's declared floor is
+`engines: {"node": ">=22.6"}` (`package.json`), and no build of this repo has been
+executed on 18. The third claim — zero npm dependencies, fresh clone, no install — held,
+and is the part carried forward. What each half is actually verified on is in the
+README's "Node versions" section, which keeps declared floors and executed runtime
+visibly apart, because they are not the same kind of claim.
 
 ## D-004 · 2026-07-22 · Local state first
 `StateStore` interface with a local JSON/SQLite implementation as the headline store, so

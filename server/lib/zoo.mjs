@@ -1,4 +1,5 @@
-// Shared Zoo API client — zero dependencies, Node 18+.
+// Shared Zoo API client — zero dependencies. For the Node floor see the README's
+// "Node versions" section; we don't restate a version here that we haven't executed.
 // The only module that touches the token. Everything speaks raw REST.
 
 import { readFileSync, existsSync } from "node:fs";

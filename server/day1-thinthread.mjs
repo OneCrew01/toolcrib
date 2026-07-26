@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Day-1 thin thread: intent → Zoo text-to-CAD (KCL + export) → mass validation.
-// Zero dependencies; Node 18+. Token comes from ZOO_API_TOKEN or a local .env file.
+// Zero dependencies. Token comes from ZOO_API_TOKEN or a local .env file.
+// Node floor: see the README's "Node versions" section — we don't restate a
+// version here that we haven't executed.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";

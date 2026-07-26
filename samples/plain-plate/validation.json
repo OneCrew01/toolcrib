@@ -1,14 +1,14 @@
-﻿{
-    "id":  "848cc603-623b-4620-acf8-75d5aea15f10",
-    "created_at":  "2026-07-22T07:35:41.610532093Z",
-    "started_at":  "2026-07-22T07:35:41.699659939Z",
-    "completed_at":  "2026-07-22T07:35:41.796832308Z",
-    "user_id":  "e185bb67-1112-496d-9fcc-dd9db136186d",
-    "status":  "completed",
-    "updated_at":  "2026-07-22T07:35:41.610532093Z",
-    "src_format":  "step",
-    "material_density":  2700.0,
-    "material_density_unit":  "kg:m3",
-    "mass":  13.078606393829295,
-    "output_unit":  "g"
+{
+  "id": "848cc603-623b-4620-acf8-75d5aea15f10",
+  "created_at": "2026-07-22T07:35:41.610532093Z",
+  "started_at": "2026-07-22T07:35:41.699659939Z",
+  "completed_at": "2026-07-22T07:35:41.796832308Z",
+  "user_id": "e185bb67-1112-496d-9fcc-dd9db136186d",
+  "status": "completed",
+  "updated_at": "2026-07-22T07:35:41.610532093Z",
+  "src_format": "step",
+  "material_density": 2700,
+  "material_density_unit": "kg:m3",
+  "mass": 13.078606393829295,
+  "output_unit": "g"
 }

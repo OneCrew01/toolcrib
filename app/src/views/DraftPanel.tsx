@@ -99,8 +99,8 @@ export function DraftPanelView({
       </div>
 
       <div className="draft-notice">
-        <strong>Your token connects your browser directly to Zoo. The hosted demo
-        never does this.</strong>{" "}
+        <strong>Your token connects your browser directly to Zoo. This is the only
+        screen in the console that touches a credential.</strong>{" "}
         The token lives in this tab's memory only — never stored, never logged,
         never proxied through the ToolCRIB backend. Disconnecting (or leaving
         this view) wipes it.

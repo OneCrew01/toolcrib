@@ -161,15 +161,23 @@ a part in prose, watch the copilot reason and draft KCL live, then push a finish
 turn into the New Job form as design intent — the reviewed pipeline underneath
 (gates, ledger, human sign-off) is exactly the same pipeline this panel feeds.
 
-The token boundary is doctrine, not an implementation detail. Any public, hosted
-deployment of this console stays replay-only — no token field, no live sessions;
-only a local operator run ever connects a browser to Zoo. **The token is entered
-at runtime, held in memory only, and talks from your browser straight to Zoo —
-wiped the moment you disconnect. The hosted demo never does this.** The ToolCRIB
-backend has zero involvement in this path — there is no proxy, and we
-refused to build one on purpose: a proxy would let anonymous visitors run billable
-agent sessions under our identity, which breaks the per-session metering honesty
-(`api_call_id` = one Zoo API call per turn) the rest of this repo is built around.
+The token boundary is doctrine, not an implementation detail. **The token is entered
+at runtime, held in memory only, and talks from your browser straight to Zoo — wiped
+the moment you disconnect.** That part is in the code: `app/src/lib/zookeeper.ts`
+sends it once in the auth frame and clears its copy immediately. The ToolCRIB backend
+has zero involvement in this path — there is no proxy, and we refused to build one on
+purpose: a proxy would let anonymous visitors run billable agent sessions under our
+identity, which breaks the per-session metering honesty (`api_call_id` = one Zoo API
+call per turn) the rest of this repo is built around.
+
+**Hosting policy, stated as policy.** This console is not hosted anywhere today — the
+repo carries no deploy configuration of any kind — and the rule for if it ever is: a
+public deployment stays replay-only, with no token field and no live sessions. Only a
+local operator run connects a browser to Zoo. Be clear about the status of that rule:
+it is an operator commitment, **not** something the build enforces. There is no
+production guard on the Zookeeper panel and no build flag that strips it, so a naive
+`npm --prefix app run build` ships the token field. Anyone who hosts this is the one
+enforcing the policy, and wiring a real gate is the prerequisite for doing so.
 
 ## Beyond fastening: the same pattern, two more domains
 
