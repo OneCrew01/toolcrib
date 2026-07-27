@@ -14,10 +14,28 @@ improves the platform for every developer instead of shipping one vertical app.
 The demo slice (a flush-mounted bracket/bezel) exists to exercise holes + countersinks +
 fastener selection in one small part.
 
-## D-002 · 2026-07-22 · Trust-layer loop is the product frame
+## D-002 · 2026-07-22 · Trust-layer loop is the product frame *(correction appended 2026-07-27)*
 Generate → validate → document → (human approve) → revise. The bracket is the demo; the
 reusable pattern — typed rule reference, validation gate, documented output package,
 revision trail — is the product. README and demo video lead with this.
+
+*Correction (2026-07-27).* The body above stands as written — it is the frame, and the
+frame held. What it does not say, and what a reader could fairly take from it, is that
+all four legs are equally finished. Three are: generate, validate and document run end
+to end in `npm run demo`. **Revise is half-built, and the halves are worth naming.**
+
+Built: a human at the gate can request a revision (`POST /api/jobs/:id/decision`,
+`api/server.mjs:335` — named actor and a reason both required), the state map carries
+`REVISION_REQUESTED -> DRAFT` (`state/states.mjs:77`), the store bumps the job's `rev`
+across it (`state/store.mjs:171`), and that walk is exercised end to end
+(`state/state.test.mjs:66`). Also built, as of today: `revision/amend.mjs`, which turns
+a caliper reading into an amended request with its work shown, demonstrated by
+`npm run amend`.
+
+Not built: anything that connects those two. No route, no console control and no runner
+path drives `REVISION_REQUESTED -> DRAFT`, so the only caller that has ever walked that
+edge is a test, and the amendment module is not called from the pipeline at all. D-009
+is why that gap was left open deliberately rather than closed badly.
 
 ## D-003 · 2026-07-22 · Node backend, dependency-light *(amended 2026-07-25)*
 Dependency-light above all: the backend is plain ESM JavaScript (`.mjs`) importing
@@ -149,3 +167,58 @@ Wired into `npm test` in three places: the working-tree contents of every git-tr
 it can still be stopped), every file of a freshly generated bundle plus its ledger reasons
 and manifest warnings (server/pipeline/pipeline.test.mjs), and both HTTP channels
 (server/api/api.test.mjs).
+
+## D-009 · 2026-07-27 · The amendment ships as a pure module, and the wiring does not
+
+`server/revision/amend.mjs` — a caliper reading plus a cited band becomes an amended
+request — landed **unwired**: no route, no console control, no ledger row, and no
+pipeline path that drives `REVISION_REQUESTED -> DRAFT`. Its only caller is
+`server/revision/demo-amend.mjs` (`npm run amend`). This entry records why, because
+"we ran out of time" is the explanation a reader will assume and it is not the one.
+
+The wired version was designed three times, adversarially, and each pass killed the
+design it was reviewing. Every one of the four findings below is a defect in *our*
+plan, not a limitation of Zoo's APIs:
+
+1. **The demonstration lane would have lied about mass.** The plan was a second
+   pipeline lane that "re-ran" a job with the amended request. The replay backend
+   reads its artifacts from a fixture directory (`pipeline/backends.mjs:46`), so a
+   revised run has to be pointed at a *different* fixture directory — and the mass
+   gate then compares that different mesh against the request's `expectedMassG`. The
+   revision would have shown a mass delta, on stage, that came from swapping fixtures
+   and not from the amendment. A demo whose headline number is an artefact of its own
+   plumbing is worse than no demo.
+2. **The concurrency fix deadlocked every job.** Re-entering a job at `DRAFT` means
+   two walks can touch one job, which argues for serialising `transition()`. It
+   cannot be serialised naively: `runValidation()` calls `this.transition` twice
+   (`state/store.mjs:190` on the invalid branch, `:198` on the valid one), so a lock
+   taken around a transition and held across the call deadlocks the *happy path* of
+   every job in the repo, not just revised ones. The store is the load-bearing piece
+   of this build. It was put out of scope rather than rewritten in an afternoon.
+3. **The resume path walked around the live-spend gate.** Re-entering a job at
+   `DRAFT` re-enters it with its backend already chosen. `--backend=live` is gated on
+   an explicit `TOOLCRIB_ALLOW_LIVE` at the two entry points that exist
+   (`pipeline/run-job.mjs:339`, `api/server.mjs:255`); a third entry point that
+   resumes an existing job inherits the backend and does not pass either check. That
+   is a revision that quietly spends real API minutes, which is exactly the class of
+   surprise this repo exists to prevent.
+4. **The PDF assertions were unsatisfiable as specified.** "The amendment appears in
+   the manufacturing PDF" was to be pinned by asserting the amended clearance and its
+   citation appear in the rendered document. They cannot be: `package/pdf.mjs` wraps
+   text (`wrapText`, `pdf.mjs:35`) and emits each wrapped line as its own `Tj`
+   operator, so a multi-word string never appears contiguously in the file. Assert on
+   the model, not on the PDF.
+
+**The decision.** Ship the reasoning, not the plumbing. A pure module is honest about
+what it is: it computes a proposal, it labels every number `cited` or `computed`, it
+refuses to invent a fact about the parent part, and it can be read, tested and
+demonstrated without a store, a job or a network. `npm run amend` makes it a runnable
+artifact rather than a described one — it prints the sha256 of the parent and amended
+KCL for both parts, so the claim that the amendment moved the insert and left the panel
+byte-identical is a measurement anyone can reproduce in one command.
+
+**The cost, stated.** The loop is not closed. A judge who wants to click "Request
+revision" and watch rev 2 appear cannot, and README, ARCHITECTURE and D-002 now all say
+so in those words rather than leaving the diagram to imply otherwise. Closing it is the
+next increment, and the order it has to happen in is: serialise the store safely
+(finding 2), give the resume path its own spend gate (finding 3), then wire the route.

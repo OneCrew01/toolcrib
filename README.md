@@ -27,6 +27,11 @@ ToolCRIB attacks that gap two ways:
    executes and *validates* it (mass properties, geometry checks); Zoo's File Format API
    exports STL/STEP; and the output ships as a documented package a stranger could
    pick up, reproduce, and remix — with a human approval gate before anything is made.
+   The **revise** leg is the newest and the least finished of the four, and this README
+   says exactly where it stops: a human at the gate can request a revision, and
+   [`npm run amend`](#when-the-print-comes-back-wrong-npm-run-amend) computes what the
+   revised request should say from a caliper reading — but nothing re-enters the machine
+   automatically yet.
 
 The demo part is small on purpose. The pattern is the product.
 
@@ -63,6 +68,67 @@ Why deterministic generation instead of prompting? Campaign C003 (FN-020): text-
 *can* build this pair — when the prompt pre-chews the engineering. Phrase it like a
 machinist ("0.3 mm total clearance") and it fails outright; phrase it casually and you
 get silently different geometry — with no API signal telling you which you got.
+
+## When the print comes back wrong: `npm run amend`
+
+The generator gets you a part. The bench tells you whether it fit. This is the other
+half — one command, offline, no API minutes, nothing installed:
+
+```bash
+npm run amend
+```
+
+It walks one bench story end to end. A flush-mount pair printed at 0.15 mm clearance
+per side; the calipers say the opening came out 0.10 mm smaller than the model; the
+insert binds going in. That story is a **worked example and the output says so**: the
+geometry is real (it is `samples/flush-mount/pair-rect-c0.15`, executed on the Zoo
+engine), the caliper reading is a stated scenario nobody took with real calipers, and
+everything downstream of the reading is computed for real. Out the other end comes an
+amended request, and every number in it is labelled one of two ways:
+
+- **cited** — a row of the fit table holds exactly this number. The rule id and the
+  full citation string are printed beside it, and the number is passed through
+  unrounded so it stays the table's and not ours.
+- **computed** — our arithmetic, printed in full, with a warning saying plainly that
+  no row in the reference authorises it. Turning a caliper reading into a clearance
+  is this tool's own reasoning. The band is cited; the correction is not.
+
+Then it does the part that is hard to argue with. It runs the real generator on the
+parent request and on the amended one, and prints the sha256 of all four KCL programs:
+
+```
+panel    parent 67d2b9f9…   amended 67d2b9f9…   IDENTICAL
+insert   parent e7684ef9…   amended 9aeb7c74…   DIFFERS
+```
+
+The panel program is byte-identical because the hole in the panel is the size it
+always was — clearance is not a value a panel emitter even reads. The insert moved:
+`clearancePerSide = 0.15mm` became `clearancePerSide = 0.2mm`, and the further lines
+that moved with it are that insert's own profile coordinates, which KCL writes as
+literal numbers. **The amendment touched exactly the part it should and nothing
+else** — and you do not have to take that on trust, because the hashes are printed
+and the whole diff is printed under them. (Had the correction needed a deeper lead-in
+chamfer, the panel would have moved too, and should have: the panel carries that
+chamfer as well. Byte-identical here is a measurement, not a rule.)
+
+Every fit-table row this leans on is still unsigned, so the proposal comes back
+watermarked `DRAFT — NOT VERIFIED` with the pending rows named. That is the
+fail-closed reference doing its job, not an oversight.
+
+**What it does not do, plainly.** `server/revision/amend.mjs` is a pure module — no
+I/O, no ledger, no state, no network. It is **not** wired into the HTTP API and
+**not** wired into the review console, and the pipeline runner does **not** drive the
+`REVISION_REQUESTED -> DRAFT` edge that opens a new revision. That edge is real code
+rather than a plan: the state map carries it (`server/state/states.mjs:77`) and the
+store bumps the job's `rev` when a caller walks it (`server/state/store.mjs:171`,
+exercised end to end by `server/state/state.test.mjs:66`). But the only caller that
+walks it today is that test. The console's *Request revision* button parks a job at
+`REVISION_REQUESTED` and stops there. Wiring the amendment onto that edge is the next
+increment; why the module shipped before the wiring is D-009 in
+[`docs/DECISION_LOG.md`](docs/DECISION_LOG.md).
+
+So: a real, runnable artifact with real hashes — and not a closed loop. Both halves
+of that sentence are load-bearing.
 
 ## The reliability harness (the night shift)
 

@@ -23,6 +23,11 @@ DECISION_LOG for the why behind each piece.*
         └─────────────────────────────────────────────────────────┘
 ```
 
+Box 5's **revise** leg is the one place this diagram runs ahead of the build, so it
+is flagged here rather than left for a reader to discover: the state machine below
+carries the `rev+1` edge and the store walks it, but nothing in the runner, the API
+or the console drives it yet. See "The revision half" for exactly what is built.
+
 ## Components
 
 - **`server/`** — Node backend, written in plain ESM JavaScript (`.mjs` — there is no
@@ -64,6 +69,67 @@ hash (sha256 chain), so `verifyLedger()` proves the recorded history is the hist
 that happened: edit or drop any row and every hash after it breaks. "Completed" is not
 "correct" (FN-010), and outputs can vanish (FN-011) — the machine encodes both as
 first-class states instead of exceptions.
+
+`REVISION_REQUESTED -> DRAFT` is drawn above because the map really carries it
+(`states.mjs:77`) and `store.transition()` bumps the job's `rev` across it
+(`store.mjs:171`, walked end to end by `state.test.mjs:66`). What no shipped caller
+does is walk it: `POST /api/jobs/:id/decision {action: "revise"}` writes
+`REVISION_REQUESTED` and stops (`api/server.mjs:335`), and `run-job.mjs` never
+re-enters a job at `DRAFT`. The edge is built and unused, which is a different thing
+from planned.
+
+## The revision half: amendment as a pure module
+
+`server/revision/amend.mjs` answers the question the bench asks after a print: *the
+insert binds — what should the model say instead?* `proposeAmendment({parentRequest,
+measurement, allowDraft})` takes the parent request and one caliper reading and
+returns a frozen proposal: the parent request with only its fit parameters changed,
+plus the shown work for why, plus the warnings that ride with it. Every number in it
+is labelled `cited` (an encoded row holds exactly this number, with its rule id and
+citation) or `computed` (our arithmetic, shown, and disclaimed — no row in the
+reference authorises deriving a clearance from a caliper reading).
+
+Where it sits: **beside** the pipeline, not inside it.
+
+```
+  reference/tables/flush-mount-fit.mjs   fail-closed lookups: the band, the lead-in
+                 |                        (both PENDING today -> allowDraft or throw)
+                 v
+  revision/amend.mjs  --asks-->  generators/flushmount.mjs   "would this build?"
+                 |                        (the real generator, twice: parent, then
+                 |                         amendment — no gate is re-implemented here)
+                 v
+        a frozen proposal  ->  a caller decides what to do with it
+                               (today: revision/demo-amend.mjs and the tests,
+                                and nothing else)
+```
+
+What it deliberately does not touch, each for a stated reason:
+
+- **The state machine and the store.** No transition, no `rev` bump, no job. The
+  module is pure — no I/O, no clock, no randomness — so it can be reasoned about and
+  tested without a store, and so it cannot half-write a job it then throws on. (It
+  does call `state/request.mjs`, which is the pure envelope validator living in that
+  directory, not the machine: it returns a result and throws nothing.)
+- **The ledger and the package.** Nothing it returns is sealed, hashed into a
+  manifest, or appended anywhere. A proposal is not a decision.
+- **The HTTP API and the console.** No route, no button. See D-009 for why the
+  wiring was cut rather than rushed.
+- **The generator's own spec gates.** It re-implements none of them. It runs
+  `generateFlushMountPair` on the parent (a request that does not build was never
+  printed, so there is nothing to amend) and then on the amendment, and reports the
+  real refusal verbatim. A hand-rolled subset here could drift out of date against
+  the generator; asking the generator cannot.
+- **`insertSize` (FMF-009).** Not consulted, deliberately: the generator sizes the
+  insert from the opening and the clearance itself, so a third fail-closed gate here
+  would guard a number nobody reads.
+
+`npm run amend` (`server/revision/demo-amend.mjs`) is the module's only caller outside
+its own tests, and its whole demonstration surface: offline, deterministic,
+argument-free, and it prints the
+sha256 of the parent and amended KCL for both parts so the "only the insert moved"
+claim is a measurement a reader can reproduce rather than a sentence. `demo-amend.test.mjs`
+pins that demonstration against its own data.
 
 ## The fastening reference: rules as data, citations as schema, fail-closed verification
 

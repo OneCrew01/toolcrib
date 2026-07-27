@@ -7,6 +7,7 @@
     "start": "node server/index.mjs",
     "demo": "node server/pipeline/run-job.mjs samples/requests/plain-plate.json --backend=replay",
     "demo:thinthread": "node server/day1-thinthread.mjs",
+    "amend": "node server/revision/demo-amend.mjs",
     "job": "node server/pipeline/run-job.mjs",
     "campaign": "node server/harness/run-campaign.mjs",
     "test": "node --test \"server/lib/*.test.mjs\" \"server/state/*.test.mjs\" \"server/reference/*.test.mjs\" \"server/revision/*.test.mjs\" \"server/generators/*.test.mjs\" \"server/package/*.test.mjs\" \"server/pipeline/*.test.mjs\" \"server/api/*.test.mjs\" \"server/wb/*.test.mjs\" && npm run test:app && npm run leak-audit",

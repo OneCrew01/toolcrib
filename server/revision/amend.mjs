@@ -184,8 +184,11 @@
 // ---------------------------------------------------------------------------
 // WOULD IT GENERATE? — the amended request is checked, not asserted
 // ---------------------------------------------------------------------------
-// generateFlushMountPair owns eight spec gates. This module duplicates NONE of
-// them. It runs the real generator TWICE and reports its refusals verbatim:
+// generateFlushMountPair owns the spec gates — seventeen `gate()` calls in its
+// body today, and a change to the clearance or the lead-in can trip most of
+// them. That count is not tracked here, and does not need to be, because this
+// module duplicates NONE of them. It runs the real generator TWICE and reports
+// its refusals verbatim:
 //
 //   THE PARENT, FIRST AND ALWAYS. A request that does not build was never
 //   printed, so there is no bench measurement of it and nothing to amend. The
