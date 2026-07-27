@@ -14,8 +14,9 @@
 // on the next run, finds no fifth probe waiting for it, and makes the audit
 // REFUSE — suite red, CLI red — instead of shipping unproven.
 //
-// This paragraph has been FALSE TWICE, which is why it now points at the thing
-// to check instead of asking to be believed:
+// That claim has been FALSE THREE TIMES. It is stated above without hedging
+// because it is now true, and the three corpses are listed here because each
+// one was found by a reader who checked instead of believing:
 //
 //   1. It was folklore. The list was a hand-typed array, and the test that
 //      "pinned" it built its expected set by hand as well — two literal probes
@@ -25,23 +26,31 @@
 //      control line and then CLEAN at exit 0.
 //   2. The derivation that replaced it read DOUBLE-QUOTED kinds only. Measured:
 //      that same fifth detector, spelled with single quotes instead -> derived
-//      list still four, suite 29 pass / 0 fail, CLI CLEAN at exit 0. One
-//      keystroke and the guarantee was a lie again. Nothing in this repo pins a
-//      quote style — there is no prettier, eslint or editorconfig config in it
-//      — so KIND_LITERAL reads every spelling a detector can carry rather than
-//      the one the four below happen to be written in today.
+//      list still four, suite 29 pass / 0 fail, CLI CLEAN at exit 0.
+//   3. Every quote character, but the NAME had to be lower-case letters and
+//      hyphens. Measured, one fifth detector per row: apiKey, sha1 and
+//      secret_leak each derived four, suite 31 pass / 0 fail, CLI CLEAN at
+//      exit 0. All three are quoted literals written beside their key — what
+//      the residual paragraph below said was covered — so the disclosure did
+//      not reach them either.
 //
-// A guard whose own header is wrong is worse than no guard, because it is
-// believed. Twice is enough that this prose is not the evidence: KIND_LITERAL
-// is, and so are the tests under "the control" in leak-audit.test.mjs.
+// Each fix was one character class narrower than the hole. The pattern now has
+// NO character class on the name at all (KIND_LITERAL, and the reasoning with
+// it). A guard whose own header is wrong is worse than no guard, because it is
+// believed; three times is enough that this prose is not the evidence. The
+// evidence is KIND_LITERAL and the tests under "the control" in
+// leak-audit.test.mjs, which walk capitals, digits, underscores, dots, spaces
+// and non-ASCII through the scan and fail if any of them goes unseen.
 //
-// What the scan sees is a kind spelled as a quoted literal beside its key. What
-// it cannot see is a kind not written that way at all — assembled from pieces,
-// held in a variable, handed in by another module. So runAudit checks a SECOND
-// time on the way out: a finding carrying a kind the control never proved is a
-// refusal, not a finding. That half fires when the detector first fires rather
-// than when the list is derived — said plainly because it is the honest
-// residual, not because it is comfortable.
+// The residual, stated so it covers what it says it covers: what the scan reads
+// is a QUOTED LITERAL sitting where the value goes. What it cannot read is a
+// value that is not a quoted literal there at all — a variable, a call, a
+// constant imported from another module, a name concatenated from pieces. No
+// spelling of a literal is excluded; being a literal is the whole condition. So
+// runAudit checks a SECOND time on the way out: a finding carrying a kind the
+// control never proved is a refusal, not a finding. That half fires when the
+// detector first fires rather than when the list is derived — said plainly
+// because it is the honest residual, not because it is comfortable.
 //
 //   path      an absolute filesystem path that names the machine this was
 //             written on — a drive-rooted path, a UNC share, a home directory.
@@ -154,21 +163,49 @@ const SOURCE = fileURLToPath(import.meta.url);
 // meant to survive.
 //
 // EVERY quote character, on both the key and the value, with the closing quote
-// required to match the opening one (\1). The first version of this pattern
-// took double quotes only, and a reviewer falsified the header above by adding
-// a fifth detector spelled with single quotes: the derived list stayed at four,
-// the suite stayed at 29 pass / 0 fail, and the CLI still said CLEAN at exit 0.
-// A guarantee that a quote character can switch off is not a guarantee, and
-// nothing in this repo enforces a quote style — there is no prettier, eslint or
-// editorconfig config here to appeal to.
+// required to match the opening one (\1) — and, INSIDE those quotes, ANY
+// CHARACTERS AT ALL. There is deliberately no character class on the name.
 //
-// It does not match its own definition: where this line spells the key, what
-// follows the key is a bracket rather than a colon, so scanning this file
-// cannot invent a kind out of the scanner. It DOES match a mention of that
-// exact shape in a comment, which would add a kind the control has no probe for
-// and turn the audit red until somebody looks — loud and closed, which is the
-// direction this file errs in on purpose.
-const KIND_LITERAL = /\b["'`]?kind["'`]?:\s*(["'`])([a-z][a-z-]*)\1/g;
+// That last part is the third version of this line, and the reason it has no
+// class is that a class is the exact thing falsified the first two times:
+//
+//   v1  double quotes only. A fifth detector spelled with single quotes was
+//       invisible -> derived list four, suite 29 pass / 0 fail, CLI CLEAN at 0.
+//   v2  every quote character, but the name had to match [a-z][a-z-]* — no
+//       capital, no digit, no underscore. Measured on that version, one fifth
+//       detector per row, nothing else changed:
+//
+//         apiKey       derived four; suite 31 pass / 0 fail; CLI CLEAN, exit 0
+//         sha1         derived four;                         CLI CLEAN, exit 0
+//         secret_leak  derived four;                         CLI CLEAN, exit 0
+//
+//       apiKey is the ordinary way JavaScript spells a two-word name, and
+//       3d-print is a name this repo of all repos could plausibly want. Both
+//       were literals written beside their key — precisely what the header
+//       claimed to see — so the residual disclosed below did not cover them and
+//       the guarantee was false for a third time.
+//
+// Widening the class again would only move the hole. So the value is now
+// [^\n]*? — anything, up to the matching quote, on the line the key is on. A
+// name this cannot see is not a differently-SPELLED name; it is not a quoted
+// literal there at all, which is the residual the header states and the second
+// check catches. NARROWING THIS BACK IS THE WRONG FIX and the suite says so:
+// "a fifth detector is found however its kind is written" walks capitals,
+// digits, underscores, dots, spaces and non-ASCII through it.
+//
+// Two consequences of a class-free value, both accepted on purpose:
+//
+//   It does not match its own definition — where this line spells the key, what
+//   follows the key is a bracket rather than a colon, so scanning this file
+//   cannot invent a kind out of the scanner.
+//
+//   It DOES read PROSE in this file. Write that key in a comment with a quote
+//   character as the next thing on the line and the text up to the next
+//   matching quote becomes a kind the control has no probe for, and the audit
+//   goes red until somebody looks. Loud and closed, which is the direction this
+//   file errs in on purpose — but it is why no comment here pairs that key with
+//   a following quote.
+const KIND_LITERAL = /\b["'`]?kind["'`]?:\s*(["'`])([^\n]*?)\1/g;
 
 /**
  * The four kinds the header documents. A FLOOR, not the list.

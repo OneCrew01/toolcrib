@@ -124,9 +124,12 @@ in a committed blob. It plants a control leak of *every one of those kinds* in i
 first, and refuses to report *clean* unless all four come back reported.
 
 **If you downloaded the ZIP instead of cloning, six tests will fail — and that is them
-doing their job.** Six of the checks look for personal data accidentally left in this
-repo's own files, and they ask `git` for the list of files to look through. A ZIP
-download has no `git` information inside it, so five of the six stop with
+doing their job.** All six belong to that same safety check. Three of them read every
+file in the project — two looking for personal information left behind by mistake, one
+for the line-ending problem — and the other three check that the reader itself still
+behaves. Every one of the six starts by asking `git` for the list of files, and a ZIP
+download has no `git` information inside it. With no list, not one of them will report
+all-clear over files it never opened, so five of the six stop with
 
 ```
 git ls-files failed (exit 128) — the sweep cannot verify what it cannot list.
@@ -138,8 +141,9 @@ and the sixth, which checks line endings, makes the same complaint in its own wo
 git ls-files --eol failed (exit 128) — the committed line endings cannot be verified.
 ```
 
-Neither one reports all-clear over a list it never got. A check that cannot see what
-it is checking should say so out loud, not pass quietly. Nothing else is affected —
+A check that cannot see what it is checking should say so out loud, not pass quietly.
+A failure of this shape never means something was found — the check stops before it
+reads anything, so it has nothing to report either way. Nothing else is affected:
 `npm run demo` still exits 0 in a ZIP. To get a fully green `npm test`, take the code
 with `git clone` rather than the ZIP button, and run it again.
 

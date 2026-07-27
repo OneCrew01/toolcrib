@@ -137,8 +137,20 @@ test("the kind list is read out of the audit's own source, not typed beside it",
   // exit 0.
   assert.deepEqual(controlKinds(), declaredKinds(readFileSync(AUDIT, "utf8")), "the kind list is not derived");
 
-  // The floor, from outside the module: derivation can only ever ADD, so this
-  // catches the other direction — a documented detector deleted or renamed.
+  // EXACT, not a floor — read this before "fixing" it. It fires in BOTH
+  // directions on purpose, and the addition direction is the one worth
+  // explaining, because whoever trips it will be doing something right:
+  //
+  //   a documented detector deleted or renamed   -> red, obviously wanted
+  //   a legitimate FIFTH detector added          -> red, also wanted
+  //
+  // The second is not a false alarm. The audit itself is satisfied the moment
+  // the fifth kind gets a probe in the control, and nothing after that would
+  // make a human re-read the four names the header spells out in prose. This
+  // line is the only thing that does. IF YOU ARE HERE HAVING ADDED A FIFTH
+  // DETECTOR: plant its probe in the control, add its name and its one-line
+  // description to the header list in leak-audit.mjs, then add it here. All
+  // three, or the audit and its documentation drift apart again.
   assert.deepEqual([...controlKinds()].sort(), ["bom", "eol", "identity", "path"]);
 
   // And it is a derivation rather than a coincidence: hand the scan a fifth
@@ -150,35 +162,54 @@ test("the kind list is read out of the audit's own source, not typed beside it",
   assert.deepEqual(fifth, [...controlKinds(), "secret"]);
 });
 
-test("a fifth detector is found however its kind is quoted — one keystroke cannot switch this off", () => {
-  // Measured, and the reason this test exists: the first derivation read
-  // DOUBLE-QUOTED kinds only. A reviewer added the fifth detector below with
-  // SINGLE quotes and nothing else changed — the derived list came back four,
-  // this suite ran 29 pass / 0 fail, and `node server/lib/leak-audit.mjs`
-  // printed its four-kind control line and then CLEAN at exit 0. A guarantee a
-  // quote character can turn off is not a guarantee, and no formatter, linter
-  // or editorconfig in this repo pins which quote gets typed.
+test("a fifth detector is found however its kind is written — no spelling switches this off", () => {
+  // This test is a graveyard, and every row in it is a real falsification of
+  // the header rather than an imagined one. TWICE the scan was fixed by
+  // widening a character class, and twice the next reader found a spelling one
+  // character outside the new class:
+  //
+  //   v1  double quotes only        'secret' in single quotes -> derived four,
+  //                                 suite 29 pass / 0 fail, CLI CLEAN, exit 0
+  //   v2  any quote, but the name   apiKey  -> derived four, suite 31 pass /
+  //       had to match [a-z][a-z-]*           0 fail, CLI CLEAN, exit 0
+  //                                 sha1, secret_leak -> same
+  //
+  // So the pattern no longer has a class on the name, and the rows below are
+  // what stops one being reintroduced: capitals, digits, a leading digit, a
+  // leading underscore, a dot, a space and a non-ASCII letter all have to come
+  // back seen. Narrowing KIND_LITERAL turns this red, which is the point —
+  // v2 was written by someone reasonable who thought a-z was enough.
   const src = readFileSync(AUDIT, "utf8");
-  const spellings = {
-    double: 'out.push({ kind: "secret", where: name, line: 1 });',
-    single: "out.push({ kind: 'secret', where: name, line: 1 });",
-    backtick: "out.push({ kind: `secret`, where: name, line: 1 });",
-    "quoted key": 'out.push({ "kind": "secret", where: name, line: 1 });',
-    "no spaces": 'out.push({kind:"secret"});',
-  };
-  for (const [label, line] of Object.entries(spellings))
+  const spellings = [
+    ["double quotes", 'out.push({ kind: "secret", where: name, line: 1 });', "secret"],
+    ["single quotes", "out.push({ kind: 'secret', where: name, line: 1 });", "secret"],
+    ["backticks", "out.push({ kind: `secret`, where: name, line: 1 });", "secret"],
+    ["a quoted key", 'out.push({ "kind": "secret", where: name, line: 1 });', "secret"],
+    ["no spaces at all", 'out.push({kind:"secret"});', "secret"],
+    ["a capital letter", 'out.push({ kind: "apiKey", where: name });', "apiKey"],
+    ["a trailing digit", 'out.push({ kind: "sha1", where: name });', "sha1"],
+    ["an underscore", 'out.push({ kind: "secret_leak", where: name });', "secret_leak"],
+    ["a leading digit", 'out.push({ kind: "3d-print", where: name });', "3d-print"],
+    ["a leading underscore", 'out.push({ kind: "_private", where: name });', "_private"],
+    ["a dot", 'out.push({ kind: "zoo.token", where: name });', "zoo.token"],
+    ["a space", 'out.push({ kind: "api key", where: name });', "api key"],
+    ["a non-ASCII letter", 'out.push({ kind: "clé", where: name });', "clé"],
+  ];
+  for (const [label, line, expected] of spellings)
     assert.deepEqual(
       declaredKinds(`${src}\n${line}\n`),
-      [...controlKinds(), "secret"],
-      `a fifth detector spelled with ${label} quotes was invisible to the scan`,
+      [...controlKinds(), expected],
+      `a fifth detector whose kind is written with ${label} was invisible to the scan`,
     );
 
   // The other direction, so this is a matcher and not a wildcard, and so the
-  // residual the header admits to is pinned rather than assumed: a kind that is
-  // NOT a literal beside its key — here a variable — stays invisible to the
-  // scan. That is the case unprovenKinds covers on the way out instead, when
-  // the detector first fires.
-  assert.deepEqual(declaredKinds(`${src}\nout.push({ kind: whateverItIs, where: name });\n`), controlKinds());
+  // residual the header admits to is pinned rather than assumed: a value that
+  // is not a quoted literal where the value goes — a variable, a call — stays
+  // invisible. That is the case unprovenKinds covers on the way out instead,
+  // when the detector first fires. Note what is NOT in this list: no spelling
+  // of a literal belongs here, because the scan reads all of them.
+  for (const line of ["out.push({ kind: whateverItIs, where: name });", "out.push({ kind: kindFor(m), where: name });"])
+    assert.deepEqual(declaredKinds(`${src}\n${line}\n`), controlKinds(), `this should not have been visible: ${line}`);
 });
 
 test("a kind scan that comes back short stops the audit instead of shrinking it", () => {
