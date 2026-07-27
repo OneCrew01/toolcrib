@@ -5,10 +5,12 @@ import assert from "node:assert";
 import { makeTable, ruleValue, VERIFIED, PENDING_OPERATOR } from "../reference/schema.mjs";
 import { UnverifiedRuleError, DRAFT_WATERMARK } from "../reference/lookup.mjs";
 import { flushMountFit, fitClearance } from "../reference/tables/flush-mount-fit.mjs";
+import { generateFlushMountPair } from "../generators/flushmount.mjs";
 import {
   proposeAmendment,
   validateMeasurement,
   quantizeMm,
+  fillWording,
   OPERATOR_FLAG_WORDING,
   MM_DECIMALS,
   MAX_DEVIATION_MM,
@@ -63,6 +65,9 @@ const tightMeasurement = () => ({
   measuredBy: "R. Vasquez",
   instrument: "digital caliper, 0.01 mm",
 });
+
+/** The other bench story, and a coherent one: opening printed large, insert rattles. */
+const looseMeasurement = () => ({ ...tightMeasurement(), measuredMm: 30.15, fit: "loose" });
 
 const propose = (over = {}, table) =>
   proposeAmendment(
@@ -130,7 +135,7 @@ function assertCitationsHonest(result, table) {
 
 test("RULING 1 (structural): every cited value is an encoded row, everything else is computed", () => {
   assertCitationsHonest(draft(), flushMountFit);
-  assertCitationsHonest(draft({ measurement: { fit: "loose" } }), flushMountFit);
+  assertCitationsHonest(draft({ measurement: looseMeasurement() }), flushMountFit);
   assertCitationsHonest(draft({ measurement: { targetFitClass: "snug" } }), flushMountFit);
   assertCitationsHonest(
     proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement() }, signedTable),
@@ -161,13 +166,13 @@ test("RULING 1: the band midpoint is not an encoded value, so it can never be ci
 test("RULING 1: a loose fit cites the tight band edge (min), an interference fit the roomy one (max)", () => {
   assert.strictEqual(draft().band.bound, "max");
   assert.strictEqual(draft({ measurement: { fit: "tight" } }).band.bound, "max");
-  assert.strictEqual(draft({ measurement: { fit: "loose" } }).band.bound, "min");
-  assert.strictEqual(draft({ measurement: { fit: "loose" } }).band.ruleId, "FMF-003");
+  assert.strictEqual(draft({ measurement: looseMeasurement() }).band.bound, "min");
+  assert.strictEqual(draft({ measurement: looseMeasurement() }).band.ruleId, "FMF-003");
 });
 
 // --- RULING 2: two independent warning strings ------------------------------
 
-const disclaimerFor = (name) => OPERATOR_FLAG_WORDING.amendmentDisclaimer.replace("{reviewer}", name);
+const disclaimerFor = (name) => fillWording(OPERATOR_FLAG_WORDING.amendmentDisclaimer, { reviewer: name });
 
 test("RULING 2: unsigned rows produce BOTH the unverified-rule warning and the disclaimer", () => {
   const r = draft();
@@ -312,8 +317,9 @@ test("arithmetic: a zero delta leaves the amended clearance EQUAL to the band �
   assert.strictEqual(r.amendedClearanceMm.basis, "computed", "equal to the band is not the same as cited");
 });
 
-test("arithmetic: an oversize opening gives clearance back — the delta goes negative", () => {
-  const r = draft({ measurement: { feature: "insert", nominalMm: 29.55, measuredMm: 29.5, fit: "loose" } });
+test("arithmetic: an undersize insert gives clearance back — the delta goes negative", () => {
+  // The parent models the insert at 30 - 2 x 0.15 = 29.70 mm; it printed 0.05 mm small.
+  const r = draft({ measurement: { feature: "insert", nominalMm: 29.7, measuredMm: 29.65, fit: "loose" } });
   assert.strictEqual(r.processDeltaMm.valueMm, -0.025);
   assert.strictEqual(r.band.valueMm, 0.2); // sliding min
   assert.strictEqual(r.amendedClearanceMm.valueMm, quantizeMm(0.2 + -0.025));
@@ -470,22 +476,276 @@ test("measurement: the normalised copy is echoed back, trimmed", () => {
   assert.ok(!("instrument" in bare));
 });
 
-// --- refusals that protect the generator ------------------------------------
+// --- would it generate? -----------------------------------------------------
 
-test("a clearance that consumes the opening, or the panel wall, is refused", () => {
-  const thin = parent();
-  thin.structuredIntent.flushMount.opening = { shape: "rect", widthMm: 0.5, heightMm: 0.5 };
-  assert.throws(
-    () => proposeAmendment({ parentRequest: thin, measurement: tightMeasurement(), allowDraft: true }),
-    /consumes the/,
+test("every proposal is run through the real generator before it is offered", () => {
+  const r = draft();
+  assert.doesNotThrow(() => generateFlushMountPair(r.amendedRequest.structuredIntent.flushMount));
+});
+
+test("an amendment that breaks a parent the generator ACCEPTS is refused, and says so", () => {
+  // A 4 mm opening: at the parent's 0.15 mm/side the chamfer run clears the
+  // insert centerline, at the amended 0.30 mm/side it does not. This gate is
+  // the generator's alone — the module models none of the eight itself, so a
+  // hand-rolled subset can never drift out of date against it.
+  const small = parent();
+  small.structuredIntent.flushMount.opening = { shape: "rect", widthMm: 4, heightMm: 4 };
+  small.structuredIntent.flushMount.insert = { lipMm: 0 };
+  assert.doesNotThrow(
+    () => generateFlushMountPair(small.structuredIntent.flushMount),
+    "fixture is wrong: the PARENT must generate for this test to mean anything",
   );
 
+  let err;
+  try {
+    proposeAmendment(
+      {
+        parentRequest: small,
+        measurement: { ...tightMeasurement(), nominalMm: 4, measuredMm: 3.9 },
+        allowDraft: true,
+      },
+      flushMountFit,
+    );
+    assert.fail("a proposal the generator would refuse must not be offered");
+  } catch (e) {
+    err = e;
+  }
+  assert.match(err.message, /this amendment would not generate/);
+  assert.match(err.message, /crosses the insert centerline/, "the generator's own gate must be quoted");
+});
+
+test("a lead-in the amendment raises past the panel wall is refused by the generator", () => {
   const shallowPanel = parent();
   shallowPanel.structuredIntent.flushMount.panel.thicknessMm = 0.7;
   shallowPanel.structuredIntent.flushMount.chamfer.depthMm = 0.3;
+  assert.doesNotThrow(() => generateFlushMountPair(shallowPanel.structuredIntent.flushMount));
   assert.throws(
     () => proposeAmendment({ parentRequest: shallowPanel, measurement: tightMeasurement(), allowDraft: true }),
     /straight\s+opening wall/,
+  );
+});
+
+test("a parent that does not generate is named as the fault, not blamed on the amendment", () => {
+  // The parent's OWN 2.9 mm chamfer already fails the 0.2 mm wall rule in a
+  // 3 mm panel. The amendment computes a 0.65 mm lead-in and merely carries
+  // the parent's deeper number through max(), so blaming "the lead-in this
+  // clearance needs" would name a cause that is not the cause.
+  const deep = parent();
+  deep.structuredIntent.flushMount.chamfer.depthMm = 2.9;
+  assert.throws(() => generateFlushMountPair(deep.structuredIntent.flushMount));
+
+  let err;
+  try {
+    proposeAmendment({ parentRequest: deep, measurement: tightMeasurement(), allowDraft: true });
+    assert.fail("should have thrown");
+  } catch (e) {
+    err = e;
+  }
+  assert.match(err.message, /the parent request does not generate as it stands/);
+  assert.ok(
+    !/this clearance needs/.test(err.message),
+    "the refusal must not blame the amendment for a chamfer the parent already carried",
+  );
+});
+
+test("a spec too thin to generate is refused rather than dressed up as a valid request", () => {
+  // Previously both hand-rolled guards silently no-opped on a spec with no
+  // dimensions, and the chamfer merge dropped angleDeg, so this returned a
+  // confident proposal the generator rejects outright.
+  const hollow = parent();
+  hollow.structuredIntent.flushMount = { panel: {}, opening: {} };
+  assert.throws(
+    () => proposeAmendment({ parentRequest: hollow, measurement: tightMeasurement(), allowDraft: true }),
+    /does not state a shape/,
+  );
+
+  const noChamfer = parent();
+  delete noChamfer.structuredIntent.flushMount.chamfer;
+  assert.throws(
+    () => proposeAmendment({ parentRequest: noChamfer, measurement: tightMeasurement(), allowDraft: true }),
+    /the parent request does not generate as it stands/,
+  );
+});
+
+// --- the reading has to describe the parent ---------------------------------
+
+test("a nominal the parent does not hold is arithmetic about a different part", () => {
+  // 0.15 mm out of a 12 mm nominal is inside the deviation cap, so nothing in
+  // the measurement itself objects — only the parent can catch this.
+  assert.throws(
+    () => draft({ measurement: { nominalMm: 12, measuredMm: 11.85 } }),
+    /the parent models that opening width at 30\.000 mm/,
+  );
+  assert.throws(() => draft({ measurement: { nominalMm: 29.9, measuredMm: 29.85 } }), /different part/);
+});
+
+test("an insert nominal is checked against opening - 2 x clearance, not against the opening", () => {
+  const insertMeasurement = { feature: "insert", nominalMm: 29.7, measuredMm: 29.65, fit: "loose" };
+  assert.ok(draft({ measurement: insertMeasurement }));
+  assert.throws(
+    () => draft({ measurement: { ...insertMeasurement, nominalMm: 30 } }),
+    /the parent models that insert width at 29\.700 mm/,
+  );
+
+  const noClearance = parent();
+  delete noClearance.structuredIntent.flushMount.clearancePerSideMm;
+  assert.throws(
+    () =>
+      proposeAmendment(
+        { parentRequest: noClearance, measurement: { ...tightMeasurement(), ...insertMeasurement }, allowDraft: true },
+        flushMountFit,
+      ),
+    /does not state a positive clearancePerSideMm/,
+  );
+});
+
+test("a dimension the opening shape does not have is refused", () => {
+  assert.throws(() => draft({ measurement: { dimension: "diameter" } }), /does not exist on a rect opening/);
+
+  const round = parent();
+  round.structuredIntent.flushMount.opening = { shape: "round", diameterMm: 30 };
+  const ok = proposeAmendment(
+    { parentRequest: round, measurement: { ...tightMeasurement(), dimension: "diameter" }, allowDraft: true },
+    flushMountFit,
+  );
+  assert.strictEqual(ok.amendedClearanceMm.valueMm, 0.325);
+  assert.throws(
+    () =>
+      proposeAmendment(
+        { parentRequest: round, measurement: tightMeasurement(), allowDraft: true },
+        flushMountFit,
+      ),
+    /does not exist on a round opening/,
+  );
+});
+
+// --- the two situational warnings -------------------------------------------
+
+test("a reading that contradicts the reported fit is said out loud, not smoothed over", () => {
+  // "It binds" + an opening that measured OVERSIZE: the arithmetic still runs,
+  // but it moves the clearance the opposite way from the symptom.
+  const r = draft({ measurement: { measuredMm: 30.15 } });
+  assert.strictEqual(r.processDeltaMm.valueMm, -0.075);
+  assert.ok(r.amendedClearanceMm.valueMm < r.band.valueMm);
+  const said = r.warnings.find((w) => w.startsWith("THE READING AND THE FIT DISAGREE:"));
+  assert.ok(said, "a proposal that moves away from the reported symptom must say so");
+  assert.match(said, /interference/);
+  assert.match(said, /gave clearance back/);
+
+  // The coherent stories carry no such warning.
+  for (const m of [tightMeasurement(), looseMeasurement()]) {
+    assert.ok(!draft({ measurement: m }).warnings.some((w) => w.startsWith("THE READING AND THE FIT DISAGREE:")));
+  }
+});
+
+test("a clearance that leaves the band it cites reports that, in prose and as a boolean", () => {
+  const out = draft(); // 0.25 (sliding max) + 0.075 = 0.325, above the 0.20-0.25 band
+  assert.strictEqual(out.amendedClearanceMm.withinCitedBand, false);
+  const note = out.warnings.find((w) => w.startsWith("OUTSIDE THE BAND IT CITES:"));
+  assert.ok(note, "a proposal outside its own cited band must say so");
+  assert.match(note, /0\.325/);
+  assert.match(note, /sliding/);
+  assert.match(note, /FMF-003/);
+  assert.match(note, /FMF-004/);
+
+  // The other direction leaves the band the other way: a loose fit corrected
+  // downward lands BELOW the class minimum, and says so.
+  const under = draft({ measurement: looseMeasurement() }); // 0.20 - 0.075 = 0.125
+  assert.strictEqual(under.amendedClearanceMm.valueMm, 0.125);
+  assert.strictEqual(under.amendedClearanceMm.withinCitedBand, false);
+
+  // A zero delta lands exactly on the cited edge and says nothing. Note this
+  // is the ONLY coherent case that does: the band edge is chosen in the same
+  // direction the delta then pushes, so any real process delta moves the
+  // MODELLED number off the band — which is the whole point, since it is the
+  // PRINTED part that is meant to land on it.
+  const held = draft({ measurement: { measuredMm: 30 } });
+  assert.strictEqual(held.processDeltaMm.valueMm, 0);
+  assert.strictEqual(held.amendedClearanceMm.valueMm, held.band.valueMm);
+  assert.strictEqual(held.amendedClearanceMm.withinCitedBand, true);
+  assert.ok(!held.warnings.some((w) => w.startsWith("OUTSIDE THE BAND IT CITES:")));
+});
+
+// --- placeholder substitution -----------------------------------------------
+
+test("wording placeholders are filled everywhere, and values are inserted literally", () => {
+  // String.replace with a plain string fills only the FIRST occurrence and
+  // interprets $&, $', $` and $$ in the value. Both are operator-visible bugs:
+  // an operator rewrite naming the reviewer twice would ship a raw
+  // "{reviewer}", and a name containing "$&" would inject the placeholder back
+  // into its own slot.
+  assert.strictEqual(fillWording("{a} and {a}", { a: "x" }), "x and x");
+  assert.strictEqual(fillWording("{a}", { a: "R. $& Vasquez" }), "R. $& Vasquez");
+  assert.strictEqual(fillWording("{a} $` {a} $'", { a: "$$" }), "$$ $` $$ $'");
+  assert.strictEqual(fillWording("{nope}", {}), "{nope}", "an unfilled placeholder stays visible");
+
+  const r = draft({ measurement: { measuredBy: "R. $& Vasquez" } });
+  const said = r.warnings.find((w) => w.startsWith("PROPOSAL,"));
+  assert.ok(said.includes("R. $& Vasquez"), said);
+  assert.ok(!said.includes("{reviewer}"), said);
+  for (const w of r.warnings) assert.ok(!/\{\w+\}/.test(w), `unsubstituted placeholder in: ${w}`);
+});
+
+// --- the proposal is a record, not a scratch pad -----------------------------
+
+test("the whole proposal is frozen — the caveats are not the caller's to delete", () => {
+  const r = draft();
+  const before = r.warnings.length;
+  assert.ok(Object.isFrozen(r), "the root object");
+  for (const path of ["warnings", "measurement", "verification", "band", "processDeltaMm", "amendedClearanceMm", "amendedChamferDepthMm", "amendedRequest"]) {
+    assert.ok(Object.isFrozen(r[path]), `${path} is not frozen`);
+  }
+  assert.ok(Object.isFrozen(r.verification.rules), "verification.rules");
+  assert.ok(Object.isFrozen(r.amendedRequest.structuredIntent.flushMount), "the amended spec");
+
+  assert.throws(() => { r.warnings.length = 0; }, TypeError);
+  assert.throws(() => { r.warnings.push("nonsense"); }, TypeError);
+  assert.throws(() => { r.measurement.measuredBy = "someone else"; }, TypeError);
+  assert.throws(() => { r.verification.rules.pop(); }, TypeError);
+  assert.throws(() => { r.amendedClearanceMm.valueMm = 99; }, TypeError);
+  assert.strictEqual(r.warnings.length, before);
+  assert.strictEqual(r.measurement.measuredBy, "R. Vasquez");
+});
+
+// --- every rule id is derived from the consulted table -----------------------
+
+test("the chamfer shown work names the row the table holds, and refuses an ambiguous table", () => {
+  const depthRow = flushMountFit.rules.find((r) => r.parameter === "chamfer-lead-in-depth-min");
+  assert.match(draft().amendedChamferDepthMm.arithmetic, new RegExp(depthRow.id));
+
+  // A second row claiming the same parameter must throw, not be silently
+  // picked over by position — which is exactly what a hardcoded id, or a
+  // first-match scan, would do.
+  const ambiguous = makeTable("fmf-two-depth-rows", [
+    { ...depthRow, id: "FMF-108" },
+    ...flushMountFit.rules,
+  ]);
+  assert.throws(
+    () => proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement(), allowDraft: true }, ambiguous),
+    /the chamfer depth row matched 2 rows/,
+  );
+});
+
+test("the band id and the band value must come from the same row", () => {
+  const maxRow = flushMountFit.byId["FMF-004"];
+
+  // Two rows both claiming to be the sliding max band: the decoy is FIRST, so
+  // a first-match scan would quote FMF-104's id beside FMF-004's value.
+  const ambiguous = makeTable("fmf-two-sliding-max", [{ ...maxRow, id: "FMF-104" }, ...flushMountFit.rules]);
+  assert.throws(
+    () => proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement(), allowDraft: true }, ambiguous),
+    /the max clearance row for fit class sliding matched 2 rows/,
+  );
+
+  // A table where the row carrying the parameter is NOT the row the lookup
+  // serves: the mismatch is caught rather than published as shown work.
+  const divergent = makeTable("fmf-divergent", [
+    ...flushMountFit.rules.map((r) => (r.id === "FMF-004" ? { ...r, parameter: "clearance-per-side-max-legacy" } : r)),
+    { ...maxRow, id: "FMF-104", value: 0.9 },
+  ]);
+  assert.throws(
+    () => proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement(), allowDraft: true }, divergent),
+    /FMF-104 holds 0\.9 but the lookup served 0\.25/,
   );
 });
 
