@@ -12,6 +12,7 @@ import {
   quantizeMm,
   fillWording,
   OPERATOR_FLAG_WORDING,
+  FIT_CLASSES,
   MM_DECIMALS,
   MAX_DEVIATION_MM,
 } from "./amend.mjs";
@@ -102,6 +103,12 @@ function basisNodes(root) {
   return out;
 }
 
+/** The units-suffixed keys a value-bearing node may state. */
+const VALUE_KEYS = ["valueMm", "valueDeg"];
+
+/** Exactly the paths allowed to say "cited". Adding one is a deliberate act. */
+const CITED_PATHS = ["amendedChamferAngleDeg", "band"];
+
 /**
  * The structural invariant: "cited" means an ENCODED ROW of the consulted
  * table holds exactly this number. Anything else is "computed". This walks
@@ -112,25 +119,37 @@ function assertCitationsHonest(result, table) {
   const nodes = basisNodes(result);
   assert.ok(nodes.length > 0, "no node carries a basis at all — the walk found nothing to check");
 
-  let cited = 0;
+  const cited = [];
   for (const { path, node } of nodes) {
     assert.ok(
       node.basis === "cited" || node.basis === "computed",
       `${path}.basis must be "cited" or "computed", got ${JSON.stringify(node.basis)}`,
     );
     if (node.basis !== "cited") continue;
-    cited++;
+    cited.push(path);
     assert.strictEqual(typeof node.ruleId, "string", `${path} claims cited but carries no ruleId`);
     assert.strictEqual(typeof node.citation, "string", `${path} claims cited but carries no citation`);
     const rule = table.byId[node.ruleId];
     assert.ok(rule, `${path} cites ${node.ruleId}, which is not a row of ${table.name}`);
+    // A cited node states ONE number, under a units-suffixed key, and that
+    // number is what the row encodes — byte-identical, never quantized.
+    const stated = VALUE_KEYS.filter((k) => Object.prototype.hasOwnProperty.call(node, k));
+    assert.strictEqual(
+      stated.length,
+      1,
+      `${path} claims cited but states ${stated.length} of ${VALUE_KEYS.join("/")} — a cited node carries exactly one number`,
+    );
     assert.strictEqual(
       ruleValue(rule),
-      node.valueMm,
-      `${path} claims ${node.ruleId} encodes ${node.valueMm}, but that row holds ${ruleValue(rule)}`,
+      node[stated[0]],
+      `${path} claims ${node.ruleId} encodes ${node[stated[0]]}, but that row holds ${ruleValue(rule)}`,
     );
   }
-  assert.strictEqual(cited, 1, "exactly one node — the clearance band — may be cited");
+  assert.deepStrictEqual(
+    cited.sort(),
+    CITED_PATHS,
+    "only the clearance band and the lead-in angle may be cited — everything else is our arithmetic",
+  );
 }
 
 test("RULING 1 (structural): every cited value is an encoded row, everything else is computed", () => {
@@ -231,9 +250,12 @@ test("RULING 2: the unverified warning names exactly the rows still pending", ()
 test("RULING 2: the wording is one findable constant, and it says what it has to say", () => {
   assert.ok(Object.isFrozen(OPERATOR_FLAG_WORDING));
   const { unverifiedRule, amendmentDisclaimer, derivationUncited } = OPERATOR_FLAG_WORDING;
-  for (const s of [unverifiedRule, amendmentDisclaimer, derivationUncited]) {
-    assert.strictEqual(typeof s, "string");
-    assert.ok(s.length > 80, "an operator-facing caveat that short is not a caveat");
+  // EVERY operator-facing string lives in this one constant — an operator
+  // rewriting the voice must not have to find a sixth one hiding in the code.
+  for (const [name, s] of Object.entries(OPERATOR_FLAG_WORDING)) {
+    assert.strictEqual(typeof s, "string", name);
+    assert.ok(s.length > 80, `${name}: an operator-facing caveat that short is not a caveat`);
+    assert.match(s, /^[A-Z][A-Z ,'-]+:/, `${name}: every caveat leads with what it is`);
   }
   assert.notStrictEqual(unverifiedRule, amendmentDisclaimer);
   assert.ok(unverifiedRule.includes("{ruleIds}"), "the unverified warning must name the rows");
@@ -462,6 +484,65 @@ test("measurement: feature, dimension and fit class are closed vocabularies", ()
   assert.throws(() => validateMeasurement({ ...tightMeasurement(), measuredBy: "" }), /measuredBy/);
 });
 
+test("measurement: targetFitClass is checked BY the exported validator, not by a module two away", () => {
+  // The exported validator is the contract. It must not hand back a
+  // measurement carrying a class nobody checked — the eventual refusal came
+  // from fitClearance and named a parameter ("class") that does not appear in
+  // the measurement contract at all, so an operator reading it went looking
+  // for a field they never typed.
+  for (const bad of ["banana", "", "  ", "SNUG", 7, null]) {
+    assert.throws(
+      () => validateMeasurement({ ...tightMeasurement(), targetFitClass: bad }),
+      /measurement\.targetFitClass/,
+      `targetFitClass ${JSON.stringify(bad)} was returned unchecked`,
+    );
+  }
+  // undefined is the ABSENT case and is reported as absent, by name.
+  assert.throws(
+    () => validateMeasurement({ ...tightMeasurement(), targetFitClass: undefined }),
+    /missing: targetFitClass/,
+  );
+  assert.throws(
+    () => validateMeasurement({ ...tightMeasurement(), targetFitClass: "banana" }),
+    /must be one of snug, press, sliding, smooth-sliding, loose, service/,
+  );
+
+  // And the vocabulary this module promises is one the table still serves.
+  for (const name of FIT_CLASSES) {
+    assert.ok(validateMeasurement({ ...tightMeasurement(), targetFitClass: name }));
+    assert.doesNotThrow(
+      () => fitClearance({ class: name, allowDraft: true }),
+      `${name} is offered by this module but fitClearance no longer serves it`,
+    );
+  }
+});
+
+test("measurement: instrument, when given, has to be a usable string", () => {
+  for (const bad of [12, "", "   ", null, true, {}]) {
+    assert.throws(
+      () => validateMeasurement({ ...tightMeasurement(), instrument: bad }),
+      /measurement\.instrument, when given, must be a non-empty string/,
+      `instrument ${JSON.stringify(bad)} was accepted`,
+    );
+  }
+  assert.strictEqual(validateMeasurement({ ...tightMeasurement(), instrument: " calipers " }).instrument, "calipers");
+});
+
+test("an amended clearance that works out at zero or below is refused in this module's own words", () => {
+  // Reachable: a snug band (0.10 min) minus a 1.0 mm process delta. Without
+  // this guard the operator gets "clearanceMm must be a positive number" out of
+  // chamferFor — a message naming an internal argument, from two modules away.
+  let err;
+  try {
+    draft({ measurement: { nominalMm: 30, measuredMm: 32, fit: "loose", targetFitClass: "snug" } });
+    assert.fail("a negative clearance must not be proposed");
+  } catch (e) {
+    err = e;
+  }
+  assert.match(err.message, /the amended clearance works out at -0\.900 mm per side/);
+  assert.ok(!/clearanceMm must be a positive number/.test(err.message), err.message);
+});
+
 test("measurement: fit-class aliases resolve, and the canonical class is echoed back", () => {
   assert.strictEqual(draft({ measurement: { targetFitClass: "smooth-sliding" } }).fitClass, "sliding");
   assert.strictEqual(draft({ measurement: { targetFitClass: "press" } }).fitClass, "snug");
@@ -559,12 +640,115 @@ test("a spec too thin to generate is refused rather than dressed up as a valid r
     /does not state a shape/,
   );
 
+  // A parent with no chamfer at all is refused by NAME, before the generator
+  // is asked — the module reads the parent's lead-in the same way it reads the
+  // opening, and a value it cannot read is one it must not quote. The
+  // generator agrees with the verdict; it just is not the one that reaches it.
   const noChamfer = parent();
   delete noChamfer.structuredIntent.flushMount.chamfer;
+  assert.throws(() => generateFlushMountPair(noChamfer.structuredIntent.flushMount));
   assert.throws(
     () => proposeAmendment({ parentRequest: noChamfer, measurement: tightMeasurement(), allowDraft: true }),
-    /the parent request does not generate as it stands/,
+    /does not state a positive numeric chamfer\.angleDeg/,
   );
+});
+
+test("an unbuildable parent is named even when the amendment would repair it", () => {
+  // A 0.4 mm lead-in under a 0.25 mm/side clearance breaks the generator's
+  // "lead-in >= 2 x clearance" rule. The amendment raises the lead-in to
+  // 0.65 mm and therefore GENERATES — so a module that only tries the parent
+  // when the amendment fails silently repairs a request that was never
+  // buildable, and never says so. The parent is asked first, always.
+  const broken = parent();
+  broken.structuredIntent.flushMount.clearancePerSideMm = 0.25;
+  broken.structuredIntent.flushMount.chamfer = { angleDeg: 45, depthMm: 0.4 };
+  assert.throws(
+    () => generateFlushMountPair(broken.structuredIntent.flushMount),
+    /must be >= 2 x clearancePerSideMm/,
+    "fixture is wrong: the PARENT must be unbuildable for this test to mean anything",
+  );
+
+  let err;
+  try {
+    proposeAmendment({ parentRequest: broken, measurement: tightMeasurement(), allowDraft: true });
+    assert.fail("a request that never generated was never printed, so there is nothing to amend");
+  } catch (e) {
+    err = e;
+  }
+  assert.match(err.message, /the parent request does not generate as it stands/);
+  assert.match(err.message, /must be >= 2 x clearancePerSideMm/, "the generator's own words, verbatim");
+
+  // And the repair it would have offered is real, which is what makes the
+  // silent version dangerous rather than merely untidy.
+  const repaired = { ...broken.structuredIntent.flushMount, clearancePerSideMm: 0.325, chamfer: { angleDeg: 45, depthMm: 0.65 } };
+  assert.doesNotThrow(() => generateFlushMountPair(repaired));
+});
+
+// --- the parent's own numbers are read, never invented -----------------------
+
+test("the parent's lead-in is read like every other parent value: stated, or refused", () => {
+  for (const chamfer of [
+    { angleDeg: 45, depthMm: "0.8" }, // a hand-written JSON request — nothing upstream type-checks in here
+    { angleDeg: 45, depthMm: 0 },
+    { angleDeg: 45, depthMm: -0.8 },
+    { angleDeg: 45, depthMm: Number.NaN },
+    { angleDeg: 45 },
+  ]) {
+    const p = parent();
+    p.structuredIntent.flushMount.chamfer = chamfer;
+    assert.throws(
+      () => proposeAmendment({ parentRequest: p, measurement: tightMeasurement(), allowDraft: true }),
+      /does not state a positive numeric chamfer\.depthMm/,
+      `chamfer ${JSON.stringify(chamfer)} was accepted`,
+    );
+  }
+  for (const chamfer of [{ depthMm: 0.8 }, { angleDeg: "45", depthMm: 0.8 }, { angleDeg: 0, depthMm: 0.8 }]) {
+    const p = parent();
+    p.structuredIntent.flushMount.chamfer = chamfer;
+    assert.throws(
+      () => proposeAmendment({ parentRequest: p, measurement: tightMeasurement(), allowDraft: true }),
+      /does not state a positive numeric chamfer\.angleDeg/,
+      `chamfer ${JSON.stringify(chamfer)} was accepted`,
+    );
+  }
+});
+
+test("the shown work quotes the parent's real lead-in, not a substituted zero", () => {
+  // The failure this pins: a `?? 0` fallback printed "the parent's chamfer
+  // depth is 0.000 mm" — a fabricated fact about the operator's part, narrated
+  // as arithmetic, in a module whose whole value is checkable shown work.
+  const said = draft().amendedChamferDepthMm.arithmetic;
+  assert.match(said, /the parent states 0\.800 mm/);
+  assert.ok(!/0\.000 mm/.test(said), said);
+
+  const shallow = parent();
+  shallow.structuredIntent.flushMount.chamfer.depthMm = 0.4;
+  const raised = proposeAmendment(
+    { parentRequest: shallow, measurement: tightMeasurement(), allowDraft: true },
+  ).amendedChamferDepthMm.arithmetic;
+  assert.match(raised, /the parent states 0\.400 mm/);
+});
+
+// --- the cited lead-in angle is applied, not just blocked on -----------------
+
+test("the cited lead-in angle is written into the amendment, not consulted and discarded", () => {
+  // FMF-007 gates this module fail-closed and is named in the unverified-rule
+  // warning. A row the operator is told to go verify must be a row the
+  // proposal actually leaned on.
+  const angled = parent();
+  angled.structuredIntent.flushMount.chamfer = { angleDeg: 30, depthMm: 0.8 };
+  const r = proposeAmendment({ parentRequest: angled, measurement: tightMeasurement(), allowDraft: true });
+
+  const angleRow = flushMountFit.rules.find((x) => x.parameter === "chamfer-lead-in-angle");
+  assert.strictEqual(r.amendedChamferAngleDeg.valueDeg, ruleValue(angleRow));
+  assert.strictEqual(r.amendedChamferAngleDeg.ruleId, angleRow.id);
+  assert.strictEqual(r.amendedChamferAngleDeg.basis, "cited");
+  assert.strictEqual(
+    r.amendedRequest.structuredIntent.flushMount.chamfer.angleDeg,
+    ruleValue(angleRow),
+    "the cited angle must reach the amended request",
+  );
+  assert.match(r.warnings.find((w) => w.startsWith("UNVERIFIED RULE:")), new RegExp(angleRow.id));
 });
 
 // --- the reading has to describe the parent ---------------------------------
@@ -577,6 +761,26 @@ test("a nominal the parent does not hold is arithmetic about a different part", 
     /the parent models that opening width at 30\.000 mm/,
   );
   assert.throws(() => draft({ measurement: { nominalMm: 29.9, measuredMm: 29.85 } }), /different part/);
+});
+
+test("the agreement tolerance is one number, and a refusal at the boundary is legible", () => {
+  // The rule is |nominal - modelled| <= half a quantization step. Both sides
+  // of the boundary, against a parent modelling exactly 30 mm.
+  assert.ok(draft({ measurement: { nominalMm: 30.0005, measuredMm: 29.8505 } }));
+  assert.ok(draft({ measurement: { nominalMm: 29.9995, measuredMm: 29.8495 } }));
+
+  let err;
+  try {
+    draft({ measurement: { nominalMm: 30.0006, measuredMm: 29.8506 } });
+    assert.fail("0.0006 mm is past the tolerance and must be refused");
+  } catch (e) {
+    err = e;
+  }
+  // Both numbers render at 3 dp, so without the difference the operator reads
+  // "30.001 vs 30.000" and is told a one-micron disagreement is fatal. The
+  // message states the actual gap and the actual limit.
+  assert.match(err.message, /differ by 0\.0006 mm/);
+  assert.match(err.message, /over the 0\.0005 mm this module accepts/);
 });
 
 test("an insert nominal is checked against opening - 2 x clearance, not against the opening", () => {
@@ -596,6 +800,36 @@ test("an insert nominal is checked against opening - 2 x clearance, not against 
         flushMountFit,
       ),
     /does not state a positive clearancePerSideMm/,
+  );
+});
+
+test("an opening shape this module cannot amend is refused as such, not as a missing field", () => {
+  const withShape = (shape) => {
+    const p = parent();
+    p.structuredIntent.flushMount.opening = { shape, widthMm: 30, heightMm: 20 };
+    return () => proposeAmendment({ parentRequest: p, measurement: tightMeasurement(), allowDraft: true });
+  };
+
+  // A shape that collides with Object.prototype must read as an unknown shape,
+  // not as an inherited function the next line calls .includes on. That crashed
+  // with a raw TypeError out of a module that turns every other bad input into
+  // a sentence a human can act on.
+  for (const hostile of ["toString", "constructor", "hasOwnProperty", "valueOf"]) {
+    assert.throws(withShape(hostile), RangeError, `shape "${hostile}" did not produce a domain error`);
+    assert.throws(withShape(hostile), new RegExp(`states shape "${hostile}"`));
+  }
+
+  // A genuinely unsupported shape: the parent DOES state one, so a message
+  // saying it states none sends the operator looking for a field that is there.
+  assert.throws(withShape("oval"), /states shape "oval", which this module cannot amend/);
+  assert.throws(withShape("oval"), /only "rect" and "round" openings are supported/);
+
+  // Absent is still absent, and still says so.
+  const bare = parent();
+  bare.structuredIntent.flushMount.opening = { widthMm: 30, heightMm: 20 };
+  assert.throws(
+    () => proposeAmendment({ parentRequest: bare, measurement: tightMeasurement(), allowDraft: true }),
+    /does not state a shape/,
   );
 });
 
@@ -666,6 +900,48 @@ test("a clearance that leaves the band it cites reports that, in prose and as a 
   assert.ok(!held.warnings.some((w) => w.startsWith("OUTSIDE THE BAND IT CITES:")));
 });
 
+test("an amendment that changes nothing says so, and is still an answer", () => {
+  // The parent already models the number band + delta arrives at. The proposal
+  // is still returned — the shown work is the useful part and it says something
+  // real — but the operator must not be handed a page of arithmetic and a
+  // byte-identical request with nothing marking it as a no-op.
+  const already = parent();
+  already.structuredIntent.flushMount.clearancePerSideMm = 0.325;
+  const r = proposeAmendment({ parentRequest: already, measurement: tightMeasurement(), allowDraft: true });
+
+  assert.strictEqual(r.amendedClearanceMm.valueMm, 0.325);
+  assert.deepStrictEqual(
+    r.amendedRequest.structuredIntent.flushMount,
+    already.structuredIntent.flushMount,
+    "fixture is wrong: this amendment must be identical to its parent",
+  );
+  assert.strictEqual(r.unchanged, true);
+  const said = r.warnings.find((w) => w.startsWith("THIS CHANGES NOTHING:"));
+  assert.ok(said, "a no-op amendment must say it is one");
+  assert.match(said, /0\.325 mm/);
+  assert.match(said, /0\.800 mm/);
+
+  // A real amendment is not flagged, and says nothing of the kind.
+  const moved = draft();
+  assert.strictEqual(moved.unchanged, false);
+  assert.notStrictEqual(
+    moved.amendedRequest.structuredIntent.flushMount.clearancePerSideMm,
+    parent().structuredIntent.flushMount.clearancePerSideMm,
+  );
+  assert.ok(!moved.warnings.some((w) => w.startsWith("THIS CHANGES NOTHING:")));
+
+  // A lead-in the amendment raises is a change even when the clearance holds.
+  const shallow = parent();
+  shallow.structuredIntent.flushMount.clearancePerSideMm = 0.325;
+  shallow.structuredIntent.flushMount.chamfer = { angleDeg: 45, depthMm: 0.65 };
+  const deepened = proposeAmendment(
+    { parentRequest: shallow, measurement: { ...tightMeasurement(), measuredMm: 29.8 }, allowDraft: true },
+  );
+  assert.strictEqual(deepened.amendedClearanceMm.valueMm, 0.35);
+  assert.strictEqual(deepened.amendedChamferDepthMm.valueMm, 0.7);
+  assert.strictEqual(deepened.unchanged, false);
+});
+
 // --- placeholder substitution -----------------------------------------------
 
 test("wording placeholders are filled everywhere, and values are inserted literally", () => {
@@ -692,7 +968,7 @@ test("the whole proposal is frozen — the caveats are not the caller's to delet
   const r = draft();
   const before = r.warnings.length;
   assert.ok(Object.isFrozen(r), "the root object");
-  for (const path of ["warnings", "measurement", "verification", "band", "processDeltaMm", "amendedClearanceMm", "amendedChamferDepthMm", "amendedRequest"]) {
+  for (const path of ["warnings", "measurement", "verification", "band", "processDeltaMm", "amendedClearanceMm", "amendedChamferDepthMm", "amendedChamferAngleDeg", "amendedRequest"]) {
     assert.ok(Object.isFrozen(r[path]), `${path} is not frozen`);
   }
   assert.ok(Object.isFrozen(r.verification.rules), "verification.rules");
@@ -723,6 +999,30 @@ test("the chamfer shown work names the row the table holds, and refuses an ambig
   assert.throws(
     () => proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement(), allowDraft: true }, ambiguous),
     /the chamfer depth row matched 2 rows/,
+  );
+});
+
+test("the lead-in angle id and the lead-in angle value must come from the same row", () => {
+  const angleRow = flushMountFit.rules.find((r) => r.parameter === "chamfer-lead-in-angle");
+
+  // Two rows claiming to be the lead-in angle: a first-match scan would pick
+  // one and report the other's number as cited.
+  const ambiguous = makeTable("fmf-two-angle-rows", [{ ...angleRow, id: "FMF-107" }, ...flushMountFit.rules]);
+  assert.throws(
+    () => proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement(), allowDraft: true }, ambiguous),
+    /the chamfer angle row matched 2 rows/,
+  );
+
+  // A table where the row carrying the parameter is NOT the row chamferFor
+  // serves (it resolves FMF-007 by hardcoded id). The cited number and the id
+  // beside it would disagree, so the proposal is refused rather than published.
+  const divergent = makeTable("fmf-divergent-angle", [
+    ...flushMountFit.rules.map((r) => (r.id === angleRow.id ? { ...r, parameter: "chamfer-lead-in-angle-legacy" } : r)),
+    { ...angleRow, id: "FMF-107", value: 60 },
+  ]);
+  assert.throws(
+    () => proposeAmendment({ parentRequest: parent(), measurement: tightMeasurement(), allowDraft: true }, divergent),
+    /FMF-107 holds 60 but the lookup served 45 for the lead-in angle/,
   );
 });
 

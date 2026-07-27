@@ -35,9 +35,12 @@
 //
 // So the split this module ships is deliberate and is enforced by tests:
 //
-//   CITED     the clearance band. One encoded row, one rule id, one citation,
-//             the table's own number passed through UNQUANTIZED so it stays
-//             byte-identical to the row it came from.
+//   CITED     the clearance band, and the chamfer lead-in ANGLE. Two encoded
+//             rows, two rule ids, two citations, the table's own numbers
+//             passed through UNQUANTIZED so they stay byte-identical to the
+//             rows they came from. Both are APPLIED to the amended request —
+//             this module does not gate on, or warn about, a row it then
+//             ignores.
 //   COMPUTED  everything else. The process delta, the amended clearance and
 //             the amended chamfer depth are OUR arithmetic. No row in the
 //             reference authorises deriving a clearance from a caliper
@@ -49,10 +52,11 @@
 // it as the band. Only an encoded band EDGE is ever labelled cited.
 //
 // Every rule id this module quotes is DERIVED from the consulted table by
-// parameter name, through one helper (uniqueRule), and the band's id is
-// cross-checked against the value the lookup served. There is no hardcoded id
-// anywhere below: a renumbered or duplicated row throws rather than quietly
-// naming the wrong row in operator-facing shown work.
+// parameter name, through one helper (uniqueRule), and BOTH cited ids — the
+// band's and the lead-in angle's — are cross-checked against the value the
+// lookup served. There is no hardcoded id anywhere below: a renumbered or
+// duplicated row throws rather than quietly naming the wrong row in
+// operator-facing shown work.
 //
 // ---------------------------------------------------------------------------
 // THE MEASUREMENT CONTRACT — this is frozen at first use, so it is precise
@@ -71,7 +75,8 @@
 //                                           to both axes.
 //   nominalMm      number  what the model says that dimension is. Finite,
 //                          > 0, ≤ 1000, and it must AGREE WITH THE PARENT to
-//                          within one quantization step — see below.
+//                          within AGREE_MM — see below for the one statement
+//                          of that rule.
 //   measuredMm     number  what the calipers read. Finite, > 0, ≤ 1000.
 //   fit            "interference" | "tight" | "loose" | "good"
 //                          the seated fit the human observed. "good" is
@@ -79,11 +84,15 @@
 //                          work, and changing a fit the operator called good
 //                          would be a counter-proposal, not a revision.
 //   targetFitClass "snug" | "press" | "sliding" | "smooth-sliding" |
-//                  "loose" | "service"      the fit the operator wanted. The
-//                          FMF aliases are accepted; the canonical class is
-//                          echoed back as fitClass. Note "loose" is both a
-//                          fit outcome and a fit class — they are different
-//                          fields and mean different things.
+//                  "loose" | "service"      the fit the operator wanted. A
+//                          CLOSED vocabulary (FIT_CLASSES), enforced by
+//                          validateMeasurement like every other closed field —
+//                          the exported validator is the contract, so it may
+//                          not hand back a class it has not checked. The FMF
+//                          aliases are accepted; the canonical class is echoed
+//                          back as fitClass. Note "loose" is both a fit outcome
+//                          and a fit class — they are different fields and mean
+//                          different things.
 //   measuredBy     string  the named human who took the reading and who must
 //                          accept the proposal. Non-empty.
 //   instrument     string  OPTIONAL. e.g. "digital caliper, 0.01 mm".
@@ -96,10 +105,23 @@
 //   insert  + width|height|diameter  →  that opening dimension
 //                                       − 2 × spec.clearancePerSideMm
 //
-// A nominal that disagrees by more than one quantization step is refused. The
-// failure this prevents: a 12 mm nominal against a 30 mm opening produces a
-// delta, a clearance and a full page of shown work that is arithmetic about a
-// different part, presented with no caveat at all.
+// The tolerance is AGREE_MM = 0.0005 mm — HALF a quantization step — and the
+// test is on the absolute difference, |nominal − modelled| ≤ AGREE_MM. It is
+// not "they round to the same number at 3 dp": 0.0004 and 0.0009 round apart
+// yet are only 0.0005 apart. One statement of the rule, in one place; the
+// refusal quotes the actual difference so a rejection at the boundary is
+// legible rather than looking like two identical numbers.
+//
+// The failure this prevents: a 12 mm nominal against a 30 mm opening produces
+// a delta, a clearance and a full page of shown work that is arithmetic about
+// a different part, presented with no caveat at all.
+//
+// THE PARENT'S OWN CHAMFER IS READ THE SAME WAY. chamfer.angleDeg and
+// chamfer.depthMm must both be stated as positive numbers, or the parent is
+// refused by name. A missing depth used to default to 0 and then get NARRATED
+// back to the operator — "the parent's chamfer depth is 0.000 mm" — which is a
+// fabricated fact about their part sitting in the middle of shown work whose
+// whole value is that every number in it can be checked.
 //
 // Absurd input is refused rather than amended: |measuredMm − nominalMm| must
 // be no more than 2 mm AND no more than 10% of nominal. Past that it is not a
@@ -132,9 +154,10 @@
 // QUANTIZATION: every millimetre value this module COMPUTES is rounded to 3
 // decimal places (1 micron) — see MM_DECIMALS. 0.2 + 0.09 is
 // 0.29000000000000004 in IEEE754 and nobody prints to the fourteenth decimal.
-// The cited band is the one number NOT quantized: it is the table's, not ours,
-// and rounding it would break the "cited means an encoded row holds exactly
-// this number" invariant the tests check structurally.
+// The two CITED numbers — the band and the lead-in angle — are the ones NOT
+// quantized: they are the table's, not ours, and rounding them would break the
+// "cited means an encoded row holds exactly this number" invariant the tests
+// check structurally.
 //
 // ---------------------------------------------------------------------------
 // FAIL-CLOSED, ON BOTH LOOKUPS
@@ -145,6 +168,15 @@
 // throws UnverifiedRuleError. With it, the result carries the DRAFT watermark
 // and the unverified-rule warning names every pending row it leaned on.
 //
+// chamferFor consults TWO rows: the lead-in ANGLE (FMF-007) and the minimum
+// DEPTH formula (FMF-008). Both are applied. The angle is written to the
+// amended request and returned as a cited value, because a module that blocks
+// on an unsigned row, and names it in a caveat telling the operator to go
+// verify it, must not then throw that row's number away. The alternative —
+// consulting only the depth row — would mean reaching past chamferFor into
+// the table, and RULING 3 is specifically that BOTH chamfer rows gate this
+// module.
+//
 // Insert sizing (FMF-009) is deliberately NOT consulted: the generator sizes
 // the insert from the opening and the clearance itself, so consulting it here
 // would be a third gate on a number nobody reads.
@@ -153,16 +185,33 @@
 // WOULD IT GENERATE? — the amended request is checked, not asserted
 // ---------------------------------------------------------------------------
 // generateFlushMountPair owns eight spec gates. This module duplicates NONE of
-// them. It runs the real generator over the amended spec and reports the
-// generator's own refusal verbatim, because a proposal the operator cannot
-// build is worse than no proposal. Re-validating the envelope with
-// validateGenerationRequest would be theatre — that validator never looks
-// inside structuredIntent, which is the only thing an amendment changes, so it
-// could never fail and is not called on the way out.
+// them. It runs the real generator TWICE and reports its refusals verbatim:
 //
-// When the amended spec is refused the parent is tried too, so the refusal can
-// say which one is at fault: an unbuildable parent is the operator's existing
-// problem, an unbuildable amendment is ours.
+//   THE PARENT, FIRST AND ALWAYS. A request that does not build was never
+//   printed, so there is no bench measurement of it and nothing to amend. The
+//   parent used to be tried only when the AMENDMENT failed, which meant a
+//   broken parent the amendment happened to repair — say a lead-in shallower
+//   than 2 × clearance, which the amendment raises anyway — was silently fixed
+//   and never named. Checking it up front makes the answer the same either way.
+//
+//   THE AMENDMENT, SECOND. Because the parent has already been shown to build,
+//   any refusal here is unambiguously ours, and the message says so without
+//   having to guess at a cause.
+//
+// Re-validating the envelope with validateGenerationRequest would be theatre —
+// that validator never looks inside structuredIntent, which is the only thing
+// an amendment changes, so it could never fail and is not called on the way
+// out.
+//
+// ---------------------------------------------------------------------------
+// AN AMENDMENT THAT CHANGES NOTHING IS STILL AN ANSWER
+// ---------------------------------------------------------------------------
+// band + delta can land exactly on the numbers the parent already states. The
+// proposal is still returned — the shown work is the useful part, and it says
+// something real: the model is not what is wrong. But `unchanged` is true and
+// a warning says so, because handing an operator a page of arithmetic and a
+// request byte-identical to the one they filed, with nothing marking it as a
+// no-op, invites them to "apply" a change that is not one.
 
 import { validateGenerationRequest } from "../state/request.mjs";
 import { DRAFT_WATERMARK } from "../reference/lookup.mjs";
@@ -232,6 +281,16 @@ export const OPERATOR_FLAG_WORDING = Object.freeze({
     "that actually binds, on the feature that actually binds, before you accept it.",
 
   /**
+   * Present when the arithmetic lands on the numbers the parent already
+   * states, so the "amended" request is a copy of the one that was filed.
+   */
+  noChange:
+    "THIS CHANGES NOTHING: the correction works out to exactly what your request already says — " +
+    "{clearanceMm} mm of clearance per side and a {depthMm} mm lead-in. The amended request is a " +
+    "copy of the one you filed. So the model is not what is wrong: run a calibration coupon on " +
+    "this machine, in this material, before you print the same numbers again.",
+
+  /**
    * Present when the amended clearance lands outside the band it cites. Common
    * and expected, not an error — but the operator should hear it said.
    */
@@ -281,14 +340,40 @@ export const FEATURES = Object.freeze(["opening", "insert"]);
 export const DIMENSIONS = Object.freeze(["width", "height", "diameter"]);
 export const FIT_OUTCOMES = Object.freeze(["interference", "tight", "loose", "good"]);
 
+/**
+ * The fit classes a measurement may ask for — this module's copy of the alias
+ * set fitClearance accepts (flush-mount-fit.mjs:120-127, not exported there).
+ * A test asserts every name here still resolves through fitClearance, so the
+ * copy cannot rot silently in the direction that matters: a name this module
+ * promises and the table no longer serves.
+ */
+export const FIT_CLASSES = Object.freeze([
+  "snug",
+  "press",
+  "sliding",
+  "smooth-sliding",
+  "loose",
+  "service",
+]);
+
 /** Fit outcomes that mean "too tight" — these aim at the roomy band edge. */
 const TOO_TIGHT = Object.freeze(new Set(["interference", "tight"]));
 
-/** Which opening dimensions exist on each opening shape. */
-const DIMENSIONS_BY_SHAPE = Object.freeze({
-  rect: Object.freeze(["width", "height"]),
-  round: Object.freeze(["diameter"]),
-});
+/**
+ * Which opening dimensions exist on each opening shape. Null-prototype: an
+ * opening whose shape is "toString" or "constructor" must read as an UNKNOWN
+ * shape, not as an inherited function that the next line then calls .includes
+ * on. A plain object literal here crashed with "allowed.includes is not a
+ * function" — a raw internal TypeError escaping a module that turns every
+ * other bad input into a sentence a human can act on.
+ */
+const DIMENSIONS_BY_SHAPE = Object.freeze(
+  Object.assign(Object.create(null), {
+    rect: Object.freeze(["width", "height"]),
+    round: Object.freeze(["diameter"]),
+  }),
+);
+const SHAPES = Object.freeze(["rect", "round"]);
 const SPEC_KEY = Object.freeze({ width: "widthMm", height: "heightMm", diameter: "diameterMm" });
 
 /** Absurd-input limits. Past these it is the wrong part, not a process delta. */
@@ -306,7 +391,13 @@ export function quantizeMm(n) {
   return Object.is(r, -0) ? 0 : r;
 }
 
-/** Two millimetre values agree if they are the same number at MM_DECIMALS. */
+/**
+ * How far a stated nominal may sit from the parent's modelled value: HALF a
+ * quantization step. One statement of the rule — the header says the same
+ * number and the refusal quotes the actual difference against it. Not "they
+ * round to the same number at MM_DECIMALS", which is a different test: 0.0004
+ * and 0.0009 round apart yet are only 0.0005 apart.
+ */
 const AGREE_MM = 0.5 / SCALE;
 
 const mm = (n) => n.toFixed(MM_DECIMALS);
@@ -392,9 +483,15 @@ export function validateMeasurement(raw) {
     );
   }
 
-  if (typeof raw.targetFitClass !== "string" || raw.targetFitClass.trim() === "") {
-    throw new RangeError("measurement.targetFitClass must be a non-empty fit-class name");
-  }
+  // A closed vocabulary, checked HERE like feature/dimension/fit. Deferring it
+  // to fitClearance meant this exported validator handed back a measurement
+  // carrying a class nobody had checked, and the eventual refusal named a
+  // parameter ("class") that does not appear in the measurement contract at all.
+  const targetFitClass = oneOf(
+    typeof raw.targetFitClass === "string" ? raw.targetFitClass.trim() : raw.targetFitClass,
+    FIT_CLASSES,
+    "targetFitClass",
+  );
   if (typeof raw.measuredBy !== "string" || raw.measuredBy.trim() === "") {
     throw new RangeError(
       "measurement.measuredBy must name the human who took the reading — every proposal is " +
@@ -411,7 +508,7 @@ export function validateMeasurement(raw) {
     nominalMm,
     measuredMm,
     fit,
-    targetFitClass: raw.targetFitClass.trim(),
+    targetFitClass,
     measuredBy: raw.measuredBy.trim(),
     ...(raw.instrument === undefined ? {} : { instrument: raw.instrument.trim() }),
   };
@@ -472,13 +569,22 @@ function bandRules(table, fitClass) {
  */
 function modelledDimension(spec, m) {
   const shape = spec.opening?.shape;
-  const allowed = DIMENSIONS_BY_SHAPE[shape];
-  if (!allowed) {
+  if (shape === undefined || shape === null || shape === "") {
     throw new RangeError(
-      `the parent's opening does not state a shape ("rect" or "round"), so there is no modelled ` +
-        `dimension to check your reading against. There is nothing to amend.`,
+      `the parent's opening does not state a shape (${SHAPES.map((s) => `"${s}"`).join(" or ")}), so there ` +
+        `is no modelled dimension to check your reading against. There is nothing to amend.`,
     );
   }
+  if (!Object.hasOwn(DIMENSIONS_BY_SHAPE, shape)) {
+    // Distinct from "states no shape": the operator gave one and it is not
+    // supported. Sending them looking for a missing field that is not missing
+    // is a worse failure than the unsupported shape itself.
+    throw new RangeError(
+      `the parent's opening states shape ${JSON.stringify(shape)}, which this module cannot amend — ` +
+        `only ${SHAPES.map((s) => `"${s}"`).join(" and ")} openings are supported.`,
+    );
+  }
+  const allowed = DIMENSIONS_BY_SHAPE[shape];
   if (!allowed.includes(m.dimension)) {
     throw new RangeError(
       `measurement.dimension "${m.dimension}" does not exist on a ${shape} opening — ` +
@@ -509,6 +615,48 @@ function modelledDimension(spec, m) {
   };
 }
 
+/**
+ * The parent's own chamfer, read the way every other parent value is read:
+ * stated as a positive number, or refused by name.
+ *
+ * The amendment rewrites both of these fields and quotes the parent's numbers
+ * back to the operator as arithmetic, so neither may be invented. A `?? 0`
+ * fallback here put "the parent's chamfer depth is 0.000 mm" into shown work
+ * for a parent that stated 0.8, or stated nothing at all. Whether the values
+ * are BUILDABLE is not decided here — the generator owns its own gates (angle
+ * in (5, 80), depth clear of the panel wall) and gets asked directly.
+ */
+function parentChamfer(spec) {
+  const c = spec.chamfer;
+  for (const [key, what] of [
+    ["angleDeg", "lead-in angle"],
+    ["depthMm", "lead-in depth"],
+  ]) {
+    if (!positiveNumber(c?.[key])) {
+      throw new RangeError(
+        `the parent spec does not state a positive numeric chamfer.${key} ` +
+          `(got ${JSON.stringify(c?.[key])}), so there is no parent ${what} for the amendment to ` +
+          `compare itself against, and nothing this module quotes about it would be true.`,
+      );
+    }
+  }
+  return { angleDeg: c.angleDeg, depthMm: c.depthMm };
+}
+
+/**
+ * Ask the real generator whether a spec builds. Returns the refusal message,
+ * or null. The generator owns eight spec gates; this module models none of
+ * them, so a hand-rolled subset can never drift out of date against it.
+ */
+function refusalFor(spec) {
+  try {
+    generateFlushMountPair(spec);
+    return null;
+  } catch (e) {
+    return e.message;
+  }
+}
+
 // --- the proposal -----------------------------------------------------------
 
 /**
@@ -528,7 +676,9 @@ function modelledDimension(spec, m) {
  *   processDeltaMm: {valueMm: number, basis: "computed", arithmetic: string},
  *   amendedClearanceMm: {valueMm: number, basis: "computed", arithmetic: string, withinCitedBand: boolean},
  *   amendedChamferDepthMm: {valueMm: number, basis: "computed", arithmetic: string},
+ *   amendedChamferAngleDeg: {valueDeg: number, ruleId: string, citation: string, basis: "cited"},
  *   amendedRequest: object,
+ *   unchanged: boolean,
  *   warnings: string[],
  *   verification: {status: string, rules: object[]},
  *   watermark?: string
@@ -547,15 +697,34 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
   //    the parent does not hold is arithmetic about a different part.
   const m = validateMeasurement(measurement);
   const modelled = modelledDimension(spec, m);
-  if (Math.abs(m.nominalMm - modelled.valueMm) > AGREE_MM) {
+  const disagreeMm = Math.abs(m.nominalMm - modelled.valueMm);
+  if (disagreeMm > AGREE_MM) {
     throw new RangeError(
       `measurement.nominalMm is ${mm(m.nominalMm)} mm, but the parent models that ${m.feature} ` +
-        `${m.dimension} at ${mm(modelled.valueMm)} mm (${modelled.describedAs}). A correction derived ` +
-        `from a nominal the parent does not hold is arithmetic about a different part.`,
+        `${m.dimension} at ${mm(modelled.valueMm)} mm (${modelled.describedAs}) — they differ by ` +
+        `${disagreeMm.toFixed(MM_DECIMALS + 1)} mm, over the ${AGREE_MM.toFixed(MM_DECIMALS + 1)} mm this ` +
+        `module accepts. A correction derived from a nominal the parent does not hold is arithmetic ` +
+        `about a different part.`,
     );
   }
 
-  // 3. CITED: the clearance band. Fail-closed — throws UnverifiedRuleError
+  // The parent's own lead-in, read now with the rest of the parent, because
+  // the amendment rewrites both of its fields and quotes both back as shown
+  // work. Nothing about the parent may be invented.
+  const parentCham = parentChamfer(spec);
+
+  // 3. WOULD THE PARENT GENERATE? Asked first, and asked of the real
+  //    generator. A request that does not build was never printed, so there is
+  //    no bench measurement of it and nothing to amend — including when the
+  //    amendment would happen to repair it.
+  const parentRefusal = refusalFor(spec);
+  if (parentRefusal) {
+    throw new RangeError(
+      `the parent request does not generate as it stands, so there is nothing to amend: ${parentRefusal}`,
+    );
+  }
+
+  // 4. CITED: the clearance band. Fail-closed — throws UnverifiedRuleError
   //    without allowDraft, because every FMF row is PENDING today.
   const clearance = fitClearance({ class: m.targetFitClass, allowDraft }, table);
   const bound = TOO_TIGHT.has(m.fit) ? "max" : "min";
@@ -577,7 +746,7 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
     basis: "cited",
   };
 
-  // 4. COMPUTED: the process delta. Ours, from the measurement, uncited.
+  // 5. COMPUTED: the process delta. Ours, from the measurement, uncited.
   const rawDelta =
     m.feature === "opening" ? (m.nominalMm - m.measuredMm) / 2 : (m.measuredMm - m.nominalMm) / 2;
   const processDeltaMm = {
@@ -593,7 +762,7 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
       `quantized to ${MM_DECIMALS} dp`,
   };
 
-  // 5. COMPUTED: the amended clearance. band + delta, and nothing else.
+  // 6. COMPUTED: the amended clearance. band + delta, and nothing else.
   const amendedValue = quantizeMm(band.valueMm + processDeltaMm.valueMm);
   if (amendedValue <= 0) {
     throw new RangeError(
@@ -612,62 +781,84 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
       `quantized to ${MM_DECIMALS} dp`,
   };
 
-  // 6. The chamfer lead-in has to keep up with the new clearance. SECOND
+  // 7. The chamfer lead-in has to keep up with the new clearance. SECOND
   //    fail-closed lookup — allowDraft is threaded here too. FMF-007/008 are
   //    PENDING like everything else, so an unthreaded flag throws right here,
   //    halfway through composing the amendment.
+  //
+  //    BOTH rows it consults are applied. The DEPTH is computed (the row is a
+  //    formula, and the parent's own deeper lead-in wins). The ANGLE is cited:
+  //    the table's encoded 45 degrees, written straight into the amendment.
   const chamfer = chamferFor({ clearanceMm: amendedValue, allowDraft }, table);
+
+  const angleRule = uniqueRule(table, "chamfer-lead-in-angle", "the chamfer angle row");
+  if (ruleValue(angleRule) !== chamfer.angleDeg) {
+    throw new Error(
+      `${angleRule.id} holds ${ruleValue(angleRule)} but the lookup served ${chamfer.angleDeg} for the ` +
+        `lead-in angle. A cited number and the id beside it must come from the same row.`,
+    );
+  }
+  const amendedChamferAngleDeg = {
+    // NOT quantized, for the same reason the band is not: it is the table's
+    // number, not ours.
+    valueDeg: chamfer.angleDeg,
+    ruleId: angleRule.id,
+    citation: chamfer.citation.angle,
+    basis: "cited",
+  };
+
   const depthRuleId = uniqueRule(table, "chamfer-lead-in-depth-min", "the chamfer depth row").id;
-  const parentDepth = typeof spec.chamfer?.depthMm === "number" ? spec.chamfer.depthMm : 0;
   const requiredDepth = quantizeMm(chamfer.depthMinMm);
-  const amendedDepth = quantizeMm(Math.max(parentDepth, requiredDepth));
+  const amendedDepth = quantizeMm(Math.max(parentCham.depthMm, requiredDepth));
   const amendedChamferDepthMm = {
     valueMm: amendedDepth,
     basis: "computed",
     arithmetic:
       `${depthRuleId} minimum lead-in for ${mm(amendedValue)} mm/side is ${mm(requiredDepth)} mm; ` +
-      `the parent's chamfer depth is ${mm(parentDepth)} mm, so the amendment ` +
-      (amendedDepth > parentDepth ? `raises it to ${mm(amendedDepth)} mm` : `keeps it at ${mm(amendedDepth)} mm`),
+      `the parent states ${mm(parentCham.depthMm)} mm, so the amendment ` +
+      (amendedDepth > parentCham.depthMm
+        ? `raises it to ${mm(amendedDepth)} mm`
+        : `keeps it at ${mm(amendedDepth)} mm`),
   };
 
-  // 7. The amended request: the parent, byte-for-byte, with the fit
+  // 8. The amended request: the parent, byte-for-byte, with the fit
   //    parameters changed. Keys this module does not understand ride along
   //    untouched.
   const amendedRequest = structuredClone(parentRequest);
   const amendedSpec = nested ? amendedRequest.structuredIntent.flushMount : amendedRequest.structuredIntent;
   amendedSpec.clearancePerSideMm = amendedValue;
-  amendedSpec.chamfer = { ...(amendedSpec.chamfer ?? {}), depthMm: amendedDepth };
+  amendedSpec.chamfer = {
+    ...amendedSpec.chamfer,
+    angleDeg: amendedChamferAngleDeg.valueDeg,
+    depthMm: amendedDepth,
+  };
 
-  // 8. WOULD IT GENERATE? Asked of the real generator, not of a copy of two of
-  //    its eight gates. If it refuses, the parent is tried too so the refusal
-  //    names the party at fault instead of guessing at a cause.
-  try {
-    generateFlushMountPair(amendedSpec);
-  } catch (amendedError) {
-    let parentError = null;
-    try {
-      generateFlushMountPair(spec);
-    } catch (e) {
-      parentError = e;
-    }
-    if (parentError) {
-      throw new RangeError(
-        `the parent request does not generate as it stands, so there is nothing to amend: ` +
-          `${parentError.message}`,
-      );
-    }
+  // Those three writes are the only ones, so comparing them to the parent's
+  // own numbers decides whether this "amendment" amends anything at all.
+  const unchanged =
+    Object.is(spec.clearancePerSideMm, amendedValue) &&
+    Object.is(parentCham.depthMm, amendedDepth) &&
+    Object.is(parentCham.angleDeg, amendedChamferAngleDeg.valueDeg);
+
+  // 9. WOULD THE AMENDMENT GENERATE? The parent already has (step 3), so any
+  //    refusal here is ours and the message can say so outright.
+  const amendedRefusal = refusalFor(amendedSpec);
+  if (amendedRefusal) {
     throw new RangeError(
       `this amendment would not generate. The parent generates, but at ${mm(amendedValue)} mm/side ` +
-        `clearance with a ${mm(amendedDepth)} mm lead-in the generator refuses it: ` +
-        `${amendedError.message}. Aim at a tighter fit class, or change the parent geometry.`,
+        `clearance with a ${mm(amendedDepth)} mm lead-in at ${amendedChamferAngleDeg.valueDeg} deg the ` +
+        `generator refuses it: ${amendedRefusal}. Aim at a tighter fit class, or change the parent geometry.`,
     );
   }
 
-  // 9. Verification over BOTH lookups, and the warnings that ride with it.
-  const rules = [];
-  for (const r of [...clearance.verification.rules, ...chamfer.verification.rules]) {
-    if (!rules.some((x) => x.id === r.id)) rules.push(r);
-  }
+  // 10. Verification over BOTH lookups, and the warnings that ride with it.
+  //     No dedup: fitClearance resolves band rows through FIT_CLASS_RULES and
+  //     chamferFor through its own ["FMF-007", "FMF-008"]
+  //     (flush-mount-fit.mjs:129-133, :202), so the two id sets are disjoint by
+  //     construction for any table that can be injected here. A dedup pass
+  //     would be a guard that can never find anything, which reads as a safety
+  //     net and is not one.
+  const rules = [...clearance.verification.rules, ...chamfer.verification.rules];
   const pending = rules.filter((r) => r.status !== VERIFIED);
   const draft = pending.length > 0;
 
@@ -678,6 +869,14 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
   const warnings = [];
   if (draft) {
     warnings.push(fillWording(OPERATOR_FLAG_WORDING.unverifiedRule, { ruleIds: pending.map((r) => r.id).join(", ") }));
+  }
+  if (unchanged) {
+    warnings.push(
+      fillWording(OPERATOR_FLAG_WORDING.noChange, {
+        clearanceMm: mm(amendedValue),
+        depthMm: mm(amendedDepth),
+      }),
+    );
   }
   if (contradicts) {
     warnings.push(
@@ -703,7 +902,7 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
   warnings.push(OPERATOR_FLAG_WORDING.derivationUncited);
   warnings.push(fillWording(OPERATOR_FLAG_WORDING.amendmentDisclaimer, { reviewer: m.measuredBy }));
 
-  // 10. Frozen on the way out: the caveats are not the caller's to delete.
+  // 11. Frozen on the way out: the caveats are not the caller's to delete.
   return deepFreeze({
     fitClass: clearance.class,
     measurement: m,
@@ -711,7 +910,9 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
     processDeltaMm,
     amendedClearanceMm,
     amendedChamferDepthMm,
+    amendedChamferAngleDeg,
     amendedRequest,
+    unchanged,
     warnings,
     verification: { status: draft ? PENDING_OPERATOR : VERIFIED, rules },
     ...(draft ? { watermark: DRAFT_WATERMARK } : {}),
