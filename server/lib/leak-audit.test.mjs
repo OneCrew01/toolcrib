@@ -23,7 +23,7 @@ import assert from "node:assert";
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   runAudit,
@@ -47,6 +47,124 @@ import { VacuousScanError, CONTROL_TOKEN } from "./identity.mjs";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
 const AUDIT = join(REPO, "server", "lib", "leak-audit.mjs");
+/** The audit's path as git spells it, so a scratch copy lands where its imports expect. */
+const posix = (p) => p.split(sep).join("/");
+const AUDIT_REL = posix(relative(REPO, AUDIT));
+
+/** Every relative specifier one source imports — static `from "./x"` and `import("./x")` alike. */
+const relativeImports = (src) => [
+  ...new Set([...String(src).matchAll(/(?:\bfrom|\bimport)\s*\(?\s*["'](\.[^"']*)["']/g)].map((m) => m[1])),
+];
+
+/**
+ * Every local module reachable from the audit, transitively, repo-relative —
+ * DERIVED from the imports rather than typed beside them.
+ *
+ * Two tests need this list and they must never disagree: one PINS it (a new
+ * import is how a detector in another module gets wired in, and such a detector
+ * is a kind the source scan cannot see), and one COPIES it into a scratch repo.
+ *
+ * The copy list used to be the hand-typed `["identity.mjs", "repo-path.mjs"]`,
+ * and that was a trap. Measured, with a third module added and imported: the
+ * copied audit died at ESM resolution before it could refuse, and the assertion
+ * that fired said "a broken kind scan did not exit as a refusal" — 31 tests, 30
+ * pass, 1 fail, the one failure blaming the kind scan when the actual cause was
+ * a file nobody copied. A guard firing for the wrong reason reads exactly like a
+ * guard that works.
+ */
+function auditModuleClosure() {
+  const seen = new Map();
+  const visit = (abs) => {
+    for (const spec of relativeImports(readFileSync(abs, "utf8"))) {
+      const dep = resolve(dirname(abs), spec);
+      const rel = posix(relative(REPO, dep));
+      if (seen.has(rel)) continue;
+      seen.set(rel, dep);
+      visit(dep);
+    }
+  };
+  visit(AUDIT);
+  return [...seen.keys()];
+}
+
+/**
+ * A scratch git repo holding a COPY of the audit and every module it imports,
+ * with the audit's source mutated on the way in and any extra files planted.
+ *
+ * A copy rather than the real tree, because both callers need an audit that is
+ * WRONG — one whose own kind scan comes back short, one wired to a fifth
+ * detector in a sibling module — and mutating a tracked file to prove a test
+ * would leave the repo dirty for the duration of the run.
+ */
+function scratchAudit(mutate, extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "toolcrib-leak-audit-copy-"));
+  const put = (rel, text) => {
+    // A dependency resolving OUTSIDE the repo would give a "../" here and write
+    // into the parent of a scratch directory. Not reachable today — the import
+    // pin allows two modules, both in server/lib — but a test that writes where
+    // it was not asked to is a worse bug than the one it was checking for.
+    assert.ok(!rel.startsWith(".."), `refusing to write outside the scratch repo: ${rel}`);
+    mkdirSync(join(dir, dirname(rel)), { recursive: true });
+    writeFileSync(join(dir, rel), text);
+  };
+  for (const rel of auditModuleClosure()) put(rel, readFileSync(join(REPO, rel), "utf8"));
+  for (const [rel, text] of Object.entries(extra)) put(rel, text);
+
+  const original = readFileSync(AUDIT, "utf8");
+  const mutated = mutate(original);
+  assert.notEqual(mutated, original, "the mutation did not apply — this test proves nothing");
+  put(AUDIT_REL, mutated);
+
+  for (const args of [["init", "-q", "."], ["add", "-A"]])
+    assert.equal(spawnSync("git", args, { cwd: dir, encoding: "utf8" }).status, 0, `git ${args[0]} failed`);
+  return { dir, audit: join(dir, AUDIT_REL) };
+}
+
+/**
+ * A fifth detector in a module of its own, spelling its kind as ordinarily as
+ * any detector in the audit does. `fires` is a literal "true" or "false": the
+ * silent one is the case that shipped unproven, the loud one is the case the
+ * verdict's second check catches.
+ */
+const siblingDetector = (fires) => `// A fifth detector, in a module of its own — where "one scanner, not two" says
+// a detector's matching belongs. Its kind is spelled here, not at the push.
+export const scanProbe = (entries) =>
+  entries
+    .filter(() => ${fires})
+    .map((e) => ({ kind: "secret", where: e.name, line: 1, detail: "a planted secret" }));
+`;
+
+/** Where that module lands. Deliberately a name no real detector would take, so a genuine
+ *  fifth detector added one day collides with nothing here and gets ONE red test, not two. */
+const PROBE_MODULE = "server/lib/probe-detector.mjs";
+
+/** Run a scratch copy of the audit as a program, the way a judge would run the real one. */
+function runCopy({ dir, audit }, args = ["--quiet"]) {
+  const r = spawnSync(process.execPath, [audit, ...args], { encoding: "utf8", cwd: dir });
+  const said = `${r.stdout}${r.stderr}`;
+
+  // DID IT EVEN START? Every path through main() prints the "leak audit" prefix
+  // except a --quiet clean run, which prints nothing at all; a copy that died on
+  // the way in prints a raw Node stack and neither. Without this check, an
+  // uncopied module or a mutation that will not compile arrives at whichever
+  // assertion comes next and is reported as ITS subject failing.
+  //
+  // Both halves measured, both while the verdict was in perfect health: a
+  // hand-typed copy list that missed a module gave "a broken kind scan did not
+  // exit as a refusal: ERR_MODULE_NOT_FOUND", and a mutation applied twice gave
+  // "the silent fifth detector changed the verdict: SyntaxError: Identifier
+  // 'scanProbe' has already been declared". A guard firing for the wrong reason
+  // reads exactly like a guard that works.
+  if (!said.includes("leak audit"))
+    assert.doesNotMatch(
+      said,
+      /\n\s+at /,
+      `the scratch copy never reached the audit — it died on the way in, so nothing below is a statement ` +
+        `about the verdict. Fix the harness (auditModuleClosure, or the mutation this test applies), not ` +
+        `the assertions after it:\n${said}`,
+    );
+  return { ...r, said };
+}
 
 // The machine roots, assembled. See the header.
 const DRIVE = "C" + ":" + "\\";
@@ -212,6 +330,91 @@ test("a fifth detector is found however its kind is written — no spelling swit
     assert.deepEqual(declaredKinds(`${src}\n${line}\n`), controlKinds(), `this should not have been visible: ${line}`);
 });
 
+test("a fifth detector in a SIBLING module is invisible until it fires — the residual, measured", () => {
+  // The FOURTH falsification of the header, pinned so there is not a fifth. The
+  // first three were spellings; this one is location. declaredKinds reads
+  // readFileSync(SOURCE) and SOURCE is leak-audit.mjs, so a kind spelled as a
+  // perfectly ordinary literal in another module is not in the derived list —
+  // which the header's old wording ("being a literal is the whole condition")
+  // denied. Measured then: a scanSecrets() in server/lib/secrets.mjs, imported
+  // and joined the way scanIdentity is -> derived FOUR, CLI CLEAN at exit 0.
+  //
+  // Direction one needs no mutation, because this repo already contains the
+  // case: identity.mjs uses that same key for its own internal hit vocabulary.
+  const src = readFileSync(AUDIT, "utf8");
+  const sibling = readFileSync(join(REPO, "server", "lib", "identity.mjs"), "utf8");
+  const theirs = declaredKinds(`${src}\n${sibling}`).filter((k) => !controlKinds().includes(k));
+  assert.ok(theirs.length >= 1, "identity.mjs no longer keeps a vocabulary of its own — find another live example");
+  assert.deepEqual(declaredKinds(src), controlKinds(), "the real derivation must read this file and nothing else");
+
+  // Which is also the measured reason the derivation is NOT simply widened to
+  // cover the imports: a sibling's private vocabulary is not something the
+  // control can plant a probe for, so widening it turns a CLEAN tree red.
+  // (Measured end to end on a clone: derived six, CLI refused at exit 2.)
+  assert.throws(
+    () => runAudit(clean(), LF_ROWS, { kinds: [...controlKinds(), ...theirs] }),
+    (e) => {
+      assert.match(e.message, /the control was NOT reported for: /);
+      for (const k of theirs) assert.match(e.message, new RegExp(k), `the refusal did not name ${k}`);
+      return true;
+    },
+    "deriving kinds from the imported modules would have to be refused, not accepted",
+  );
+
+  // Direction two, the whole program, against a copy wired to a real fifth
+  // detector in a module of its own — the join placed with the other pushes
+  // into `findings`, which is what the identity join is.
+  const wire = (s) =>
+    s
+      .replace('from "./identity.mjs";', `from "./identity.mjs";\nimport { scanProbe } from "./probe-detector.mjs";`)
+      .replace(
+        "  const controlFindings = findings.filter(",
+        "  findings.push(...scanProbe(all));\n\n  const controlFindings = findings.filter(",
+      );
+
+  // (a) Fires on nothing: the audit prints CLEAN at exit 0 and its control line
+  //     still says four. THIS IS THE RESIDUAL — asserted rather than described,
+  //     so nobody has to take the header's word for it, and so that the day it
+  //     stops being true this test says so. It is bounded by (b) and guarded by
+  //     the import pin below; what it is not is invisible.
+  const quiet = runCopy(scratchAudit(wire, { [PROBE_MODULE]: siblingDetector("false") }), []);
+  assert.equal(quiet.status, 0, `the silent fifth detector changed the verdict:\n${quiet.said}`);
+  assert.match(quiet.said, /control: 4 finding\(s\)/, quiet.said);
+  assert.doesNotMatch(quiet.said, /secret/, "the derivation read a sibling module after all");
+
+  // (b) The moment it fires, the second check refuses. So no verdict is ever
+  //     PRINTED that leans on a detector the control never proved.
+  const loud = runCopy(scratchAudit(wire, { [PROBE_MODULE]: siblingDetector("true") }), []);
+  assert.equal(loud.status, 2, `a firing unproven detector was not refused:\n${loud.said}`);
+  assert.match(loud.said, /never proved alive: secret/, loud.said);
+});
+
+test("a detector MODULE cannot be wired in quietly — the audit's import surface is pinned", () => {
+  // The structural half of that fix. A detector living in another module must
+  // be IMPORTED into leak-audit.mjs before anything it returns can be joined,
+  // and the kind scan cannot see the name it spells. So the imports are pinned:
+  // wiring one in is a deliberate act with a red test and a to-do list attached
+  // instead of a silent fifth detector shipping unproven.
+  //
+  // Deliberately EXACT and deliberately hand-typed. A pin derived from the
+  // thing it pins agrees with anything, which is the defect that started all of
+  // this — see the first corpse in the audit's header.
+  assert.deepEqual(
+    relativeImports(readFileSync(AUDIT, "utf8")).sort(),
+    ["./identity.mjs", "./repo-path.mjs"],
+    "leak-audit.mjs imports a local module this pin does not know about. IF IT IS A NEW DETECTOR: the kind " +
+      "scan reads leak-audit.mjs alone, so a name spelled in your module is invisible to it. (1) Write the " +
+      "literal at the push site in runAudit, the way the identity join does; (2) plant a probe for it in the " +
+      "control; (3) add its name and one-line description to the header list. Then add the module here. If it " +
+      "is not a detector, add it here and carry on.",
+  );
+
+  // The scratch copies are built from the same walk, so the pin and the copy
+  // list cannot drift apart — the drift that made a missing file read as a
+  // broken kind scan.
+  assert.deepEqual(auditModuleClosure().sort(), ["server/lib/identity.mjs", "server/lib/repo-path.mjs"]);
+});
+
 test("a kind scan that comes back short stops the audit instead of shrinking it", () => {
   // The failure mode deriving the list introduces. A scan that matched nothing
   // would hand back an empty kind list, the control would be satisfied by
@@ -231,21 +434,13 @@ test("a broken kind scan refuses through the scrubber, not as a raw stack full o
   // refusing, which is the one thing scrubPaths is in the catch to prevent.
   //
   // Proven the only honest way: a COPY of the audit, mutated so its own kind
-  // scan comes back short, run as a program in a scratch repo of its own.
-  const dir = mkdtempSync(join(tmpdir(), "toolcrib-leak-audit-kindscan-"));
-  mkdirSync(join(dir, "server", "lib"), { recursive: true });
-  for (const f of ["identity.mjs", "repo-path.mjs"])
-    writeFileSync(join(dir, "server", "lib", f), readFileSync(join(REPO, "server", "lib", f), "utf8"));
-  const broken = readFileSync(AUDIT, "utf8").replace('{ kind: "bom", where: name', '{ kind: "b" + "om", where: name');
-  assert.notEqual(broken, readFileSync(AUDIT, "utf8"), "the mutation did not apply — this test proves nothing");
-  const copy = join(dir, "server", "lib", "leak-audit.mjs");
-  writeFileSync(copy, broken);
-  for (const args of [["init", "-q", "."], ["add", "-A"]])
-    assert.equal(spawnSync("git", args, { cwd: dir, encoding: "utf8" }).status, 0, `git ${args[0]} failed`);
-
-  const r = spawnSync(process.execPath, [copy, "--quiet"], { encoding: "utf8", cwd: dir });
-  const said = `${r.stdout}${r.stderr}`;
-  assert.equal(r.status, 2, `a broken kind scan did not exit as a refusal:\n${said}`);
+  // scan comes back short, run as a program in a scratch repo of its own. The
+  // modules copied alongside it are DERIVED from the audit's imports — see
+  // auditModuleClosure, and the measured trap that hand-typing them used to be.
+  const built = scratchAudit((s) => s.replace('{ kind: "bom", where: name', '{ kind: "b" + "om", where: name'));
+  const { dir } = built;
+  const { status, said } = runCopy(built);
+  assert.equal(status, 2, `a broken kind scan did not exit as a refusal:\n${said}`);
   assert.match(said, /the kind scan did not find the documented detector\(s\): bom/);
   assert.equal((said.match(/leak audit: /g) ?? []).length, 1, `the refusal was not the CLI's own message:\n${said}`);
   assert.doesNotMatch(said, /\n\s+at /, `the refusal printed a stack — every frame of one is a path:\n${said}`);

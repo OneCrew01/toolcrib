@@ -7,16 +7,22 @@
 //
 // It sweeps every file git TRACKS (and, given --bundle, every file in a
 // generated job bundle) for four things a judge must never receive. That list
-// is NOT TYPED anywhere: controlKinds() reads it out of this file's own source,
-// which is the whole reason "exhaustive" is a fact here rather than a wish.
+// is NOT TYPED anywhere: controlKinds() reads it out of THIS FILE's own source,
+// which is what makes it exhaustive OVER THIS FILE rather than aspirational.
 // Every kind it finds must be planted in the control and come back reported
-// before any verdict is emitted, so a fifth detector added below grows the list
+// before any verdict is emitted, so a fifth detector added BELOW grows the list
 // on the next run, finds no fifth probe waiting for it, and makes the audit
 // REFUSE — suite red, CLI red — instead of shipping unproven.
 //
-// That claim has been FALSE THREE TIMES. It is stated above without hedging
-// because it is now true, and the three corpses are listed here because each
-// one was found by a reader who checked instead of believing:
+// "OVER THIS FILE" IS A REAL LIMIT, not a turn of phrase, and it is written
+// into the sentence that makes the promise because four times running this
+// header made the promise and left the limit for a reader to discover. What
+// the limit is, what stands guard over it, and what it takes to get past it
+// are set out under "the residual" below. Read that before believing this.
+//
+// That claim has been FALSE FOUR TIMES. It is stated above without hedging
+// because it is now true AND scoped, and the corpses are listed here because
+// every one was found by a reader who checked instead of believing:
 //
 //   1. It was folklore. The list was a hand-typed array, and the test that
 //      "pinned" it built its expected set by hand as well — two literal probes
@@ -33,24 +39,71 @@
 //      exit 0. All three are quoted literals written beside their key — what
 //      the residual paragraph below said was covered — so the disclosure did
 //      not reach them either.
+//   4. Not the pattern this time, but what the pattern is pointed AT. Fixes 1-3
+//      were all about SPELLING, so the residual paragraph closed with "no
+//      spelling of a literal is excluded; being a literal is the whole
+//      condition". Being a literal is NOT the whole condition — being a literal
+//      IN THIS FILE is. Measured: a scanSecrets() in a new
+//      server/lib/secrets.mjs, pushing an ordinary quoted "secret" the way any
+//      detector here does, imported and joined into runAudit exactly the way
+//      scanIdentity is, then committed so the tree was tracked -> derived list
+//      FOUR, and the CLI printed "control: 4 finding(s) … (bom, path, eol,
+//      identity)" and then CLEAN at exit 0 over 236 entries.
 //
-// Each fix was one character class narrower than the hole. The pattern now has
-// NO character class on the name at all (KIND_LITERAL, and the reasoning with
-// it). A guard whose own header is wrong is worse than no guard, because it is
-// believed; three times is enough that this prose is not the evidence. The
-// evidence is KIND_LITERAL and the tests under "the control" in
-// leak-audit.test.mjs, which walk capitals, digits, underscores, dots, spaces
-// and non-ASCII through the scan and fail if any of them goes unseen.
+// Fixes 1-3 were each one character class narrower than the hole, so the
+// pattern now has NO character class on the name at all (KIND_LITERAL, and the
+// reasoning with it). Fix 4 could not be a pattern change, because no pattern
+// reads a file nobody opened. It is a SCOPE, written into the claim itself,
+// plus a pin on this file's local imports — because importing is what a
+// detector in another module must do before anything it returns can be joined.
 //
-// The residual, stated so it covers what it says it covers: what the scan reads
-// is a QUOTED LITERAL sitting where the value goes. What it cannot read is a
-// value that is not a quoted literal there at all — a variable, a call, a
-// constant imported from another module, a name concatenated from pieces. No
-// spelling of a literal is excluded; being a literal is the whole condition. So
-// runAudit checks a SECOND time on the way out: a finding carrying a kind the
-// control never proved is a refusal, not a finding. That half fires when the
-// detector first fires rather than when the list is derived — said plainly
-// because it is the honest residual, not because it is comfortable.
+// A guard whose own header is wrong is worse than no guard, because it is
+// believed. Four times is enough that this prose is not the evidence. The
+// evidence is KIND_LITERAL, the import pin, and the tests under "the control"
+// in leak-audit.test.mjs, which walk capitals, digits, underscores, dots,
+// spaces and non-ASCII through the scan, pin the sibling-module limit against
+// this repo's own real code, and fail if any of it is quietly taken away.
+//
+// --- the residual, scoped so it covers what it says it covers ---------------
+//
+// What the derivation reads is a QUOTED LITERAL, IN THIS FILE, sitting where
+// the value goes. Both halves of that are load-bearing:
+//
+//   not a literal   a value that is not a quoted literal there at all — a
+//                   variable, a call, a constant imported from elsewhere, a
+//                   name built from pieces. No SPELLING is excluded: capitals,
+//                   digits, a leading digit or underscore, dots, spaces and
+//                   non-ASCII all read, and the suite walks every one of them.
+//   not this file   a name spelled as a perfectly ordinary literal in a SIBLING
+//                   module. SOURCE is this file and readFileSync opens only it,
+//                   so that text is never read. identity.mjs is a LIVE example
+//                   rather than a hypothetical: it uses the very same key for
+//                   its own internal hit vocabulary, two names, and neither is
+//                   in the audit's derived list. A test pins that.
+//
+// Both are caught the moment such a detector FIRES — unprovenKinds refuses any
+// finding carrying a kind the control never proved alive — so a wrong verdict
+// is never PRINTED. What that does not cover is a detector that fires on
+// nothing, which is exactly the detector nobody has shown works, and whose
+// silence would then be believed alongside four that were proven.
+//
+// So the cross-file half gets a structural guard as well, because it has a
+// structural shape: the set of local modules this file imports is PINNED by a
+// test. Wire in a ./secrets.mjs and the suite goes red naming the three things
+// to do — spell the literal at the push site HERE, plant its probe in the
+// control, add it to the list below — instead of letting it through quietly.
+//
+// Not fixed by deriving from the imported modules too, and that was measured
+// rather than assumed: identity.mjs's own use of that key means a derivation
+// which read this file's imports came back with SIX names, two of which no
+// control can plant a probe for, and the audit refused on a CLEAN tree at
+// exit 2. A guard that is red on a good repo is a guard that gets deleted.
+//
+// --- the four kinds ---------------------------------------------------------
+//
+// THE PROSE LIST. A legitimate fifth detector is added here as well as to the
+// control and the push site; the suite's exact-equality assertion on the kind
+// list exists to send whoever adds one back to this paragraph.
 //
 //   path      an absolute filesystem path that names the machine this was
 //             written on — a drive-rooted path, a UNC share, a home directory.
@@ -101,6 +154,18 @@
 // COMMITTED_PATH, exported from server/lib/repo-path.mjs beside the scrubber
 // it belongs to. This file owns the corpus, the control and the verdict; it
 // owns no vocabulary of its own.
+//
+// THERE IS A RULE ATTACHED TO THAT SPLIT, and it is the rule that keeps the
+// guarantee at the top of this file true: the sibling module owns the
+// VOCABULARY, this file owns the KIND. Look at how the identity hits are joined
+// inside runAudit — identity.mjs hands back hits, and the literal naming what
+// they are is written HERE, at the push. Do that for any fifth detector, in
+// whatever module its matching lives, and it is derived, probed and proven like
+// the other four. Skip it and the kind is invisible to the derivation, because
+// the derivation reads this file; the import pin is what makes that loud
+// instead of silent. This section is exactly the paragraph that pointed the
+// fourth reader down the one path the derivation cannot see, so it now carries
+// the rule that makes the path safe.
 
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -528,7 +593,12 @@ export function runAudit(entries, eolRows, { control = CONTROL, kinds = controlK
     throw new VacuousScanError(
       `the control was NOT reported for: ${blind.join(", ")}. ` +
         `A scanner that cannot see a planted leak has proven nothing about the leaks it did not report, ` +
-        `so no verdict is being emitted. Fix the detector (or the control) before believing any sweep.`,
+        `so no verdict is being emitted. Fix the detector, or the control, before believing any sweep. ` +
+        `IF A NAME ABOVE IS NOT A DETECTOR AT ALL: this list is read out of leak-audit.mjs's own text, so ` +
+        `a COMMENT in that file which writes the finding key with a quote after it on the same line enters ` +
+        `the list exactly as a detector would — reword that comment. Do NOT narrow KIND_LITERAL to make it ` +
+        `go away: that pattern was widened after three separate falsifications, and the suite fails if it ` +
+        `is narrowed back.`,
     );
 
   const unproven = unprovenKinds(findings, kinds);
