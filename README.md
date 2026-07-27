@@ -104,8 +104,10 @@ insert   parent e7684ef9…   amended 9aeb7c74…   DIFFERS
 The panel program is byte-identical because the hole in the panel is the size it
 always was — clearance is not a value a panel emitter even reads. The insert moved:
 `clearancePerSide = 0.15mm` became `clearancePerSide = 0.2mm`, and the further lines
-that moved with it are that insert's own profile coordinates, which KCL writes as
-literal numbers. **The amendment touched exactly the part it should and nothing
+that moved with it are that one parameter's consequences — the derived insert
+dimensions the generator writes out as comments, and the profile coordinates KCL
+carries as literal numbers. Not one of them is a second decision, and the output
+counts and classifies them so you can see that rather than take it on faith. **The amendment touched exactly the part it should and nothing
 else** — and you do not have to take that on trust, because the hashes are printed
 and the whole diff is printed under them. (Had the correction needed a deeper lead-in
 chamfer, the panel would have moved too, and should have: the panel carries that
