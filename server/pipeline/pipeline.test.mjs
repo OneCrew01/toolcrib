@@ -110,6 +110,17 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
   // package sealed and parked
   const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
   assert.match(r.pkg.manifest.packageHash, /^[0-9a-f]{64}$/);
+
+  // The seal the ledger carries is the WHOLE digest. This row is chained and
+  // packageHash covers generationRequest.json, so the chain already commits to
+  // the exact request bytes — it just did it through a 12-character, 48-bit
+  // window. Asserted by equality against the manifest's own hash, not by shape,
+  // so a truncation to ANY length fails here rather than only the old one.
+  const sealRow = r.ledger.find((row) => row.to === STATE.PDF_GENERATION);
+  assert.ok(
+    sealRow.reason.includes(`(packageHash ${r.pkg.manifest.packageHash})`),
+    `the sealed-exports ledger row does not carry the full packageHash: ${sealRow.reason}`,
+  );
   assert.ok(existsSync(join(bundleDir, "manifest.json")));
   assert.ok(existsSync(join(bundleDir, "notifications.log")));
   const present = r.pkg.manifest.files.filter((f) => f.status === "present").map((f) => f.path);

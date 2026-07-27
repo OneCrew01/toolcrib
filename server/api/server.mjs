@@ -27,6 +27,12 @@ import { runJob } from "../pipeline/run-job.mjs";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const ALLOWED_ORIGIN = "http://localhost:5173"; // vite dev app
+// The two spellings of that one console. Vite prints "http://localhost:5173"
+// but serves the same dev server on the numeric loopback address, and an
+// operator who types 127.0.0.1 must still be able to approve. Nothing else is
+// on this list: it is the allowlist for requests that CHANGE STATE, not the
+// CORS advertisement above, which stays single-valued.
+const ALLOWED_ORIGINS = new Set([ALLOWED_ORIGIN, "http://127.0.0.1:5173"]);
 const BACKENDS = new Set(["replay", "flushmount", "live"]);
 const ID_RE = /^[A-Za-z0-9_-]+$/; // mirrors the store's filename-safe job ids
 const CONTENT_TYPES = {
@@ -84,6 +90,56 @@ function readBody(req, limit = 1 << 20) {
     });
     req.on("error", fail);
   });
+}
+
+// ---- the forgery guards ----------------------------------------------------
+//
+// Nothing on this API authenticates, and two of its routes are state-changing:
+// POST /api/jobs starts a pipeline, POST /api/jobs/:id/decision signs the named
+// human approval at the review gate. Before these guards, a plain HTML form on
+// ANY page the operator happened to visit could POST to the local server and
+// drive that approval — no XHR, no CORS, nothing for the browser to block,
+// because a form submission is not a request the same-origin policy stops. The
+// CORS block below is not a control against that and never was: it governs
+// whether a script may READ a response, and a form does not need to read one.
+//
+// Three complementary controls, each in its own layer:
+//   (a) server/index.mjs binds 127.0.0.1 — the port is not on the LAN at all.
+//   (b) Origin, when present, must be the console (checked here).
+//   (c) Content-Type must be application/json (checked here).
+//
+// (c) is what independently kills the form vector: the three enctypes a <form>
+// can produce are urlencoded, multipart and text/plain, and a script that sets
+// application/json cross-origin turns the request into a preflighted one, which
+// the OPTIONS handler answers for the console's origin only.
+
+const STATE_CHANGING = (method) => method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+
+function guardStateChanging(req) {
+  const origin = req.headers.origin;
+  // Origin ABSENT is ADMITTED, on purpose — this is the deliberate call, not
+  // an oversight. A browser attaches Origin to every state-changing request it
+  // makes, INCLUDING a plain form POST, so a request without one did not come
+  // from a page: it is curl, this repo's own test suite, or an operator script,
+  // and the README documents those. Refusing them would break the documented
+  // flows while closing nothing, because the only caller that can choose to
+  // omit the header is one already executing code on this machine — and by (a)
+  // it has to be on this machine to reach the port at all, at which point it
+  // can read the job files directly and HTTP is not the boundary that matters.
+  // The form vector cannot use this door: a form always sends its Origin, and
+  // if it somehow did not, (c) below still refuses its content type.
+  if (origin !== undefined && !ALLOWED_ORIGINS.has(origin))
+    throw new HttpError(403, `origin not allowed to change state: ${String(origin).slice(0, 120)}`);
+
+  // Parameters are stripped before comparing: fetch sends "application/json"
+  // bare, but "application/json; charset=utf-8" is the same media type and a
+  // proxy or a hand-rolled client may spell it that way.
+  const type = String(req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+  if (type !== "application/json")
+    throw new HttpError(
+      415,
+      `state-changing requests must be content-type: application/json, got ${type ? JSON.stringify(type) : "no content-type"}`,
+    );
 }
 
 // ---- job shapes ------------------------------------------------------------
@@ -361,6 +417,12 @@ export function createApiServer({
         });
         return res.end();
       }
+
+      // Before routing, not inside each route: a route added later is guarded
+      // the day it is added, and a state-changing request to a path that does
+      // not exist is refused rather than answered with a 404 that confirms the
+      // server is here and listening.
+      if (STATE_CHANGING(req.method)) guardStateChanging(req);
 
       if (req.method === "GET" && url.pathname === "/health")
         return sendJson(200, { ok: true, service: "toolcrib", ts: new Date().toISOString() });

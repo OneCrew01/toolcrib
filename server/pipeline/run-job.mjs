@@ -301,7 +301,13 @@ export async function runJob(requestPath, {
   }
   const bundleDir = pkg?.bundleDir ?? pkg?.packageDir ?? join(outRoot, jobId);
   const seal = pkg?.manifest?.packageHash ?? pkg?.manifest?.sealHash;
-  await move(STATE.PDF_GENERATION, `exports sealed at ${displayPath(bundleDir)} (packageHash ${seal ? seal.slice(0, 12) + "…" : "n/a"})${fallbacks.includes("assemblePackage") ? " via contract fallback — packager track not yet landed" : ""}`);
+  // The FULL 64 hex, not a prefix. This reason is a ledger row, so the hash
+  // chain commits to whatever it says, and generationRequest.json is inside the
+  // bundle packageHash covers — the chain therefore already bound the exact
+  // request bytes. It bound them through a 12-char (48-bit) window, which is
+  // the one number here anybody could have argued with. Full digest, one
+  // string, nothing else to reason about.
+  await move(STATE.PDF_GENERATION, `exports sealed at ${displayPath(bundleDir)} (packageHash ${seal ?? "n/a"})${fallbacks.includes("assemblePackage") ? " via contract fallback — packager track not yet landed" : ""}`);
   const pdfEntry = pkg?.manifest?.files?.find?.((f) => f.path?.endsWith?.("manufacturingPackage.pdf") && f.status === "present");
   await move(STATE.WAITING_FOR_HUMAN_REVIEW, pdfEntry
     ? `manufacturingPackage.pdf rendered (${pdfEntry.bytes}B); parked for human review`

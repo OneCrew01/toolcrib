@@ -116,6 +116,13 @@ line, appended *after* the seal by `server/pipeline/run-job.mjs`, so it is delib
 outside the hash and is not a manifest entry. Nothing inside the seal can change without
 `dodCheck` catching it.
 
+That seal is also written into the ledger, in full: the `PACKAGING -> PDF_GENERATION`
+row's reason carries the whole 64-hex `packageHash`, and that row is hash-chained like
+every other. Since `generationRequest.json` is one of the sealed files, the chain
+therefore commits to the exact request bytes the part was built from — change the
+request after the fact and the manifest, the seal in the ledger, and the chain from that
+row forward all have to be forged together.
+
 `npm run leak-audit` (also the last step of `npm test`) sweeps every tracked file — and,
 with `--bundle=<dir>`, a generated job bundle — for four things: a filesystem path that names
 a **person** (a drive root, a UNC share, a home directory — a machine-rooted path that names
@@ -163,6 +170,18 @@ npm --prefix app install     # console deps (React + Vite); the demo needs none 
 npm start                    # API on :8787 — the only server process that holds a Zoo token
 npm --prefix app run dev     # console on :5173, dev proxy to the API
 ```
+
+The API binds `127.0.0.1` and nothing else, with no environment override — an
+unauthenticated approval gate does not belong on a LAN. On top of that, the two routes
+that change state (`POST /api/jobs` and the human decision route) require
+`content-type: application/json` and refuse any `Origin` that is not the console. That
+second pair is not belt-and-braces: a plain HTML form on any page you happen to have
+open can POST to a localhost port, the same-origin policy does not stop a form
+submission, and the CORS block governs who may *read* a response, which a form does not
+need to do. `server/api/server.mjs` carries the reasoning, including the deliberate call
+on a request with no `Origin` at all (curl, scripts — admitted, and why). Remove any one
+of the three and `server/api/listen.test.mjs` or the forgery guards in
+`server/api/api.test.mjs` go red.
 
 Open `http://localhost:5173`. The job list reads the same flat-file data directory
 the CLI writes, so `npm run demo` and `npm run job` runs already show up before you

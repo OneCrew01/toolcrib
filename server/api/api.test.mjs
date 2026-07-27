@@ -329,6 +329,122 @@ test("unknown job detail is a 404", async () => {
   assert.equal(status, 404);
 });
 
+// ---- the approval gate may not be driven by a page the operator visits -----
+//
+// The vector these three tests close: this API authenticates nothing, and
+// POST /api/jobs/:id/decision signs a NAMED HUMAN APPROVAL. An HTML form on any
+// page the operator happens to have open can POST to a localhost port — a form
+// submission is not a request the same-origin policy stops, and the CORS block
+// governs who may READ a response, which a form does not need to do. So the
+// controls are: bind loopback (server/api/listen.test.mjs, on the real boot
+// file), refuse a foreign Origin, and refuse a content type a form can produce.
+//
+// Every test below drives a job that is PARKED AT THE GATE and re-reads its
+// state afterwards, because "the request was refused" and "the approval did not
+// happen" are different claims and only the second one is the one that matters.
+
+let gateJobId; // parked at WAITING_FOR_HUMAN_REVIEW, for the forgery guards
+
+test("a third job parks at the human gate for the forgery guards to attack", async () => {
+  const created = await post("/api/jobs", { request: PLAIN_PLATE, backend: "replay" });
+  assert.equal(created.status, 202);
+  gateJobId = created.body.jobId;
+  await waitForState(gateJobId, STATE.WAITING_FOR_HUMAN_REVIEW);
+});
+
+test("state-changing routes refuse every content type a form can send (415)", async () => {
+  // These three are the complete enctype vocabulary of an HTML form. A form
+  // cannot set any other content type, and a script that sets application/json
+  // cross-origin turns the request into a preflighted one the OPTIONS handler
+  // answers for the console's origin only. So this list IS the vector.
+  const enctypes = [
+    "application/x-www-form-urlencoded",
+    "multipart/form-data; boundary=----WebKitFormBoundary",
+    "text/plain;charset=UTF-8",
+  ];
+  for (const type of enctypes) {
+    const forged = await fetch(`${BASE}/api/jobs/${gateJobId}/decision`, {
+      method: "POST",
+      headers: { "content-type": type },
+      body: JSON.stringify({ action: "approve", actorName: "Mallory" }),
+    });
+    assert.equal(forged.status, 415, `decision route accepted ${type}`);
+
+    const forgedCreate = await fetch(`${BASE}/api/jobs`, {
+      method: "POST",
+      headers: { "content-type": type },
+      body: JSON.stringify({ request: PLAIN_PLATE, backend: "replay" }),
+    });
+    assert.equal(forgedCreate.status, 415, `create route accepted ${type}`);
+  }
+  // A request with no content type at all is not a loophole either.
+  const bare = await fetch(`${BASE}/api/jobs/${gateJobId}/decision`, { method: "POST" });
+  assert.equal(bare.status, 415);
+
+  // the claim that actually matters
+  const after = await api(`/api/jobs/${gateJobId}`);
+  assert.equal(after.body.job.state, STATE.WAITING_FOR_HUMAN_REVIEW, "a forged form moved the job");
+  assert.equal(after.body.ledger.filter((r) => r.actor.kind === "HUMAN").length, 0);
+});
+
+test("state-changing routes refuse a foreign Origin (403)", async () => {
+  // Each of these is a real shape: an ordinary attacker page, a neighbouring
+  // port on the operator's own machine, and the "null" a sandboxed iframe or a
+  // data: URL sends. A refusal here also proves the header reached the server —
+  // if the client had dropped it the request would have been ADMITTED and this
+  // assertion would be the thing that noticed.
+  for (const origin of ["https://evil.example", "http://localhost:5174", "http://127.0.0.1:8787", "null"]) {
+    const forged = await fetch(`${BASE}/api/jobs/${gateJobId}/decision`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ action: "approve", actorName: "Mallory" }),
+    });
+    assert.equal(forged.status, 403, `decision route accepted origin ${origin}`);
+    assert.match((await forged.json()).error, /origin/i);
+
+    const forgedCreate = await fetch(`${BASE}/api/jobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ request: PLAIN_PLATE, backend: "replay" }),
+    });
+    assert.equal(forgedCreate.status, 403, `create route accepted origin ${origin}`);
+  }
+
+  const after = await api(`/api/jobs/${gateJobId}`);
+  assert.equal(after.body.job.state, STATE.WAITING_FOR_HUMAN_REVIEW, "a foreign origin moved the job");
+  assert.equal(after.body.ledger.filter((r) => r.actor.kind === "HUMAN").length, 0);
+});
+
+test("the guards admit the console: both spellings of its origin, and no origin at all", async () => {
+  // Admitted-then-refused-on-the-BODY is the proof the guard let it through:
+  // an unknown backend is a 400 from createJob, which only runs after the
+  // guard. Neither of these starts a pipeline.
+  for (const headers of [
+    { "content-type": "application/json", origin: "http://127.0.0.1:5173" }, // numeric console
+    { "content-type": "application/json; charset=utf-8", origin: "http://localhost:5173" }, // parameterised type
+  ]) {
+    const res = await fetch(`${BASE}/api/jobs`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ request: PLAIN_PLATE, backend: "warp-drive" }),
+    });
+    assert.equal(res.status, 400, `the guard refused the console: ${JSON.stringify(headers)}`);
+    assert.match((await res.json()).error, /backend/);
+  }
+
+  // Origin ABSENT is admitted on purpose — curl, scripts, and every other
+  // request in this file, which is why the whole suite is the standing proof of
+  // that decision. The reasoning is in server/api/server.mjs; the short version
+  // is that a browser always sends Origin, so a caller without one is already
+  // running code on a machine the loopback bind means it had to be sitting at.
+  const approved = await post(`/api/jobs/${gateJobId}/decision`, {
+    action: "approve",
+    actorName: "Dana Loopback",
+  });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.body.job.state, STATE.DELIVERED);
+});
+
 test("CORS: vite dev origin allowed on /api routes, preflight answered", async () => {
   const preflight = await fetch(BASE + "/api/jobs", {
     method: "OPTIONS",

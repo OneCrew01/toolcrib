@@ -123,6 +123,21 @@ request against the job's own bundle directory and rejects any path that would
 resolve outside it (`abs.startsWith(bundleDir + sep)`), so a crafted `../` segment
 400s instead of walking off the package.
 
+Nothing on this API authenticates, so the two POST routes are fenced by where the
+server listens and who is allowed to talk to it. `server/index.mjs` binds `127.0.0.1`
+with no environment override, and every state-changing request must carry
+`content-type: application/json` (else 415) and either the console's `Origin` or none
+at all (else 403). The threat is specific and it is not CORS: a plain HTML form on any
+page the operator is browsing can POST to a localhost port, the same-origin policy does
+not stop form submissions, and the CORS block only decides who may *read* a response —
+which a form never needs to do. A form cannot send `application/json`, and a script
+that does is preflighted into the OPTIONS handler, which admits the console only.
+Origin-absent is admitted deliberately (curl, operator scripts); the reasoning is in
+`server/api/server.mjs` beside the check. `server/api/listen.test.mjs` drives the real
+boot file and reads the bound host back off the listening socket; the forgery guards in
+`server/api/api.test.mjs` try the whole form-enctype vocabulary and three foreign
+origins against a job parked at the gate, and assert the job did not move.
+
 `app/` is a thin client: it polls the API (2 s on the job-detail view), renders
 whatever the API returns, and holds no Zoo credentials at all — the footer says so
 on every screen except the Zookeeper panel, which says something stronger (below).

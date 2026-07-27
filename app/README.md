@@ -7,7 +7,7 @@ only TypeScript in the repo (the backend is plain `.mjs`). Start here:
 
 ```bash
 npm --prefix app install     # the console is the only part of the repo with deps
-npm start                    # from the repo root: API on :8787
+npm start                    # from the repo root: API on 127.0.0.1:8787 (loopback only)
 npm --prefix app run dev     # console on :5173, proxying /api and /health to :8787
 ```
 
@@ -33,7 +33,7 @@ Keep it that way.
 | `src/lib/zookeeper.ts` | Native client for Zoo's ML copilot websocket — pure frame classifier/aggregator plus a thin socket wrapper. **The only file in `app/` that opens a socket to a third party** (`COPILOT_URL`, line 42) **and the only one that sends a credential off-machine** (line 504). `DraftPanel.tsx` collects the token into component state and hands it here; nothing else in `app/` touches one. |
 | `src/lib/zookeeper.selfcheck.ts` | Recorded-frame fixtures through those pure functions. Runs as the **last step of the root `npm test`**, not just in dev. |
 | `src/index.css` | The whole theme, tokenized: color/font/radius live in the `:root` block at the top, so a reskin is variable edits there. Two brand accents only (`--panel`, `--insert`). Two values are deliberately literals rather than tokens — the `.brand-mark::after` 1px logo inset and the 50% radius on status dots — and the file's header comment says why. |
-| `vite.config.ts` | Dev proxy: `/api` and `/health` → `http://localhost:8787`. No port override, so Vite's default `:5173` is the console's port — and `:5173` is exactly what the API's CORS allowlist admits (`server/api/server.mjs`). |
+| `vite.config.ts` | Dev proxy: `/api` and `/health` → `http://localhost:8787` (the API binds loopback only). No port override, so Vite's default `:5173` is the console's port — and `:5173` is exactly the origin the API admits on state-changing requests (`server/api/server.mjs`). The proxy forwards the browser's `Origin` header through unchanged, which is what lets that check see the console; the CORS allowlist beside it advertises the same port but governs who may *read* a response, and is not the control. |
 
 ## The credential rule, which is not a detail
 
