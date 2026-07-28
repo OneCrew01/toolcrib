@@ -1,6 +1,7 @@
 # Burn-cert samples — the pass/fail pair IS the demo
 
-Two coupon plates, same footprint, one wall-thickness change. Both were
+Two coupon plates (a coupon is a small test piece you print instead of the real
+part, to check one thing about it), same footprint, one wall-thickness change. Both were
 authored as KCL, executed and exported to STL by the live Zoo engine
 (`mcp export_kcl`, 2026-07-23), then run through the sampled min-wall gate:
 

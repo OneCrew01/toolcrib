@@ -52,8 +52,10 @@ Formulas are dimension-preserving multiples: millimeter inputs give millimeter r
   Double/multi-row edge-distance and spacing rules are therefore **not encoded** — an operator
   with the printed figure should encode them as a follow-up.
 - The flush/countersunk, preferred, typical-pitch, and transverse-pitch values do **not**
-  appear in the fetched AC Ch. 4 Sec. 4 text. They are standard AMT-handbook practice and are
-  cited to FAA-H-8083-31A with paragraph UNCONFIRMED rather than to an invented AC paragraph.
+  appear in the fetched AC Ch. 4 Sec. 4 text. They are standard AMT-handbook practice (the
+  FAA's *Aviation Maintenance Technician* handbook — the free, public training text US
+  airframe mechanics learn from) and are cited to FAA-H-8083-31A with paragraph UNCONFIRMED
+  rather than to an invented AC paragraph.
 
 ## Rules — table `flush-mount-fit`
 

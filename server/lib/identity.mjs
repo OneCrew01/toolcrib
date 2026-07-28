@@ -80,7 +80,7 @@ export const CONTROL_TOKEN = ["0badc0de", "0bad", "4bad", "8bad", "0badc0de0bad"
 // already suspects a value can hash it and check. That is a fair trade for an
 // identifier this repo's history actually carries — the guard is worth more than
 // the oracle. It is a bad trade for one the history does not carry, because then
-// this line is the only thing in the repo saying the value exists at all.
+// the line buys no protection and does nothing but answer the guess.
 //
 // One entry was removed on 2026-07-28 for exactly that reason: a second operator
 // email address. Measured before removing it, and measured without guessing the
@@ -89,9 +89,17 @@ export const CONTROL_TOKEN = ["0badc0de", "0bad", "4bad", "8bad", "0badc0de0bad"
 // compared against the two digests that were here. The surviving one matches a
 // token that IS in the history (it is the author email on the commits). The
 // removed one matched NOTHING: not a blob, not a commit. Nothing had leaked, so
-// the fingerprint was guarding a value that had never been near the corpus — and
-// a digest with no coverage is a pure confirmation oracle, since this line would
-// have been the only thing in a public repo hinting the address exists at all.
+// the fingerprint was guarding a value that had never been near the corpus, and
+// a digest with no coverage is an oracle and nothing else.
+//
+// Removing it cleans the tree from here forward. It does NOT un-publish the past:
+// measured, 33 commits reachable from `main` still carry that line verbatim, label
+// and all, and 22 of those are already pushed. So the deletion is a real
+// improvement to what a reader of the current tree finds and is not an erasure,
+// and this comment does not get to claim otherwise. Leaving the history alone was
+// re-decided deliberately the same day, with that residual counted in the ruling
+// rather than left out of it — docs/DECISION_LOG.md, D-008.
+//
 // The entries below all commit to identifiers the history really holds.
 
 /** fingerprint -> what it is. Digests only; no identifier is stored here. */

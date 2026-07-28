@@ -194,8 +194,25 @@ the tree of every commit reachable from `main` — 77 commits at the time of wri
 **43 of them carry the operator's Zoo account uuid**, in one of three historical versions
 of the two replay fixtures, and **every one of the 77 is authored and committed by a single
 personal email address**. Both are already pushed. Later commits add to the denominator
-and not to the 43: the current tree is scrubbed. The ruling is to leave all of it where it
-is, for three reasons:
+and not to the 43: the current tree is scrubbed.
+
+There is a **third** thing in that history, and it is here because leaving it out is exactly
+the failure this entry exists to prevent. Today's clean-up also deleted one line from
+`server/lib/identity.mjs` — a SHA-256 fingerprint of a second operator email address,
+labelled in the file as one. The reason is in the comment there: that digest guarded a value
+the corpus never carried, so it bought no protection and worked only in the other direction,
+as something a person who already guessed the address could check their guess against.
+Deleting it takes it out of the tree. It does not take it out of the commits that already
+hold it. Re-measured as this paragraph was written, at 79 commits on `main`: 43 still carry
+the Zoo uuid (the two commits added since changed the denominator and not the count, which is
+the claim above, now checked), and **33 carry that fingerprint line verbatim, label and all**,
+in two historical versions of `identity.mjs`. Twenty-two of the 33 were pushed before this
+clean-up was written — the remote's tip still carried the line at that moment — and
+`git log -p` over that one file shows it to anyone who asks. Removing it forward and
+publishing the history are the same change set, and they pull in opposite directions. That
+is stated rather than smoothed over.
+
+The ruling is to leave all three where they are, for four reasons:
 
 - A Zoo `user_id` is an identifier, not a credential. Nothing is revoked, rotated or
   protected by editing it out of a past commit. The current tree already reads the Nil
@@ -204,10 +221,20 @@ is, for three reasons:
   its owner has ever pushed, so removing it from this one removes it from nowhere.
 - The operator's real name goes public deliberately in `LICENSE` — MIT requires a named
   copyright holder. This repo is not anonymous and was never trying to be.
+- The residual fingerprint is a digest, not an address. It cannot be run backwards; it can
+  only confirm a candidate somebody arrives already holding. Measured the same way the
+  removal was — every email token in every blob, plus the author, committer and message
+  lines of every commit on every ref — that address is in nothing else here: 0 blob hits and
+  0 commit-metadata hits, against 158 for the digest that stayed. So there is nothing in this
+  repo to derive the guess from. Taking the line out of the tree costs one line and is worth
+  it. Taking it out of the past costs a force-push over a published history, which is the
+  same price the Zoo uuid and the author email were just weighed against and it does not buy
+  more here.
 
 The point of writing this down is that it converts an oversight into a choice. Anyone who
-finds that uuid in the history later is looking at something its owner decided to leave
-there, on a date, for stated reasons — not at something nobody noticed.
+finds the uuid, the author email or that fingerprint in the history later is looking at
+something its owner decided to leave there, on a date, for stated reasons — not at something
+nobody noticed.
 
 ## D-009 · 2026-07-27 · The amendment ships as a pure module, and the wiring does not *(corrected in place 2026-07-27)*
 

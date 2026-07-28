@@ -33,7 +33,7 @@ const ACTOR_KEY = "toolcrib.actorName";
 // SIGNATURE_MEANING in server/package/assemble.mjs.
 //
 // It was a hand-typed reword of that constant, which meant the two guarded
-// surfaces could be re-worded after an operator ruling while this one — the
+// surfaces could be re-worded later while this one — the
 // only one a reviewer actually reads before clicking — kept the old sentence,
 // with a green suite the whole time. This build cannot import a server module,
 // so the pin is a text one: server/package/package.test.mjs reads this file and

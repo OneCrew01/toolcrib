@@ -390,7 +390,7 @@ test("the printed package disclaims itself, and says what signing it does not me
 // string was a hand-typed reword ("Approving records that you, by name, ...").
 // Nothing reached it: every assertion above compares the PDF and the JSON to
 // the exported constant, and no test, type or self-check touches the .tsx. So
-// SIGNATURE_MEANING could be sharpened after an operator ruling, both guarded
+// SIGNATURE_MEANING could be sharpened in a later edit, both guarded
 // surfaces would update, the suite would stay green, and the reviewer clicking
 // the button would be the only one reading a sentence nobody re-approved.
 //
