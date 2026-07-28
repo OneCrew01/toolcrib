@@ -3,8 +3,9 @@ dist/
 *.log
 .DS_Store
 
-# Secrets. Nothing of any of these shapes has ever existed in this repo — the
-# guard is here so it cannot start, not because something got out.
+# Secrets. No file matching any of these patterns has ever existed here — the guard
+# is here so one cannot start, not because something got out. The tracked
+# `.env.example` does not match `.env`; it is the empty template, with no value in it.
 .env
 .env.local
 *credentials*.json

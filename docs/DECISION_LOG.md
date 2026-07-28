@@ -225,11 +225,16 @@ The ruling is to leave all three where they are, for four reasons:
   only confirm a candidate somebody arrives already holding. Measured the same way the
   removal was — every email token in every blob, plus the author, committer and message
   lines of every commit on every ref — that address is in nothing else here: 0 blob hits and
-  0 commit-metadata hits, against 158 for the digest that stayed. So there is nothing in this
-  repo to derive the guess from. Taking the line out of the tree costs one line and is worth
-  it. Taking it out of the past costs a force-push over a published history, which is the
-  same price the Zoo uuid and the author email were just weighed against and it does not buy
-  more here.
+  0 commit-metadata hits. The digest that stayed is the exact opposite, and openly so: it is
+  on the author line and the committer line of every commit in this history, and nowhere
+  else — not in a blob, not in a commit message. That is written as a rule and not as a
+  count on purpose. At two hits per commit any number put here is wrong again by the next
+  commit, which is precisely what happened to the number this sentence replaces: it was
+  measured at 79 commits, landed on the 80th, and was stale on arrival. So there is nothing
+  in this repo to derive the guess from. Taking the line out of the tree costs one line and
+  is worth it. Taking it out of the past costs a force-push over a published history, which
+  is the same price the Zoo uuid and the author email were just weighed against and it does
+  not buy more here.
 
 The point of writing this down is that it converts an oversight into a choice. Anyone who
 finds the uuid, the author email or that fingerprint in the history later is looking at

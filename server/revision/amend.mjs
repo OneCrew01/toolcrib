@@ -249,8 +249,8 @@ export const DISCLAIMER_TEXT = Object.freeze({
   unverifiedRule:
     "UNVERIFIED RULE: the reference rows behind this proposal ({ruleIds}) have not been " +
     "signed off by the operator yet. They are bench practice measured off printed fit " +
-    "coupons, not a published number. Print a coupon pair and check it with calipers " +
-    "before you lean on them.",
+    "coupons, not a published number. Print a coupon pair — two small test prints, not " +
+    "the real part — and check them with calipers before you lean on them.",
 
   /**
    * ALWAYS present. The reference gives a band and nothing else; turning a

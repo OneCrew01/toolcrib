@@ -29,8 +29,8 @@ npm run demo   # the whole loop, offline: no network, no API minutes, no install
 
 One real request walks the entire machine — validation → cited reference consult →
 generation (replayed from real prior Zoo outputs) → measured geometry gates → a
-hash-sealed job package → parked at a gate that waits for a human. The last thing it
-prints is that job's transition ledger, re-verified end to end:
+hash-sealed job package → parked at a gate that waits for a human. It ends by printing
+that job's transition ledger, re-verified end to end, and the state it stopped in:
 
 ```
   ·                        -> DRAFT                    [SYS:pipeline-orchestrator] created
@@ -41,6 +41,8 @@ prints is that job's transition ledger, re-verified end to end:
   PACKAGING                -> PDF_GENERATION           [SYS:pipeline-orchestrator] exports sealed at server/pipeline/data/packages/4049aa72-c50b-4c92-a919-92abddca3258 (packageHash 8fb0dc8c2a11c25771828a3a0ce22ff95deaa754b900e57a68e1e00e3ebfe030)
   PDF_GENERATION           -> WAITING_FOR_HUMAN_REVIEW [SYS:pipeline-orchestrator] manufacturingPackage.pdf rendered (16407B); parked for human review
   ledger verify: OK (7 rows, hash chain intact)
+
+final state: WAITING_FOR_HUMAN_REVIEW
 ```
 
 That is pasted from a real run of this repo, not retyped. The job id and the
