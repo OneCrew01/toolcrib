@@ -19,6 +19,43 @@ it breaks — check the numbers against your own source first. Whether a finishe
 fit for the job it is going into is a call for the person holding that part. It is not a
 call a generator can make, and it is not made by the citation printed next to a number.
 
+## See it run (60 seconds, no install, no API key)
+
+```bash
+git clone <this repo>
+cd toolcrib
+npm run demo   # the whole loop, offline: no network, no API minutes, no install step
+```
+
+One real request walks the entire machine — validation → cited reference consult →
+generation (replayed from real prior Zoo outputs) → measured geometry gates → a
+hash-sealed job package → parked at a gate that waits for a human. The last thing it
+prints is that job's transition ledger, re-verified end to end:
+
+```
+  ·                        -> DRAFT                    [SYS:pipeline-orchestrator] created
+  DRAFT                    -> VALIDATING               [SYS:pipeline-orchestrator] request file: samples/requests/plain-plate.json
+  VALIDATING               -> GENERATING               [SYS:request-validator] request valid
+  GENERATING               -> GEOMETRY_CHECK           [SYS:pipeline-orchestrator] replay backend produced kcl(2469B) + files [stl, step, gltf, png]; 2 reference rule lookup(s) — DRAFT — NOT VERIFIED
+  GEOMETRY_CHECK           -> PACKAGING                [SYS:pipeline-orchestrator] gates: envelope=pass, watertight=pass, mass=pass; measured {"bboxMm":{"x":50,"y":50,"z":2},"watertight":true,"volumeMm3":4843.9277,"triangles":540,"massG":13.0786}
+  PACKAGING                -> PDF_GENERATION           [SYS:pipeline-orchestrator] exports sealed at server/pipeline/data/packages/4049aa72-c50b-4c92-a919-92abddca3258 (packageHash 8fb0dc8c2a11c25771828a3a0ce22ff95deaa754b900e57a68e1e00e3ebfe030)
+  PDF_GENERATION           -> WAITING_FOR_HUMAN_REVIEW [SYS:pipeline-orchestrator] manufacturingPackage.pdf rendered (16407B); parked for human review
+  ledger verify: OK (7 rows, hash chain intact)
+```
+
+That is pasted from a real run of this repo, not retyped. The job id and the
+`packageHash` are minted fresh on every run, so those two will differ for you; the rest
+is what you get. Every row is hash-chained to the one before it, and the last line is
+the chain being recomputed and checked rather than asserted.
+
+And the part it built — the engine-rendered preview the run seals into the package,
+byte-identical to the copy shipped here:
+
+![A 50 × 50 × 2 mm plate with four 5 mm holes, rendered by Zoo's engine](samples/plain-plate/preview.png)
+
+What is inside that sealed package, what the leak sweep does, and how to point the same
+pipeline at the live API are in [Setup](#setup).
+
 ## The problem
 
 Modern text-to-CAD is remarkable at *shapes* and still hard to trust for *features that
@@ -91,7 +128,9 @@ lip, each part in its own color so the fit reads visually. Output is
 remixer-friendly KCL 2.0: your numbers are named constants, every derived dimension
 carries its formula as a comment, and the generator refuses to emit geometry that
 violates its own arithmetic gates. Printable fit-coupon sets at four clearances live
-in `samples/flush-mount/coupons/`.
+in `samples/flush-mount/coupons/`. (A **coupon** is a machinist's word for a small
+test piece you make to check one thing before committing to the real part — nothing
+to do with discounts. Print the set, try the fits, keep the one that felt right.)
 
 Why deterministic generation instead of prompting? Campaign C003 (FN-020): text-to-cad
 *can* build this pair — when the prompt pre-chews the engineering. Phrase it like a
@@ -189,20 +228,15 @@ right now and when it landed.
 
 ## Setup
 
-```bash
-git clone <this repo>
-cd toolcrib
-npm run demo   # full loop, zero network, zero API minutes, no install step
-```
+The command is at the top of this file —
+[See it run](#see-it-run-60-seconds-no-install-no-api-key). This section is what it
+leaves behind.
 
-`npm run demo` walks one real request through the entire machine — validation →
-cited reference consult → generation (replayed from real prior Zoo outputs) →
-measured geometry gates → a hash-sealed job package (CAD source, STL/STEP,
-engine-rendered preview, validation report, 13-section manufacturing PDF, tamper-
-evident manifest) — and parks it at the human-review gate with the full transition
-ledger printed and verified. No token needed, and nothing to install: every import
-under `server/` is a `node:` builtin, so the demo has zero npm dependencies and runs
-against an empty `node_modules`. (Node versions below.)
+`npm run demo` parks its job at the human-review gate and writes a hash-sealed package
+beside it: CAD source, STL/STEP, engine-rendered preview, validation report, 13-section
+manufacturing PDF, tamper-evident manifest. No token needed, and nothing to install:
+every import under `server/` is a `node:` builtin, so the demo has zero npm dependencies
+and runs against an empty `node_modules`. (Node versions below.)
 
 The bundle is a nested directory, so count it recursively — `find <bundle> -type f` gives
 **12 files across six subdirectories, 11 of them sealed**. (A plain `ls` of the top level
@@ -328,7 +362,7 @@ a part in prose, watch the copilot reason and draft KCL live, then push a finish
 turn into the New Job form as design intent — the reviewed pipeline underneath
 (gates, ledger, human sign-off) is exactly the same pipeline this panel feeds.
 
-The token boundary is doctrine, not an implementation detail. **The token is entered
+The token boundary is a hard rule, not an implementation detail. **The token is entered
 at runtime, held in memory only, and talks from your browser straight to Zoo — wiped
 the moment you disconnect.** That part is in the code: `app/src/lib/zookeeper.ts`
 sends it once in the auth frame and clears its copy immediately. The ToolCRIB backend
@@ -359,7 +393,10 @@ pipeline runs exactly three checks on a part — does it fit the printer, is the
 closed, does it weigh what the request said. Neither of these is one of them.
 
 **Design-for-flammability** (`server/reference/tables/burn-cert.mjs`,
-`server/generators/burncert-validate.mjs`) turns published wall-thickness findings
+`server/generators/burncert-validate.mjs`; **burn-cert** is shorthand for *burn
+certification* — the lab test where a real piece of the real plastic is set alight to
+see whether it meets a published flammability standard, and nothing in this repo is
+that test) turns published wall-thickness findings
 (FAA TC TN23-65 / UL-94) into a wall-thickness check over an STL: it samples points
 on the mesh and measures how thick the plastic is there, against the floor the table
 names. `server/generators/burncert-recipe.mjs` (`printRecipe`) writes out the half a
@@ -370,8 +407,9 @@ exits 1. Nothing here certifies anything — that takes a physical coupon burned
 lab per 14 CFR 25.853 — and every rule ships stamped as unverified until a person
 signs it off.
 
-**Assembly weight & balance** (`server/wb/`) adds up an assembly's parts and works
-out where the combined center of gravity lands. It labels each part's mass `modeled`
+**Assembly weight & balance** (`server/wb/`, and **W&B** wherever the code shortens it)
+adds up an assembly's parts and works out where the combined **center of gravity (CG)**
+lands — the single point the whole thing balances about. It labels each part's mass `modeled`
 (computed from the volume and a density you give it) or `measured` (you weighed it on
 a kitchen scale, which wins), and the report says which one each row used. Give it a
 window the CG has to stay inside and the check is fail-closed: land outside it and

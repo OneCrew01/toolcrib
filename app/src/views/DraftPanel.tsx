@@ -3,7 +3,7 @@
 // Natural-language drafting chat over Zoo's copilot websocket
 // (wss://api.zoo.dev/ws/ml/copilot) that feeds the New Job form.
 //
-// Token boundary (doctrine): the token is entered at runtime, held in
+// Token boundary (a hard rule): the token is entered at runtime, held in
 // component/client memory ONLY — never localStorage/sessionStorage, never
 // logged, never sent anywhere except Zoo's wss endpoint. The backend is never
 // in the TOKEN's path. Say it that way, not "the backend has zero involvement"
@@ -71,7 +71,7 @@ export function DraftPanelView({
       },
     });
     clientRef.current = client;
-    // Memory-only doctrine: the field is cleared the moment the client takes
+    // Memory-only rule: the field is cleared the moment the client takes
     // the token; the client wipes its own copy once the auth frame is sent.
     setToken("");
     client.connect();

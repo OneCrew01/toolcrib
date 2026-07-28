@@ -133,7 +133,7 @@ test("an email hint withholds the address; a uuid hint keeps its grep handle", (
   assert.equal(uuidHit.hint, "7c9f2a41…");
   assert.ok(stranger.startsWith(uuidHit.hint.slice(0, 8)), "the uuid hint must stay greppable");
 
-  // The same function the two email entries in KNOWN would render through.
+  // The same function the email entry in KNOWN would render through.
   const address = "not.a.real.person@example.invalid";
   const line = describeHits([
     { where: "some/file.json", why: "an operator email address", hint: hintFor(address), digest: fingerprint(address) },

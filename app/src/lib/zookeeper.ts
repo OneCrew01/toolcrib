@@ -25,7 +25,7 @@
 //   - turn ends at end_of_stream (carries whole_response) or error (which
 //     terminates the turn — no end_of_stream follows)
 //
-// Token doctrine (operator mode): the token is held in client memory only for
+// The hard rule about the token (operator mode): it is held in client memory only for
 // the instant needed to build the auth frame, is sent ONLY to Zoo's wss
 // endpoint, is never logged, never persisted, and is wiped from this object
 // the moment the auth frame is on the wire.

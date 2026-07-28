@@ -222,25 +222,25 @@ import { PENDING_OPERATOR, VERIFIED, ruleValue } from "../reference/schema.mjs";
 import { flushMountFit, fitClearance, chamferFor } from "../reference/tables/flush-mount-fit.mjs";
 import { generateFlushMountPair } from "../generators/flushmount.mjs";
 
-// --- the operator-flag wording ----------------------------------------------
+// --- the disclaimer text -----------------------------------------------------
 
 /**
- * OPERATOR-FLAG ITEM. The public voice ruling is "aviation standard but not
- * grade. E for everyone." — we build to a published standard and we never
- * claim to have been graded against one. Plain English: the reader is a
- * stranger who owns a 3D printer.
+ * Every line of text this module shows a person lives here, in one place, so
+ * the wording can be rewritten without reading the rest of the module.
  *
- * Every operator-facing string lives here, in one place, so the operator can
- * rewrite them without reading the module. The tests assert MEANING (that a
- * disclaimer survives rule signing, that it names a human, that it does not
- * claim certification) against these constants rather than pinning the prose,
- * so editing the words below does not turn the suite red.
+ * One rule governs the words: this repo builds to a published standard and
+ * never says it has been graded against one. Plain English throughout — the
+ * reader is a stranger who owns a 3D printer.
+ *
+ * The tests assert MEANING (a disclaimer survives rule signing, it names a
+ * human, it does not claim certification) rather than pinning the prose, so
+ * editing the words below does not turn the suite red.
  *
  * {placeholders} are substituted by fillWording(), which replaces EVERY
  * occurrence and inserts values literally — so a rewrite that names the
  * reviewer twice is filled twice, and a name containing "$&" survives intact.
  */
-export const OPERATOR_FLAG_WORDING = Object.freeze({
+export const DISCLAIMER_TEXT = Object.freeze({
   /**
    * Present ONLY while a reference row this proposal leaned on is still
    * waiting for an operator signature. It correctly disappears when the rows
@@ -875,11 +875,11 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
 
   const warnings = [];
   if (draft) {
-    warnings.push(fillWording(OPERATOR_FLAG_WORDING.unverifiedRule, { ruleIds: pending.map((r) => r.id).join(", ") }));
+    warnings.push(fillWording(DISCLAIMER_TEXT.unverifiedRule, { ruleIds: pending.map((r) => r.id).join(", ") }));
   }
   if (unchanged) {
     warnings.push(
-      fillWording(OPERATOR_FLAG_WORDING.noChange, {
+      fillWording(DISCLAIMER_TEXT.noChange, {
         clearanceMm: mm(amendedValue),
         depthMm: mm(amendedDepth),
       }),
@@ -887,7 +887,7 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
   }
   if (contradicts) {
     warnings.push(
-      fillWording(OPERATOR_FLAG_WORDING.deltaContradictsFit, {
+      fillWording(DISCLAIMER_TEXT.deltaContradictsFit, {
         fit: m.fit,
         feature: m.feature,
         direction: processDeltaMm.valueMm > 0 ? "took clearance away" : "gave clearance back",
@@ -896,7 +896,7 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
   }
   if (!withinCitedBand) {
     warnings.push(
-      fillWording(OPERATOR_FLAG_WORDING.outsideCitedBand, {
+      fillWording(DISCLAIMER_TEXT.outsideCitedBand, {
         valueMm: mm(amendedValue),
         fitClass: clearance.class,
         minMm: mm(clearance.perSideMinMm),
@@ -906,8 +906,8 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
       }),
     );
   }
-  warnings.push(OPERATOR_FLAG_WORDING.derivationUncited);
-  warnings.push(fillWording(OPERATOR_FLAG_WORDING.amendmentDisclaimer, { reviewer: m.measuredBy }));
+  warnings.push(DISCLAIMER_TEXT.derivationUncited);
+  warnings.push(fillWording(DISCLAIMER_TEXT.amendmentDisclaimer, { reviewer: m.measuredBy }));
 
   // 11. Frozen on the way out: the caveats are not the caller's to delete.
   return deepFreeze({

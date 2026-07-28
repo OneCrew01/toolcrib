@@ -95,16 +95,17 @@ was recovered from a mirror of the official section PDF. Read verbatim and encod
 with exact citations: para 4-57c(1) (edge distance ≥ 2D, spacing ≥ 3D) and 4-57g(3)
 (rivet dia ≈ 3 × thicker sheet). Figure 4-5 (multi-row minimums) is a scanned image —
 values unreadable, deliberately NOT encoded. Flush-head 2.5D, preferred values, and
-typical pitch practice are AMT-handbook material, encoded citing FAA-H-8083-31A with
-paragraph "UNCONFIRMED" rather than an invented AC paragraph. Every rule ships
-PENDING_OPERATOR regardless of source until checked against the printed text
-(docs/VERIFICATION_LOG.md).
+typical pitch practice are AMT-handbook material (the FAA's *Aviation Maintenance
+Technician* handbook — the free, public training text US airframe mechanics learn from),
+encoded citing FAA-H-8083-31A with paragraph "UNCONFIRMED" rather than an invented AC
+paragraph. Every rule ships PENDING_OPERATOR regardless of source until checked against
+the printed text (docs/VERIFICATION_LOG.md).
 
 ## D-006 · 2026-07-22 · License MIT
 Maximum remixability; matches the contest's remix-and-expand theme. (Revisit before the
 repo goes public if a different open license is preferred.)
 
-## D-008 · 2026-07-25 · Account identity is scrubbed forward, and guarded by fingerprint
+## D-008 · 2026-07-25 · Account identity is scrubbed forward, and guarded by fingerprint *(corrected and re-decided 2026-07-28)*
 The two replay fixtures (`samples/plain-plate/validation.json`,
 `samples/plain-plate-stl/validation.json`) are captured `GET /file/mass` responses, and a
 captured response carries the account that made the call: `user_id` held the operator's
@@ -167,6 +168,46 @@ Wired into `npm test` in three places: the working-tree contents of every git-tr
 it can still be stopped), every file of a freshly generated bundle plus its ledger reasons
 and manifest warnings (server/pipeline/pipeline.test.mjs), and both HTTP channels
 (server/api/api.test.mjs).
+
+*Correction (2026-07-28).* Everything above stands except one sentence, and it is the
+sentence the decision rested on: "The in-window commit timestamps are the contest's
+evidence that this repo was built from scratch inside the window." **Rewriting history
+does not touch commit timestamps.** A rewrite changes what each commit CONTAINS, so every
+commit fingerprint changes — and the author date and the committer date are carried across
+untouched unless the tool is told to change them. Measured rather than asserted, on a
+throwaway clone so this repo's own history was never at risk: `git filter-branch
+--index-filter` over the last five commits produced five new shas and five author/committer
+date pairs identical to the originals to the second. So "do not rewrite" was never what was
+buying the in-window evidence. That evidence lives in the dates, and the dates survive a
+rewrite.
+
+The real costs of a rewrite are different ones, and they are named here because the one on
+the record was imaginary. Every sha changes, so the `git show d4adfb4:` quotations D-003 and
+D-004 use to reproduce their own superseded text stop resolving. And this branch is already
+pushed, so a rewrite means force-pushing over a published history that other clones may
+already hold. Both are real; neither is what the original entry said.
+
+*Re-decided (2026-07-28): publish as-is, knowingly.* With the imaginary cost removed the
+question was asked again from scratch, against what the history actually holds. Measured
+today, with this repo's own detector run over every blob in the object graph and then over
+the tree of every commit reachable from `main` — 77 commits at the time of writing:
+**43 of them carry the operator's Zoo account uuid**, in one of three historical versions
+of the two replay fixtures, and **every one of the 77 is authored and committed by a single
+personal email address**. Both are already pushed. Later commits add to the denominator
+and not to the 43: the current tree is scrubbed. The ruling is to leave all of it where it
+is, for three reasons:
+
+- A Zoo `user_id` is an identifier, not a credential. Nothing is revoked, rotated or
+  protected by editing it out of a past commit. The current tree already reads the Nil
+  UUID, and the guard described above is what stops the next one.
+- An author email is how git attribution works. It is on every commit of every public repo
+  its owner has ever pushed, so removing it from this one removes it from nowhere.
+- The operator's real name goes public deliberately in `LICENSE` — MIT requires a named
+  copyright holder. This repo is not anonymous and was never trying to be.
+
+The point of writing this down is that it converts an oversight into a choice. Anyone who
+finds that uuid in the history later is looking at something its owner decided to leave
+there, on a date, for stated reasons — not at something nobody noticed.
 
 ## D-009 · 2026-07-27 · The amendment ships as a pure module, and the wiring does not *(corrected in place 2026-07-27)*
 

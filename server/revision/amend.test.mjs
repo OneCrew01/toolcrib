@@ -11,7 +11,7 @@ import {
   validateMeasurement,
   quantizeMm,
   fillWording,
-  OPERATOR_FLAG_WORDING,
+  DISCLAIMER_TEXT,
   FIT_CLASSES,
   MM_DECIMALS,
   MAX_DEVIATION_MM,
@@ -191,7 +191,7 @@ test("RULING 1: a loose fit cites the tight band edge (min), an interference fit
 
 // --- RULING 2: two independent warning strings ------------------------------
 
-const disclaimerFor = (name) => fillWording(OPERATOR_FLAG_WORDING.amendmentDisclaimer, { reviewer: name });
+const disclaimerFor = (name) => fillWording(DISCLAIMER_TEXT.amendmentDisclaimer, { reviewer: name });
 
 test("RULING 2: unsigned rows produce BOTH the unverified-rule warning and the disclaimer", () => {
   const r = draft();
@@ -229,7 +229,7 @@ test("RULING 2: the disclaimer is independent — it survives every signing stat
       table,
     );
     assert.ok(r.warnings.includes(disclaimerFor("R. Vasquez")), `disclaimer missing for ${table.name}`);
-    assert.ok(r.warnings.includes(OPERATOR_FLAG_WORDING.derivationUncited), `derivation note missing for ${table.name}`);
+    assert.ok(r.warnings.includes(DISCLAIMER_TEXT.derivationUncited), `derivation note missing for ${table.name}`);
   }
 });
 
@@ -248,11 +248,11 @@ test("RULING 2: the unverified warning names exactly the rows still pending", ()
 });
 
 test("RULING 2: the wording is one findable constant, and it says what it has to say", () => {
-  assert.ok(Object.isFrozen(OPERATOR_FLAG_WORDING));
-  const { unverifiedRule, amendmentDisclaimer, derivationUncited } = OPERATOR_FLAG_WORDING;
+  assert.ok(Object.isFrozen(DISCLAIMER_TEXT));
+  const { unverifiedRule, amendmentDisclaimer, derivationUncited } = DISCLAIMER_TEXT;
   // EVERY operator-facing string lives in this one constant — an operator
   // rewriting the voice must not have to find a sixth one hiding in the code.
-  for (const [name, s] of Object.entries(OPERATOR_FLAG_WORDING)) {
+  for (const [name, s] of Object.entries(DISCLAIMER_TEXT)) {
     assert.strictEqual(typeof s, "string", name);
     assert.ok(s.length > 80, `${name}: an operator-facing caveat that short is not a caveat`);
     assert.match(s, /^[A-Z][A-Z ,'-]+:/, `${name}: every caveat leads with what it is`);
@@ -971,7 +971,7 @@ test("wording placeholders are filled everywhere, and values are inserted litera
   // the operator's wording: rewording the disclaimer made find() return
   // undefined and this test died with a TypeError about `.includes` — a crash
   // that says nothing about the property under test, which is substitution.
-  const label = OPERATOR_FLAG_WORDING.amendmentDisclaimer.split(":")[0];
+  const label = DISCLAIMER_TEXT.amendmentDisclaimer.split(":")[0];
   const said = r.warnings.find((w) => w.startsWith(label));
   assert.ok(said, `no warning carries the amendment disclaimer (looked for "${label}:")`);
   assert.ok(said.includes("R. $& Vasquez"), said);

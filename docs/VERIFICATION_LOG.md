@@ -116,7 +116,11 @@ above, against the printed sources named per row.
   be V-1 at 1 mm) **were confirmed verbatim from a fetched secondary source**
   (`forgelabs.com/blog/ul-94-fire-safety-standards-additive-manufacturing`,
   fetched 2026-07-23). The authoritative record is the **UL Yellow Card for the exact
-  filament grade** — sign-off requires checking the Yellow Card, not the blog.
+  filament grade** — sign-off requires checking the Yellow Card, not the blog. (A
+  *Yellow Card* is the datasheet UL publishes for one specific plastic from one
+  specific maker: it lists the flammability rating that exact material earned at each
+  thickness tested. It is per-grade, not per-plastic-family, which is why a rating
+  read off a blog post about "PC-ABS" is not a rating for the spool you bought.)
 - **14 CFR 25.853(a)** text was fetched and confirmed 2026-07-23 via the Cornell LII
   mirror (`law.cornell.edu/cfr/text/14/25.853`): "Materials … must meet the applicable
   test criteria prescribed in part I of appendix F of this part…". Context only —

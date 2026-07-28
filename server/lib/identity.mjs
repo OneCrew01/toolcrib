@@ -74,11 +74,24 @@ export const fingerprint = (token) =>
 // matters.
 export const CONTROL_TOKEN = ["0badc0de", "0bad", "4bad", "8bad", "0badc0de0bad"].join("-");
 
+// --- what is fingerprinted, and what deliberately is not -------------------
+//
+// A fingerprint cannot be run backwards, but it CAN confirm a guess: anyone who
+// already suspects a value can hash it and check. That is a fair trade for an
+// identifier this repo's history actually carries — the guard is worth more than
+// the oracle. It is a bad trade for one the history does not carry, because then
+// this line is the only thing in the repo saying the value exists at all.
+//
+// One entry was removed on 2026-07-28 for exactly that reason: a second operator
+// address, on a domain that appears nowhere in this repo or its history. Nothing
+// leaked; the fingerprint was guarding a value that had never been anywhere near
+// the corpus, and publishing it bought a confirmation oracle for no coverage.
+// The entries below all commit to identifiers the history really holds.
+
 /** fingerprint -> what it is. Digests only; no identifier is stored here. */
 const KNOWN = new Map([
   ["330d5638ff98a18545e141985f270c924663c7e38b4d2d581598916cbd38b537", "the operator's Zoo account user_id"],
   ["12122db1f7d1d21624ea29170847cfc9738bd880aac4f9fcf9e4056533816637", "an operator email address"],
-  ["b7f39c11d2730206e2577bf4d37227e7956171fd13c869432856c4ddd3b26fa8", "an operator email address"],
   [fingerprint(CONTROL_TOKEN), "CONTROL — a synthetic token that is nobody's account"],
 ]);
 
