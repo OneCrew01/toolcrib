@@ -574,8 +574,11 @@ and confirmed to resolve before it was written down.
   the measurement of it is wrong, which is what makes this dangerous rather than annoying —
   nothing downstream fails.
 - **Impact:** any consumer that trusts `calculate_bounding_box` is silently corrupted, and a 20 %
-  XY inflation is exactly the size that reads as plausible rather than broken. The concrete
-  casualty here is the printer-envelope check FN-015 closed: a 23.64 mm box on a 19.7 mm part
+  XY inflation is exactly the size that reads as plausible rather than broken. The casualty is the
+  printer-envelope check FN-015 closed as a *capability* — **not this repo's envelope gate, which
+  never asks the engine**: `run-job.mjs` measures the finished STL with the offline analyzer
+  `server/package/stl-analyze.mjs` and compares that to `buildVolumeMm`. The hazard is real for
+  anyone who does wire the engine call into a gate: a 23.64 mm box on a 19.7 mm part
   rejects nothing today, but on a part near the plate limit it rejects a job that would have
   printed — and a build-volume rejection is precisely the kind of answer nobody re-derives by hand.
   Counting this one, the same measurement now has three behaviours: exact on path-built solids

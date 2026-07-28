@@ -21,13 +21,13 @@ ToolCRIB attacks that gap two ways:
    fasteners, edge distances, and flush mounting, derived from public-domain FAA
    acceptable-practice data (AC 43.13-1B) — the kind of shop knowledge that normally
    lives in a dog-eared binder, exposed as a typed backend reference with every value
-   carrying its source citation. Every request that passes validation gets asked —
-   it has an answer when the request names hole sizes in mm, and when it does not,
-   the ledger row written once the files come back says so in as many words
-   (`reference consult skipped:` and the reason). A request rejected at validation
-   never gets that far. `npm run amend` checks a clearance against it. (The
-   flush-mount generator does not — it builds from the numbers you hand it. That
-   boundary is stated again below, where the generator is.)
+   carrying its source citation. The pipeline asks the reference about every request
+   that passes validation — the reference has an answer when the request names hole
+   sizes in mm, and when it does not, the ledger row written once the files come back
+   says so in as many words (`reference consult skipped:` and the reason). A request
+   rejected at validation never gets that far. `npm run amend` checks a clearance
+   against it. (The flush-mount generator does not — it builds from the numbers you
+   hand it. That boundary is stated again below, where the generator is.)
 2. **A traceable generate → validate → document → revise loop.** Intent goes in; Zoo's
    Agent API drafts editable parametric CAD (KCL, not a dead mesh); Zoo's Engine API
    executes and *validates* it (mass properties, geometry checks); Zoo's File Format API

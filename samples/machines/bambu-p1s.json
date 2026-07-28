@@ -10,5 +10,5 @@
     { "name": "PETG", "approvedUse": "shop tooling, form blocks, fixtures" },
     { "name": "TPU", "approvedUse": "soft-jaw and chafe-guard prototypes" }
   ],
-  "notes": "Bench machine profile for the capability gate: generated parts must fit buildVolumeMm (checked live via the Engine bounding_box command, see FN-015) and use an approved material profile. What comes off this machine is shop and bench work — jigs, fixtures, form blocks, soft jaws and prototypes."
+  "notes": "Bench machine profile. The pipeline measures the STL it produced and refuses the job unless the part fits inside the build volume above, turned whichever way it needs to be. It does not check the material — that choice is yours. What comes off this machine is shop and bench work only — jigs, fixtures, form blocks, soft jaws and prototypes."
 }
