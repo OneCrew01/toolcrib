@@ -74,6 +74,9 @@ export const PINS = {
 
   // the generator: where clearance is declared, and where the panel reads the chamfer
   "server/generators/flushmount.mjs:23": "no I/O, no network, no clock",
+  // D-010's declared deviation: the two string literals that were edited
+  "server/generators/flushmount.mjs:169": "gate(!(opening.cornerRadiusMm > 0)",
+  "server/generators/flushmount.mjs:220": '"clean miter, both parts:',
   "server/generators/flushmount.mjs:272": "const { W, H, T, ow, oh, A, d, e, colors } = dd;",
   "server/generators/flushmount.mjs:336": 'constLine("clearancePerSide", mm(c))',
   "server/generators/flushmount.mjs:411": "const { W, H, T, ow, A, d, e, colors } = dd;",

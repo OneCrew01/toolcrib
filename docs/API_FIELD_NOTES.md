@@ -540,22 +540,39 @@ and confirmed to resolve before it was written down.
   | micro_clear | 23.976 × 23.976 × 3.005 | 19.98 × 19.98 × 3.00 | 19.98 × 19.98 × 3 |
 
 - **The pattern is the reportable part:** XY = **1.2 × the true part**, Z = **part + 0.1 ×
-  chamferDepth**, arithmetic-exact on every row. It is checkable end to end on the one row whose
-  parameters this repo ships: base_c015's true part matches
+  chamferDepth**, arithmetic-exact on every row. One row is checkable end to end against a file
+  this repo ships: base_c015's true part matches
   `samples/flush-mount/coupons/c0.15/insert.kcl` on all four numbers — a 19.7 × 19.7 × 3 insert at
-  `chamferDepth = 0.8` — and 19.7 × 1.2 = 23.64, 3 + 0.1 × 0.8 = 3.08, both to the digit. Run the same arithmetic backwards on the other three and the implied depths
-  are 2.8, 0.6 and 0.05, which match what their case names say they are; those are *implied*, not
-  read off the spec. Five parameter sets were measured and the pattern held in all five; the four
-  with recorded numbers are tabulated.
+  `chamferDepth = 0.8` — and 19.7 × 1.2 = 23.64, 3 + 0.1 × 0.8 = 3.08, both to the digit. Run the
+  same arithmetic backwards on the other three and the implied chamfer depths are 2.8, 0.6 and
+  0.05 — **back-derived from the very pattern they would otherwise be evidence for**, so they are
+  not corroboration and are not offered as any. The case names do not supply it either:
+  `deep_chamfer` is the only one that names a depth at all; `tiny_scale` names a scale reduction,
+  and 0.6 mm on a 0.9 mm part is two thirds of the plate's thickness — nothing about that row is
+  tiny except its overall scale; `micro_clear` names a clearance, which its true part does confirm
+  — 19.98 = 20.0 − 2 × 0.01 — while saying nothing about a chamfer. base_c015 is the row the claim
+  stands on. Five parameter sets were measured and the pattern held in all five; the four with
+  recorded numbers are tabulated.
 - **Mechanism: UNKNOWN, and deliberately not guessed.** One thing it is *not* is the raw extent of
-  the cutters: for base_c015 the wedge prisms reach ±15.8 mm, while half the reported box is
-  11.82 mm. Beyond that we have two round factors — 1.2 and 0.1 — that track the part and the
-  chamfer depth rather than the tool, and nothing that says why. Naming a cause we did not measure
-  would be the defect this repo exists to stop.
+  the cutters, and the shipped file is enough to say so.
+  `samples/flush-mount/coupons/c0.15/insert.kcl` declares
+  `wedgeSpanY = insertHeight + 2 * chamferReach + 2mm` = 19.7 + 3.6 + 2 = 25.3 mm, extruded
+  `symmetric = true`, so each wedge prism reaches **±12.65 mm**; in its own sketch plane the same
+  wedge spans 8.05 → 10.2 mm across and 1.85 → 4.0 mm in Z. The part plus every cutter is
+  therefore 25.3 × 25.3 × 4.0 mm. The reported box is neither that nor the part: it sits *strictly
+  between* them on all three axes — 11.82 mm per side against 9.85 for the part and 12.65 for the
+  cutters, 3.08 mm tall against 3.0 and 4.0. Beyond that we have two round factors — 1.2 and 0.1 —
+  that track the part and the chamfer depth rather than the tool, and nothing that says why.
+  Naming a cause we did not measure would be the defect this repo exists to stop.
 - **What it does NOT touch:** the exported mesh. Both meshes — boolean-built and native — are
   watertight, 0 degenerate, 0 sliver, 20 triangles, 12 vertices, and agree on volume to
-  2.4e-9 mm³ (1139.7366463938852 vs 1139.7366440254093). The part is right; only the measurement
-  of it is wrong, which is what makes this dangerous rather than annoying — nothing downstream fails.
+  2.4e-6 mm³ (1139.7366463938852 vs 1139.7366440254093) — a relative agreement of 2.1e-9. *(Filed
+  here first as "2.4e-9 mm³": the relative figure wearing the absolute one's units, three orders
+  out. It was caught by subtracting the two numbers printed next to it, which is the entire
+  argument for putting arithmetic in a test rather than in a sentence —*
+  `server/generators/chamfer-claims.test.mjs` *does that subtraction now.)* The part is right; only
+  the measurement of it is wrong, which is what makes this dangerous rather than annoying —
+  nothing downstream fails.
 - **Impact:** any consumer that trusts `calculate_bounding_box` is silently corrupted, and a 20 %
   XY inflation is exactly the size that reads as plausible rather than broken. The concrete
   casualty here is the printer-envelope check FN-015 closed: a 23.64 mm box on a 19.7 mm part
@@ -564,11 +581,19 @@ and confirmed to resolve before it was written down.
   Counting this one, the same measurement now has three behaviours: exact on path-built solids
   (FN-015), null dimensions on imported ones (FN-022), inflated on boolean-built ones (here). Only
   the third lies quietly.
-- **Repro:** execute `samples/flush-mount/coupons/c0.15/insert.kcl` — shipped, and the base_c015
-  row — and ask for its bounding box → 23.64 × 23.64 × 3.08. Measure the same part from its shipped
-  mesh `samples/flush-mount/coupons/c0.15/insert.stl` (`server/package/stl-analyze.mjs`, the
-  offline analyzer FN-021 pinned against `/file/mass`) → 19.7 × 19.7 × 3.0. The other three rows
-  are the same generator at other parameters (`server/generators/flushmount.mjs`).
+- **Repro — and what is missing from it.** The offline half runs in this repo:
+  `node --test server/generators/chamfer-claims.test.mjs` measures the shipped mesh
+  `samples/flush-mount/coupons/c0.15/insert.stl` with `server/package/stl-analyze.mjs` (the offline
+  analyzer FN-021 pinned against `/file/mass`) → 19.7 × 19.7 × 3.0 watertight over 20 triangles,
+  reads the cutter extents above out of the shipped `.kcl`, and holds the engine figures beside
+  them so every piece of arithmetic in this note is a test rather than a sentence. It runs as part
+  of `npm test`. The engine half does not run here: execute
+  `samples/flush-mount/coupons/c0.15/insert.kcl` — shipped, and the base_c015 row — and ask for its
+  bounding box → 23.64 × 23.64 × 3.08. **The 35-call probe harness that produced that figure is not
+  committed to this repo**, because re-running it spends API minutes. The consequence is worth
+  stating rather than leaving to be discovered: nothing here re-measures the engine, so if a
+  release quietly fixes the bounding box, this note goes stale and no test goes red. The other
+  three rows are the same generator at other parameters (`server/generators/flushmount.mjs`).
 - **Suggested fix:** return the bounding box of the resulting solid after a boolean. If the value
   is instead a deliberate conservative envelope, say so in the response and on the docs page — an
   unlabelled envelope is indistinguishable from a measurement, and gets used as one.
@@ -607,9 +632,16 @@ and confirmed to resolve before it was written down.
   lead-in is flat. It prints, it looks correct, and it does not sit flush. The one check that
   separates them is centre of mass, which we compute locally and cross-check (FN-029) — and which
   has to be computed in the right frame to be worth anything, per that same note.
-- **Repro:** extrude a rectangular profile; `chamfer(tags = [solid.sketch.tags.s0, s1, s2, s3])`;
-  read the centre of mass (mapping the axis convention per FN-029). Repeat with each tag wrapped in
-  `getOppositeEdge()`. Everything except the centroid matches.
+- **Repro — and what is missing from it.** On the engine: extrude a rectangular profile;
+  `chamfer(tags = [solid.sketch.tags.s0, s1, s2, s3])`; read the centre of mass (mapping the axis
+  convention per FN-029). Repeat with each tag wrapped in `getOppositeEdge()`. Everything except
+  the centroid matches. **That probe is not committed to this repo** — it is a hand-written KCL run
+  against the live engine, and re-running it spends API minutes; this repo calls `chamfer()`
+  nowhere, so there is nothing here to point at. What *is* committed is the arithmetic that makes
+  the two centroids diagnostic: `node --test server/generators/chamfer-claims.test.mjs` pins that
+  they sum to the part height to float32 — the mirror-image argument above, stated as a check
+  instead of a sentence. If a release changes which end a bare tag resolves to, nothing in this
+  repo will notice.
 - **Suggested doc edit:** the chamfer page's `tags` parameter should say in prose which end of an
   extruded solid a bare profile-edge tag resolves to, and that `getOppositeEdge()` addresses the
   other one. The examples demonstrate the call; they do not say what happens when you omit it.
@@ -618,7 +650,14 @@ and confirmed to resolve before it was written down.
 
 ## FN-034 · Native `chamfer()` cannot reach an interior opening rim — `tags` yields a sketch-edge tag, the operation wants a face tag, and the alternative is marked do-not-use
 - **Surface:** Engine · KCL `chamfer()` edge selection on an inner-loop (hole / opening) profile
-- **Date:** first hit 2026-07-23 while building `server/generators/flushmount.mjs`; filed 2026-07-28
+- **Date:** filed 2026-07-28. First hit while building `server/generators/flushmount.mjs`, and the
+  repo brackets that rather than dating it: the commits that built the chamfer route land
+  2026-07-23 (`9be61ca`, `dffc65a`), and the generator's header carries a `Measured 2026-07-23`
+  — but that date is attached to the *boolean-subtract* failure (FN-024), and the header's reason
+  for not calling `chamfer()` at all is a different one, undated ("the sampled KCL corpus contains
+  no chamfer()/fillet() call"). Nothing in this repo dates the inner-loop failure specifically.
+  Treat 2026-07-23 as the bracket, not as a record; the errors quoted below are verbatim, the
+  calendar around them is not evidence.
 - **Type:** documented limitation — **Zoo already knows**. This note is a timeline question, not a
   bug report.
 - **The feature:** a panel with a rectangular opening and a chamfered lead-in on the opening rim.

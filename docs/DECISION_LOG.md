@@ -251,7 +251,9 @@ mattered:
 
 1. **The geometry is identical at every parameter this repo ships.** At 45° — every coupon
    and every sample here — boolean and native produce the same solid: volume
-   1139.7366463938852 vs 1139.7366440254093 mm³ (2.4e-9 apart), 20 triangles, 12 vertices,
+   1139.7366463938852 vs 1139.7366440254093 mm³ — 2.4e-6 mm³ apart, 2.1e-9 relative (first filed
+   here and in FN-032 as "2.4e-9 mm³", the relative figure wearing the absolute one's units;
+   corrected against the subtraction, which is now a test) — 20 triangles, 12 vertices,
    watertight, 0 degenerate, 0 sliver, 4 chamfer faces of 21.382909 mm² at exactly 45.000°,
    depth 0.800 and run 0.800 with zero error, both. Twenty triangles is the topological
    minimum for a chamfered box and every face is planar, so there is no tessellation freedom
@@ -293,6 +295,21 @@ coincident faces. The generator's internal comment always said that correctly; o
 customer-facing string overclaimed, and only the string was changed — the numbers it describes
 are byte-identical, which the regenerated `.kcl` files prove by not differing.
 
+**A declared deviation, because the instruction was "do not change any generator".** It was
+changed, and it is named here rather than left for a reviewer to find in a diff. Two lines:
+`server/generators/flushmount.mjs:169`, the *message* argument of the `cornerRadiusMm` gate (the
+condition is untouched, and the test that asserts on it still passes), and
+`server/generators/flushmount.mjs:220`, the `cornerTreatment` value in the returned metadata
+object. Both are strings; neither is on the KCL-emission path. The reason it could not be a
+JSON-only edit is that `params.json` is a generated artifact: fixing the five shipped rect copies
+and leaving the generator would have restored the false claim on the next `--write-samples` run,
+so the repo would have gone on carrying the same lie with a shorter fuse. The evidence that
+nothing moved is a command rather than an assurance —
+`node server/generators/flushmount-validate.mjs --write-samples` regenerates every pair and coupon
+offline, and the working tree comes back clean: every `.kcl` byte-identical, every `params.json`
+matching what is committed. Accepting or reverting this is the operator's call, and reverting it
+puts the false `cornerTreatment` string back into five shipped files.
+
 That is a documentation defect of the same family as FN-031's fabricated `minutesUsed: 0`: a
 sentence nobody measured, shipped inside an artifact whose entire pitch is that its numbers are
 real. It is **not** filed as a field note, and the reason is a rule rather than a preference —
@@ -300,6 +317,15 @@ API_FIELD_NOTES.md is about the Zoo API, and Zoo's API did nothing wrong here. F
 slot because it has a Zoo-facing half (no surface exposes per-run minutes) with our defect as the
 consequence; this has no Zoo-facing half at all. It belongs where the evaluation that found it is
 recorded, which is here.
+
+**What is reproducible here, and what is not.** The engine numbers above came from a 35-call probe
+run against the live engine, and that harness is not committed — re-running it spends API minutes,
+and this repo calls `chamfer()` nowhere, so there is nothing here to point at. What is committed is
+`server/generators/chamfer-claims.test.mjs`, which runs in `npm test`: it measures the shipped
+coupon mesh offline, reads the wedge-cutter extents out of the shipped `.kcl`, and holds the
+recorded engine figures beside them so the arithmetic joining the two is checked rather than
+asserted. It cannot tell anyone that a future engine release fixed the bounding box. That gap is
+stated in FN-032 as well, because a repro a reader cannot run should say so where the reader is.
 
 **Why this entry exists at all.** Three field notes came out of a rejected change — FN-032
 (boolean-built solids report an inflated bounding box), FN-033, FN-034 — and so did the correction
