@@ -12,6 +12,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // strictPort, deliberately. Without it Vite silently falls back to :5174
+    // when :5173 is busy, and the API's origin allowlist does not include that
+    // port — so the console comes up looking normal, the job list renders (GET
+    // is unguarded), and then the one click that matters, approving at the
+    // human gate, returns 403 accusing the operator's own browser. Failing
+    // loudly at startup is the honest outcome: a port collision should read as
+    // a port collision, not as a security refusal.
+    strictPort: true,
     proxy: {
       '/api': 'http://localhost:8787',
       '/health': 'http://localhost:8787',
