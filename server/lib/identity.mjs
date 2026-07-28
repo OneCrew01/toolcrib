@@ -83,9 +83,15 @@ export const CONTROL_TOKEN = ["0badc0de", "0bad", "4bad", "8bad", "0badc0de0bad"
 // this line is the only thing in the repo saying the value exists at all.
 //
 // One entry was removed on 2026-07-28 for exactly that reason: a second operator
-// address, on a domain that appears nowhere in this repo or its history. Nothing
-// leaked; the fingerprint was guarding a value that had never been anywhere near
-// the corpus, and publishing it bought a confirmation oracle for no coverage.
+// email address. Measured before removing it, and measured without guessing the
+// address — every email token in every blob in the object graph, plus every
+// author, committer and message line of every commit on every ref, hashed and
+// compared against the two digests that were here. The surviving one matches a
+// token that IS in the history (it is the author email on the commits). The
+// removed one matched NOTHING: not a blob, not a commit. Nothing had leaked, so
+// the fingerprint was guarding a value that had never been near the corpus — and
+// a digest with no coverage is a pure confirmation oracle, since this line would
+// have been the only thing in a public repo hinting the address exists at all.
 // The entries below all commit to identifiers the history really holds.
 
 /** fingerprint -> what it is. Digests only; no identifier is stored here. */
