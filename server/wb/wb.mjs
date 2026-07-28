@@ -15,7 +15,8 @@
 // Honest boundaries (BL-004): modeled mass is solid/nominal — printed mass
 // depends on infill and filament density, so a part's measuredMassG
 // (operator's scale) overrides modeled mass and the basis is labeled per
-// part. No aerodynamics of any kind. Never imply "will it fly."
+// part. What comes out is a mass and a balance point. It says nothing about
+// whether the assembly is strong enough, stiff enough, or safe to use.
 
 import { meshProperties } from "./mesh-props.mjs";
 
@@ -38,7 +39,7 @@ export class CgWindowError extends Error {
 export const WB_DISCLAIMERS = Object.freeze([
   "Advisory weight & balance: this report flags, it does not certify.",
   "Modeled mass is solid/nominal; printed mass depends on infill and filament density. A part's measuredMassG (operator's scale) overrides modeled mass, and each row states which basis it used.",
-  'No aerodynamics: no lift, stall, control authority, or thrust. Weight and balance only — never implies "will it fly."',
+  "This is mass and a balance point, nothing else. It says nothing about whether the assembly is strong enough, stiff enough, or safe to use.",
   "Part positions are operator-declared placements in the assembly frame, not solved constraints.",
 ]);
 

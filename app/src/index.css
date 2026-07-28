@@ -909,7 +909,7 @@ textarea:focus {
 /* ---------- review bar ---------- */
 
 .with-review-bar {
-  padding-bottom: 84px;
+  padding-bottom: 116px;
 }
 
 .review-bar {
@@ -947,6 +947,15 @@ textarea:focus {
 
 .review-reason {
   flex: 1;
+}
+
+.review-meaning {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-soft);
 }
 
 .review-error {

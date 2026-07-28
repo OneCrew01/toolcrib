@@ -1,4 +1,4 @@
-# BL-003 · Burn-cert reference library — design-for-flammability-compliance
+# BL-003 · Burn-cert reference library — designing toward a published wall-thickness number
 
 **Status:** OPERATOR-RELEASED for immediate night-team execution (2026-07-23) —
 deadline-safety rules of engagement still bind (new files only, demo path untouched,
@@ -48,13 +48,16 @@ the CAD cannot enforce but the package can REQUIRE.
 - `server/generators/burncert.test.mjs` — floor pass/fail both ways on known meshes;
   fail-closed on PENDING table without allowDraft; recipe contains every required
   field + the disclaimer; determinism.
-- `samples/burn-cert/` — one compliant part (≥1.5 mm wall) with passing gate output +
+- `samples/burn-cert/` — one part above the floor (≥1.5 mm wall) with passing gate output +
   `recipe.md`, one deliberately thin part (0.8 mm) with the failing gate output.
   The pass/fail pair IS the demo.
 - `docs/VERIFICATION_LOG.md` — append BC rows (PENDING; operator verifies against the
   fetched/printed sources).
 
-## Demo money-shot
+## Demo money-shot — WITHDRAWN, kept only so the correction has something to point at
+
+**Do not quote the paragraph below. It is wrong. The correction under it is the
+accurate version.**
 
 > "This bracket passes the FAA's own wall-thickness findings by construction — and
 > here's the same bracket 0.7 mm thinner, caught by the gate before it ever printed.

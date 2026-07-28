@@ -382,6 +382,15 @@ function ReviewBar({ jobId, onDecided }: { jobId: string; onDecided: () => void 
           Request revision
         </button>
       </div>
+      {/* What the button means, beside the button. The same sentence is printed
+          above the signature line in the manufacturing PDF and written into
+          approvals/approvalRecord.json (server/package/assemble.mjs,
+          SIGNATURE_MEANING) — a reviewer should not have to open the PDF to
+          learn what their name on this job records. */}
+      <div className="review-meaning">
+        Approving records that you, by name, accepted this package and passed it to the
+        next step. It is not approval of the part.
+      </div>
       {error && <div className="review-error">{error}</div>}
     </div>
   );

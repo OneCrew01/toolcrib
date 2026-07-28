@@ -1,7 +1,8 @@
 /*
-ToolCRIB burn-cert coupon plate — COMPLIANT wall (2.0 mm).
+ToolCRIB burn-cert coupon plate — 2.0 mm wall, built to PASS our own gate.
 Floor under test: PC-ABS-FR minimum wall 1.5 mm (BC-003, PENDING operator
-sign-off — docs/VERIFICATION_LOG.md). Edit the named parameters; the
+sign-off — docs/VERIFICATION_LOG.md). Passing our gate is passing our gate;
+nothing here has been graded against anything. Edit the named parameters; the
 geometry follows.
 ADVISORY — design-for-burn-cert, not certification.
 */

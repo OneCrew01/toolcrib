@@ -45,8 +45,9 @@ const vec = (v) => `[${v.map((n) => fmt(n)).join(", ")}]`;
 const HONEST_BOUNDARIES = `1. Modeled mass is solid/nominal; printed mass depends on infill + filament density.
    **Calibration hook is first-class:** a part's \`measuredMassG\` (operator's scale)
    overrides modeled mass, and the report states which basis each part used.
-2. **No aerodynamics.** No lift, stall, control authority, thrust. W&B and (stretch)
-   inertia only. Never imply "will it fly."`;
+2. **This is mass and a balance point, nothing else.** It says nothing about whether
+   the assembly is strong enough, stiff enough, or safe to use. Mass, balance point
+   and (stretch) inertia only.`;
 
 function partRows(wb, positions = {}) {
   const lines = [

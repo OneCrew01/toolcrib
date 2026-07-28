@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { analyzeStl } from "./stl-analyze.mjs";
-import { assemblePackage, dodCheck, packageHashOf, ExportError, PDF_SECTIONS } from "./assemble.mjs";
+import { assemblePackage, dodCheck, packageHashOf, ExportError, PDF_SECTIONS, PDF_ADVISORY, SIGNATURE_MEANING } from "./assemble.mjs";
 import { validateGenerationRequest } from "../state/request.mjs";
 
 const FIXTURES = new URL("../../samples/plain-plate-stl/", import.meta.url);
@@ -336,4 +336,50 @@ test("gate results are a closed vocabulary", () => {
     () => assemblePackage(fakeJob(), fixtureArtifacts(), [{ gate: "x", result: "MAYBE" }], { outRoot: newOut() }),
     RangeError,
   );
+});
+
+// Every rendered run of text in the document, in page order, rejoined into one
+// string. The writer word-wraps into separate Tj operators, so a sentence a
+// human reads as one sentence is several literals in the file; asserting on
+// substrings without rejoining them can only ever check single words.
+function pdfProse(bundleDir) {
+  const bytes = readFileSync(join(bundleDir, "reports/manufacturingPackage.pdf")).toString("latin1");
+  return [...bytes.matchAll(/\((.*?)\) Tj/g)].map((m) => m[1]).join(" ").replace(/\s+/g, " ");
+}
+
+// The printed package is the one artifact in this repo designed to be carried
+// to a machine and signed by a named person, and for most of this build it was
+// the only output that disclaimed nothing at all — a Setup Checklist, an
+// Inspection Checklist, an Approval Record and a signature line, with no
+// statement anywhere that the numbers above them were computed by software and
+// checked by nobody. Signed, it looks exactly like a conformity record.
+//
+// So the advisory and what a signature actually means are asserted here as
+// whole sentences on the rendered page, not as a constant existing in a module.
+// A refactor that stops calling doc.text() still exports both strings.
+test("the printed package disclaims itself, and says what signing it does not mean", () => {
+  const { bundleDir } = assemblePackage(fakeJob(), fixtureArtifacts(), [], { outRoot: newOut() });
+  const prose = pdfProse(bundleDir);
+
+  assert.ok(prose.includes(PDF_ADVISORY), "the advisory never reached the page a human prints");
+  // Under the title, ahead of every number it qualifies — not stranded at the end.
+  assert.ok(
+    prose.indexOf(PDF_ADVISORY) < prose.indexOf("Title Block"),
+    "the advisory is printed below the first section instead of under the heading",
+  );
+
+  assert.ok(prose.includes(SIGNATURE_MEANING), "the signature line still explains nothing");
+  const sigLine = prose.indexOf("Signed by:");
+  assert.ok(sigLine > 0, "no signature line in the printed package");
+  assert.ok(
+    prose.indexOf(SIGNATURE_MEANING) < sigLine,
+    "what signing means is printed AFTER the line it qualifies",
+  );
+  // "Approved by" over a line a person signs asserts the thing the sentence
+  // above it denies, and on a printed page the label is the louder of the two.
+  assert.ok(!prose.includes("Approved by"), 'the signature block still reads "Approved by"');
+
+  // Same sentence in the machine-readable record, so the two cannot drift.
+  const record = JSON.parse(readFileSync(join(bundleDir, "approvals/approvalRecord.json"), "utf8"));
+  assert.strictEqual(record.whatSigningMeans, SIGNATURE_MEANING);
 });

@@ -108,6 +108,23 @@ test("replay walks the trunk to the human gate with a sealed package", async () 
   assert.equal(r.consult.watermark, "DRAFT — NOT VERIFIED");
   for (const lk of r.consult.lookups) assert.ok(Object.keys(lk.result.citation).length > 0);
 
+  // The caveat has to be IN the sentence. These findings are handed to the
+  // package as warnings and printed in PDF section 9 as bare bullets; the
+  // "DRAFT — NOT VERIFIED" watermark rides on a separate line further down the
+  // page, so a reader skimming bullets used to get a verdict on a rule nobody
+  // has signed with nothing in that sentence to say so. Each finding now names
+  // the rules it stands on and their unsigned state in the same breath.
+  assert.ok(r.consult.findings.length > 0, "the demo request produces no findings to check");
+  for (const f of r.consult.findings) {
+    assert.match(f, /HED-\d{3}/, `finding names no rule id: ${f}`);
+    assert.match(f, /unsigned/, `finding does not say the rule is unsigned: ${f}`);
+    assert.match(f, /comparison, not a verdict/, `finding still reads as a judgement: ${f}`);
+    // "VIOLATES" pronounced a judgement on a comparison against a row nobody
+    // has checked — and the loudest word in the sentence was the one least
+    // entitled to be there.
+    assert.doesNotMatch(f, /VIOLATES/, `finding still pronounces a violation: ${f}`);
+  }
+
   // package sealed and parked
   const bundleDir = r.pkg.bundleDir ?? r.pkg.packageDir;
   assert.match(r.pkg.manifest.packageHash, /^[0-9a-f]{64}$/);

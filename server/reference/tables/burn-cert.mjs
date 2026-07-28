@@ -1,5 +1,6 @@
-// Burn-cert reference — design-for-flammability-compliance rules for
-// FDM parts headed toward aircraft-interior use.
+// Burn-cert reference — wall-thickness and infill rules for FDM parts, taken
+// from published flammability research. Designing TOWARD those numbers is all
+// this is; nothing here is graded against them by anybody.
 //
 // Provenance (2026-07-23): FAA TC TN23-65 ("An Evaluation of the Flammability
 // of 3D Printed Parts") could NOT be fetched for verbatim confirmation —

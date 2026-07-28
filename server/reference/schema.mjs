@@ -1,7 +1,8 @@
 // Fastening reference schema — rules as data, citations as schema.
 // Every value carries its source paragraph and a verification block. Encoded
-// values are NOT trusted until a qualified person checks them against the
-// printed text (docs/VERIFICATION_LOG.md); lookups are fail-closed until then.
+// values are NOT trusted until someone with the printed source in front of them
+// checks them against it (docs/VERIFICATION_LOG.md); lookups are fail-closed
+// until then.
 
 /**
  * @typedef {object} RuleSource
@@ -15,7 +16,7 @@
 /**
  * @typedef {object} RuleVerification
  * @property {"PENDING_OPERATOR"|"VERIFIED"} status
- * @property {string|null} verifiedBy  initials / certificate number of the signer
+ * @property {string|null} verifiedBy  initials or name of whoever checked the row
  * @property {string|null} date        ISO date of sign-off
  * @property {string} [notes]
  */

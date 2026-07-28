@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-28T20:49:33.856Z",
+  "generated": "2026-07-28T21:38:25.027Z",
   "tool": "server/wb/run-wb-demo.mjs (BL-004)",
   "assembly": "wb-demo — flush-mount panel + insert + ballast block",
   "scenario": "as declared",
@@ -82,7 +82,7 @@
   "disclaimers": [
     "Advisory weight & balance: this report flags, it does not certify.",
     "Modeled mass is solid/nominal; printed mass depends on infill and filament density. A part's measuredMassG (operator's scale) overrides modeled mass, and each row states which basis it used.",
-    "No aerodynamics: no lift, stall, control authority, or thrust. Weight and balance only — never implies \"will it fly.\"",
+    "This is mass and a balance point, nothing else. It says nothing about whether the assembly is strong enough, stiff enough, or safe to use.",
     "Part positions are operator-declared placements in the assembly frame, not solved constraints."
   ]
 }

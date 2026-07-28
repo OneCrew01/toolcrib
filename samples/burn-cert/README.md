@@ -15,14 +15,14 @@ node server/generators/burncert-validate.mjs samples/burn-cert/plate-0.8mm/part.
 | `plate-0.8mm/` | 0.8 mm | **FAIL** (margin −0.7 mm), exit 1 | same plate 0.7 mm thinner — caught before it ever printed |
 
 Each bundle: `part.kcl` (source), `part.stl` (engine export), `gate-output.json`
-(the gate's verbatim report). The compliant bundle also carries `recipe.md` —
+(the gate's verbatim report). The 2.0 mm bundle also carries `recipe.md` —
 the half the CAD cannot enforce (material, ≥25% infill, orientation), which the
 package REQUIRES rather than pretends to control.
 
 Everything here is watermarked `DRAFT — NOT VERIFIED`: every burn-cert rule is
-`PENDING_OPERATOR` until a qualified person signs the rows in
-`docs/VERIFICATION_LOG.md` against the printed sources (FAA TC TN23-65 could
-not be fetched at build time — 503/403 on both official mirrors).
+`PENDING_OPERATOR` until someone with the printed source in front of them signs
+the rows in `docs/VERIFICATION_LOG.md` (FAA TC TN23-65 could not be fetched at
+build time — 503/403 on both official mirrors).
 
 > ADVISORY — design-for-burn-cert, not certification. Real certification is a
 > physical coupon in a burn chamber per 14 CFR 25.853 / Appendix F. Material

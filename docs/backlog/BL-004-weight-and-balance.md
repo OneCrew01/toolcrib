@@ -6,20 +6,22 @@ deadline-safety rules of engagement still bind. **Priority:** 2 of the released 
 
 ## Why
 
-CG is the single most safety-critical number on an aircraft, and it is pure
-arithmetic over data we already produce: per-part mass and center of mass. FN-021's
-divergence-theorem analyzer already computes volume from a mesh; the centroid (and
-the inertia tensor, stretch) is the same integral family. An assembly-level W&B
-report with a CG-window gate is the trust-layer pattern pointed at the most aviation
-number there is — and no generative-CAD demo shows it.
+Where the weight of an assembly sits is a number people get wrong by guessing, and it
+is pure arithmetic over data we already produce: per-part mass and center of mass.
+FN-021's divergence-theorem analyzer already computes volume from a mesh; the centroid
+(and the inertia tensor, stretch) is the same integral family. An assembly-level
+report with a balance-point window gate is the same trust-layer pattern — a number
+with its basis printed beside it, and a check that refuses instead of shrugging —
+pointed at a number nobody currently checks, and no generative-CAD demo shows it.
 
 ## Honest boundaries
 
 1. Modeled mass is solid/nominal; printed mass depends on infill + filament density.
    **Calibration hook is first-class:** a part's `measuredMassG` (operator's scale)
    overrides modeled mass, and the report states which basis each part used.
-2. **No aerodynamics.** No lift, stall, control authority, thrust. W&B and (stretch)
-   inertia only. Never imply "will it fly."
+2. **This is mass and a balance point, nothing else.** It says nothing about whether
+   the assembly is strong enough, stiff enough, or safe to use. Mass, balance point
+   and (stretch) inertia only.
 
 ## Deliverables
 
@@ -42,15 +44,23 @@ number there is — and no generative-CAD demo shows it.
   per-part rows, total, CG, and a deliberately armed window that PASSES — plus the
   same assembly with the ballast moved, FAILING the gate. Pass/fail pair = the demo.
 
-## Demo money-shot
+## Demo money-shot — WITHDRAWN, kept only so the correction has something to point at
+
+**Do not quote the paragraph below. It is wrong twice. The correction under it is the
+accurate version.**
 
 > "Three printed parts, one command: total mass, combined CG, and a gate that refuses
 > the package when the CG leaves the declared window. Weight and balance — the first
 > number any aviator checks — computed from the same meshes the trust layer already
 > verifies, calibrated by a kitchen scale."
 
-*Correction (2026-07-28).* The pitch above says the gate "refuses the package," and
-that is not what shipped. What it refuses is a **weight-and-balance report**.
+*Correction (2026-07-28).* Two things are wrong with it. Second first: "the first
+number any aviator checks" dresses an arithmetic tool up in a cockpit. This adds up
+masses and works out where the balance point lands. That is useful to anyone bolting
+printed parts together — a camera rig, a robot arm, a shelf bracket — and the word
+"aviator" only told a reader who this was really built for. Now the main one: the pitch
+says the gate "refuses the package," and that is not what shipped. What it refuses is a
+**weight-and-balance report**.
 `assemblyWB` is a standalone function: nothing under `server/pipeline/`,
 `server/package/` or `server/api/` imports it, so no job package is ever in its
 hands, and it is not on the `npm run demo` path. The gate itself is real and

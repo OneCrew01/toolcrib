@@ -5,6 +5,20 @@
 ToolCRIB is an open-source **trust layer for AI-generated CAD**, built on the
 [Zoo.dev](https://zoo.dev) APIs for the Zoo API Makeathon (July 22 – August 5, 2026).
 
+## Read this first
+
+What this produces is a starting point, not a finished decision. **Nothing here has
+been tested, approved, or signed off by anybody, and nothing in this repo has been
+graded against anything.** What it does is propose numbers and write down where each
+one came from: where a published document gave us a number we cite it by paragraph and
+mark the row unchecked until a person has read that source and signed it off; where no
+published document exists we say so and cite our own bench work on one named printer.
+
+If the part you print matters — it holds a load, it takes heat, somebody gets hurt when
+it breaks — check the numbers against your own source first. Whether a finished part is
+fit for the job it is going into is a call for the person holding that part. It is not a
+call a generator can make, and it is not made by the citation printed next to a number.
+
 ## The problem
 
 Modern text-to-CAD is remarkable at *shapes* and still hard to trust for *features that
@@ -371,14 +385,9 @@ and the refusal is what got written instead.
 
 ## Safety note
 
-This repo is a reference and a CAD generator. It proposes numbers and writes down
-where each one came from. It approves nothing, and **nothing in this repo has been
-graded against anything.** Where a published document gave us a number we cite it by
-paragraph and mark the row unverified until a person has read the source and signed it
-off; where no published document exists we say so and cite our own bench work on one
-named printer. Whether a finished part is fit for the job it is going into is a
-judgement for a qualified person holding that part — not for a generator, and not for
-the citation printed next to a number.
+It is at the top of this file, on purpose — [Read this first](#read-this-first). The
+short version: nothing here has been tested, approved, or signed off by anybody, and
+if the part you print matters, check the numbers against your own source first.
 
 ## License
 

@@ -52,6 +52,31 @@ export const PDF_SECTIONS = Object.freeze([
 
 const GATE_RESULTS = new Set(["PASS", "FAIL", "SKIPPED"]);
 
+// The two sentences the printed package carries about itself.
+//
+// This bundle is the one artifact in the repo designed to be printed, carried to
+// a machine, and signed by a named person — and it was the only output that
+// disclaimed nothing. Every other surface here says what it is not: burn-cert
+// lookups, W&B reports, the amendment proposal, every draft reference lookup.
+// A stranger who prints this one and signs the line at the bottom is holding a
+// piece of paper shaped exactly like a conformity record. These two sentences
+// say, on the page, that it is not one.
+//
+// PDF_ADVISORY sits directly under the title so it is read before any number.
+// SIGNATURE_MEANING sits directly above the signature line, and the same
+// sentence is written into approvals/approvalRecord.json and shown beside the
+// Approve button in the review console (app/src/views/JobDetail.tsx) — the
+// three places a person can put their name on this job, all saying the same
+// thing. package.test.mjs asserts both as whole sentences on the rendered page.
+export const PDF_ADVISORY =
+  "Every number in this document was computed by software and checked by nobody. Nothing here has been " +
+  "tested, approved, or signed off for any use. Check anything that matters against your own source before " +
+  "you cut, print, or fit a part.";
+
+export const SIGNATURE_MEANING =
+  "Signing here records that one named person accepted this package and passed it to the next step. " +
+  "It is not approval of the part.";
+
 // A number in minutesUsed is a billing claim, and this bundle's whole value is
 // that every number in it was measured. There are THREE states here and they
 // are never collapsed into each other:
@@ -293,6 +318,7 @@ export function assemblePackage(job, artifacts = {}, gates = [], opts = {}) {
     decision: null,
     note: "Approval is a HUMAN-gated state transition (WAITING_FOR_HUMAN_REVIEW -> APPROVED). " +
       "The approval step rewrites this file; the assembler never does.",
+    whatSigningMeans: SIGNATURE_MEANING,
   }, null, 2) + "\n"), "json");
 
   const manifest = {
@@ -398,6 +424,7 @@ function buildManufacturingPdf({ job, req, part, files, validation, warnings, an
   };
 
   doc.heading("Manufacturing Package");
+  doc.text(PDF_ADVISORY, { size: 9, bold: true });
 
   sec(PDF_SECTIONS[0]); // Title Block
   doc.kv("Job ID", job.jobId)
@@ -504,7 +531,10 @@ function buildManufacturingPdf({ job, req, part, files, validation, warnings, an
   doc.kv("State", "pending")
     .kv("Record", "approvals/approvalRecord.json")
     .kv("Gate", "WAITING_FOR_HUMAN_REVIEW -> APPROVED requires a HUMAN actor");
-  doc.space(10).text("Approved by: ____________________________    Date: ______________", { size: 10 });
+  doc.space(6).text(SIGNATURE_MEANING, { size: 9, bold: true });
+  // "Approved by" over a line a person signs asserts exactly what the sentence
+  // above it denies, and on paper the label is the louder of the two.
+  doc.space(10).text("Signed by: ____________________________    Date: ______________", { size: 10 });
 
   sec(PDF_SECTIONS[12]); // Revision History
   const ledger = Array.isArray(artifacts.ledger) ? artifacts.ledger : [];
