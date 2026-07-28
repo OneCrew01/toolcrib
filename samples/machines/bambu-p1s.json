@@ -10,5 +10,5 @@
     { "name": "PETG", "approvedUse": "shop tooling, form blocks, fixtures" },
     { "name": "TPU", "approvedUse": "soft-jaw and chafe-guard prototypes" }
   ],
-  "notes": "Bench machine profile for the capability gate: generated parts must fit buildVolumeMm (checked live via the Engine bounding_box command, see FN-015) and use an approved material profile. Printed plastics are shop/bench tooling only — never airworthy parts."
+  "notes": "Bench machine profile for the capability gate: generated parts must fit buildVolumeMm (checked live via the Engine bounding_box command, see FN-015) and use an approved material profile. What comes off this machine is shop and bench work — jigs, fixtures, form blocks, soft jaws and prototypes."
 }

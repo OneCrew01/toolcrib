@@ -1,6 +1,6 @@
 // Fastening reference schema — rules as data, citations as schema.
 // Every value carries its source paragraph and a verification block. Encoded
-// values are NOT trusted until a certificated person checks them against the
+// values are NOT trusted until a qualified person checks them against the
 // printed text (docs/VERIFICATION_LOG.md); lookups are fail-closed until then.
 
 /**

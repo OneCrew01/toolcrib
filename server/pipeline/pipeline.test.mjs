@@ -434,6 +434,42 @@ test("the gate console column is computed, so a long status cannot break it", as
   assert.equal(new Set(detailStarts).size, 1, `gate detail column is ragged:\n${rows.join("\n")}`);
 });
 
+// --- the reference consult's SKIP branch, and the words README quotes for it ---
+//
+// consultReference() is asked on every request that gets past validation, but it
+// only has an answer when the prompt names hole sizes in mm. Otherwise it returns
+// zero lookups plus a reason, and that reason reaches exactly one surface: the
+// GEOMETRY_CHECK ledger row, via run-job.mjs's `reference consult skipped: ...`.
+// README quotes that fragment verbatim as the reason the consult is not
+// decorative, and nothing asserted it — the same shape of gap the gate-detail
+// block above was written to close. Both halves of the README sentence are pinned
+// here: what a skipped consult says, and the fact that a request rejected at
+// validation is never asked at all.
+test("consult skip: the ledger says so in the words the README quotes", async () => {
+  const { dataDir, outRoot, root } = dirs("consult-skip");
+  const requestPath = writeJson(root, "no-holes.json", cubeRequest()); // "a plain test cube, no holes"
+  const r = await runJob(requestPath, {
+    backend: "replay", dataDir, outRoot, fixturesDir: cubeFixtures(10), ...quiet,
+  });
+  assert.equal(r.finalState, STATE.WAITING_FOR_HUMAN_REVIEW);
+  assert.deepEqual(r.consult.lookups, []);
+  assert.equal(r.consult.reason, "no fastener-hole features detected in the prompt");
+
+  const genRow = r.ledger.find((row) => row.to === STATE.GEOMETRY_CHECK);
+  assert.ok(
+    genRow.reason.endsWith("reference consult skipped: no fastener-hole features detected in the prompt"),
+    `the generation ledger row never said the consult was skipped: ${genRow.reason}`,
+  );
+
+  // The counterpart, and the reason README says "every request that PASSES
+  // validation": run-job.mjs returns at `if (!validation.ok)` before the consult
+  // call, so a rejected request is never asked and no row carries a consult note.
+  const bad = await runJob(INVALID, { backend: "replay", dataDir, outRoot, ...quiet });
+  assert.equal(bad.finalState, STATE.INPUT_ERROR);
+  assert.equal(bad.consult, null);
+  assert.equal(bad.ledger.find((row) => row.to === STATE.GEOMETRY_CHECK), undefined);
+});
+
 test("backend failure lands in GENERATION_FAILED", async () => {
   const { dataDir, outRoot, root } = dirs("genfail");
   const empty = join(root, "empty-fixtures");

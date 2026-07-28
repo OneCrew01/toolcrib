@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-23T20:00:27.870Z",
+  "generated": "2026-07-28T20:49:33.866Z",
   "tool": "server/wb/run-wb-demo.mjs (BL-004)",
   "assembly": "wb-demo — flush-mount panel + insert + ballast block",
   "scenario": "ballast moved to [45.000, 0.000, 3.000] — same assembly, ballast slid 25 mm outboard — the gate must refuse this one",

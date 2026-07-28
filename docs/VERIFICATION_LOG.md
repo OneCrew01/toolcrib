@@ -1,7 +1,7 @@
 # Verification Log — Fastening Reference
 
 Every rule the fastening reference encodes is listed here. **No encoded value is
-trusted until a certificated person compares it against the printed source text**
+trusted until a qualified person compares it against the printed source text**
 (AC 43.13-1B Chg 1 / FAA-H-8083-31A) and signs the row off. Until then the library
 is fail-closed: lookups throw `UnverifiedRuleError`, and draft opt-ins carry the
 watermark `DRAFT — NOT VERIFIED`.

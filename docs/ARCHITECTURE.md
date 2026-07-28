@@ -171,7 +171,7 @@ exact document/chapter/paragraph (AC 43.13-1B or FAA-H-8083-31A) and `formula` c
 both a callable and its plain-text form ("2 × fastener diameter"). No model call is
 involved — AI parses intent, the reference computes parameters deterministically.
 The compliance stance is fail-closed: every encoded value ships `PENDING_OPERATOR`
-and `lookup.mjs` throws `UnverifiedRuleError` until a certificated person compares
+and `lookup.mjs` throws `UnverifiedRuleError` until a qualified person compares
 the row against the printed text and signs it off in `docs/VERIFICATION_LOG.md`
 (flipping the rule's status in the same commit). Callers may opt into drafts with
 `{allowDraft: true}`, and every draft result is watermarked "DRAFT — NOT VERIFIED".

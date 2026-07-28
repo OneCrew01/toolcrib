@@ -8,7 +8,7 @@
 // state numerically; their paragraph is UNCONFIRMED until checked in print.
 //
 // Every row ships PENDING_OPERATOR. The lookup layer refuses to serve any of
-// them without an explicit draft opt-in until a certificated person signs the
+// them without an explicit draft opt-in until a qualified person signs the
 // row off in docs/VERIFICATION_LOG.md and flips the status here.
 
 import { makeTable, PENDING_OPERATOR } from "../schema.mjs";

@@ -20,7 +20,7 @@ the half the CAD cannot enforce (material, ≥25% infill, orientation), which th
 package REQUIRES rather than pretends to control.
 
 Everything here is watermarked `DRAFT — NOT VERIFIED`: every burn-cert rule is
-`PENDING_OPERATOR` until a certificated person signs the rows in
+`PENDING_OPERATOR` until a qualified person signs the rows in
 `docs/VERIFICATION_LOG.md` against the printed sources (FAA TC TN23-65 could
 not be fetched at build time — 503/403 on both official mirrors).
 
