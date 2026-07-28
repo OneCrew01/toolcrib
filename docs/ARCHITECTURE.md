@@ -126,10 +126,12 @@ What it deliberately does not touch, each for a stated reason:
 
 `npm run amend` (`server/revision/demo-amend.mjs`) is the module's only caller outside
 its own tests, and its whole demonstration surface: offline, deterministic,
-argument-free, and it prints the
-sha256 of the parent and amended KCL for both parts so the "only the insert moved"
-claim is a measurement a reader can reproduce rather than a sentence. `demo-amend.test.mjs`
-pins that demonstration against its own data.
+argument-free, and it prints the sha256 of the parent and amended KCL for both parts
+so the "only the insert moved" claim is a measurement a reader can reproduce rather
+than a sentence. `demo-amend.test.mjs` pins that demonstration against its own data,
+including the two places the printed text states an outcome — it renders the demo
+over data where the panel moved, and over data where the two programs stopped
+lining up, and requires the output to stop making the claim in each case.
 
 Read that as the measurement it is, not as a rule about the generator. The amendment
 writes **three** fields, not one — the clearance and both lead-in chamfer values

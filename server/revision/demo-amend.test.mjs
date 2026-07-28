@@ -313,6 +313,45 @@ test("compareKcl reports a position mismatch instead of printing a shifted diff"
   assert.strictEqual(shifted.amendedLines, 4);
 });
 
+// --- the render asks the data, in both places where it states an outcome -----
+//
+// Both of these feed renderAmendmentDemo() data the live demonstration does not
+// produce. That is the point: a claim the render makes from memory rather than
+// from the data cannot be caught by running it on data that happens to agree.
+
+test("when the two programs stop lining up, the output says so instead of printing a shifted diff", () => {
+  // compareKcl's docstring promises the DEMONSTRATION says "these no longer line
+  // up". It was reported and never read, so the demonstration could not say it.
+  const doctored = structuredClone(demo);
+  const insert = doctored.parts.find((x) => x.name === "insert");
+  insert.comparison = compareKcl("a\nclearancePerSide = 0.15mm\n", "a\nclearancePerSide = 0.2mm\nEXTRA\n");
+  assert.strictEqual(insert.comparison.alignedByLineCount, false, "the probe is not the case under test");
+
+  const text = renderAmendmentDemo(doctored);
+  assert.ok(text.includes("NO LONGER LINE UP"), "the output does not say the two programs stopped lining up");
+  assert.ok(!text.includes("EXTRA"), "the shifted diff was printed anyway");
+  assert.ok(
+    !text.includes("further lines moved with it"),
+    "the positional reading printed under a heading that has just said it does not apply",
+  );
+});
+
+test("if the panel program ever moves, section 10 stops claiming it did not", () => {
+  // Section 10 is the section the file's own header calls the answer it is built
+  // to show. It used to state a measured outcome as fixed prose, so a run that
+  // printed "verdict DIFFERS" for the panel in section 8 would print "the PANEL
+  // program is byte-identical" four lines later.
+  const doctored = structuredClone(demo);
+  doctored.parts.find((x) => x.name === "panel").identical = false;
+
+  const text = renderAmendmentDemo(doctored);
+  assert.ok(
+    !text.includes("The PANEL program is byte-identical"),
+    "the output still claims a byte-identical panel over data that says the opposite",
+  );
+  assert.ok(text.includes("does not hold here"), "the output does not withdraw the claim it can no longer make");
+});
+
 test("an argument is a refusal, not a shrug", () => {
   assert.strictEqual(refuseArgs([]), null);
   const refusal = refuseArgs(["--json"]);

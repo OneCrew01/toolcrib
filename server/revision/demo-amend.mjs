@@ -138,7 +138,8 @@ function classify(text) {
  * numbers in it, so the line counts match and line N in one is line N in the
  * other. `alignedByLineCount` is reported so a future generator change that
  * adds or drops a line makes the demonstration say "these no longer line up"
- * instead of printing a shifted diff that reads like 100 edits.
+ * instead of printing a shifted diff that reads like 100 edits. Section 9 of
+ * the output is where it says it, and it withholds the diff when it does.
  */
 export function compareKcl(parentText, amendedText) {
   const a = parentText.split("\n");
@@ -357,53 +358,82 @@ export function renderAmendmentDemo(demo) {
 
   // 9 ------------------------------------------------------------------------
   const insert = parts.find((x) => x.name === "insert");
-  const edits = insert.comparison.changes.filter((c) => c.kind === "parameter");
+  const cmp = insert.comparison;
   L.push(head(9, "the edit itself"));
-  if (edits.length === 1) {
-    const e = edits[0];
-    L.push(`  insert KCL, line ${e.lineNo}:`);
-    L.push(`    - ${e.parent}`);
-    L.push(`    + ${e.amended}`);
+  if (!cmp.alignedByLineCount) {
+    // The docstring on compareKcl promises the demonstration says this rather
+    // than printing a shifted diff, so this is the demonstration saying it.
+    L.push(`  THESE TWO PROGRAMS NO LONGER LINE UP: the parent is ${cmp.parentLines} lines and the`);
+    L.push(`  amended one is ${cmp.amendedLines}. The comparison below the hashes is by position, which`);
+    L.push("  is only meaningful while a parameter change re-emits the same program with");
+    L.push("  different numbers in it. A line has been added or dropped, so a positional");
+    L.push("  diff would read as dozens of edits that nobody made. It is withheld rather");
+    L.push("  than shown misleadingly: what changed is the generator, not the amendment.");
   } else {
-    L.push(`  expected exactly one declared-clearance line to change; ${edits.length} did.`);
-  }
-  const downstream = insert.comparison.changes.filter((c) => c.kind !== "parameter");
-  const counts = downstream.reduce((acc, c) => ({ ...acc, [c.kind]: (acc[c.kind] ?? 0) + 1 }), {});
-  L.push("");
-  L.push(`  ${downstream.length} further lines moved with it, and not one of them is a second`);
-  L.push("  decision — they are what that one parameter produces:");
-  for (const [kind, n] of Object.entries(counts)) {
-    L.push(
-      row(
-        `  ${kind}`,
-        kind === "comment"
-          ? `${n} lines — the derived insert dimensions, which the generator writes out beside the constants that produce them`
-          : `${n} lines — sketch coordinates and region points, which KCL carries as literal numbers`,
-      ),
-    );
-  }
-  L.push("");
-  for (const c of downstream) {
-    L.push(`  line ${c.lineNo} (${c.kind})`);
-    L.push(`    - ${c.parent}`);
-    L.push(`    + ${c.amended}`);
+    const edits = cmp.changes.filter((c) => c.kind === "parameter");
+    if (edits.length === 1) {
+      const e = edits[0];
+      L.push(`  insert KCL, line ${e.lineNo}:`);
+      L.push(`    - ${e.parent}`);
+      L.push(`    + ${e.amended}`);
+    } else {
+      L.push(`  expected exactly one declared-clearance line to change; ${edits.length} did.`);
+    }
+    const downstream = cmp.changes.filter((c) => c.kind !== "parameter");
+    const counts = downstream.reduce((acc, c) => ({ ...acc, [c.kind]: (acc[c.kind] ?? 0) + 1 }), {});
+    L.push("");
+    L.push(`  ${downstream.length} further lines moved with it, and not one of them is a second`);
+    L.push("  decision — they are what that one parameter produces:");
+    for (const [kind, n] of Object.entries(counts)) {
+      L.push(
+        row(
+          `  ${kind}`,
+          kind === "comment"
+            ? `${n} lines — the derived insert dimensions, which the generator writes out beside the constants that produce them`
+            : `${n} lines — sketch coordinates and region points, which KCL carries as literal numbers`,
+        ),
+      );
+    }
+    L.push("");
+    for (const c of downstream) {
+      L.push(`  line ${c.lineNo} (${c.kind})`);
+      L.push(`    - ${c.parent}`);
+      L.push(`    + ${c.amended}`);
+    }
   }
 
   // 10 -----------------------------------------------------------------------
+  // Every other data-dependent claim in this render asks the data first, and so
+  // does this one. It is the section a judge is meant to take away, which makes
+  // it the worst place in the file to state a measured outcome from memory.
+  const panel = parts.find((x) => x.name === "panel");
   L.push(head(10, "the point"));
-  L.push("  The amendment touched exactly the part it should and nothing else.");
-  L.push("");
-  L.push("  The PANEL program is byte-identical. Clearance is not one of the values a");
-  L.push("  panel emitter even reads (rectangular: server/generators/flushmount.mjs:272;");
-  L.push("  round: server/generators/flushmount.mjs:411) — the hole in the panel is the");
-  L.push("  size it always was; what changes is how much smaller than that hole the");
-  L.push("  insert is made.");
-  L.push("");
-  L.push("  The lead-in did not move either, so the panel had no second reason to");
-  L.push(`  change: the parent's ${mm(spec.chamfer.depthMm)} mm lead-in already clears the minimum for`);
-  L.push(`  ${mm(p.amendedClearanceMm.valueMm)} mm per side. Had the amendment needed a deeper lead-in, the panel`);
-  L.push("  WOULD have changed — and it should have, because the panel carries that");
-  L.push("  chamfer too. Byte-identical here is a measurement, not a rule.");
+  if (!panel.identical) {
+    L.push("  READ SECTION 8 AGAIN BEFORE THIS ONE. The panel program is NOT byte-identical");
+    L.push("  in this run, so the claim this section exists to make does not hold here and");
+    L.push("  is not being made.");
+    L.push("");
+    L.push("  Clearance alone does not reach the panel — that is a property of the");
+    L.push("  generator, and it is pinned by a test rather than by this run. But the panel");
+    L.push("  also carries the lead-in chamfer, and an amendment writes both chamfer");
+    L.push("  values. If the amended lead-in differs from the parent's, the panel moves and");
+    L.push("  it should; section 6 above says whether it did. If it did not, something in");
+    L.push("  the generator changed and that is what to go and look at.");
+  } else {
+    L.push("  The amendment touched exactly the part it should and nothing else.");
+    L.push("");
+    L.push("  The PANEL program is byte-identical. Clearance is not one of the values a");
+    L.push("  panel emitter even reads (rectangular: server/generators/flushmount.mjs:272;");
+    L.push("  round: server/generators/flushmount.mjs:411) — the hole in the panel is the");
+    L.push("  size it always was; what changes is how much smaller than that hole the");
+    L.push("  insert is made.");
+    L.push("");
+    L.push("  The lead-in did not move either, so the panel had no second reason to");
+    L.push(`  change: the parent's ${mm(spec.chamfer.depthMm)} mm lead-in already clears the minimum for`);
+    L.push(`  ${mm(p.amendedClearanceMm.valueMm)} mm per side. Had the amendment needed a deeper lead-in, the panel`);
+    L.push("  WOULD have changed — and it should have, because the panel carries that");
+    L.push("  chamfer too. Byte-identical here is a measurement, not a rule.");
+  }
 
   // 11 -----------------------------------------------------------------------
   L.push(head(11, "what this is not"));

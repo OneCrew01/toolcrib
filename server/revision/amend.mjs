@@ -855,9 +855,9 @@ export function proposeAmendment({ parentRequest, measurement, allowDraft = fals
   }
 
   // 10. Verification over BOTH lookups, and the warnings that ride with it.
-  //     No dedup: fitClearance resolves band rows through FIT_CLASS_RULES and
-  //     chamferFor through its own ["FMF-007", "FMF-008"]
-  //     (flush-mount-fit.mjs:129-133, :202), so the two id sets are disjoint by
+  //     No dedup: fitClearance resolves band rows through FIT_CLASS_RULES
+  //     (flush-mount-fit.mjs:129-133) and chamferFor through its own hardcoded
+  //     pair (flush-mount-fit.mjs:202), so the two id sets are disjoint by
   //     construction for any table that can be injected here. A dedup pass
   //     would be a guard that can never find anything, which reads as a safety
   //     net and is not one.

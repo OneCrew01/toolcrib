@@ -107,11 +107,12 @@ always was — clearance is not a value a panel emitter even reads. The insert m
 that moved with it are that one parameter's consequences — the derived insert
 dimensions the generator writes out as comments, and the profile coordinates KCL
 carries as literal numbers. Not one of them is a second decision, and the output
-counts and classifies them so you can see that rather than take it on faith. **The amendment touched exactly the part it should and nothing
-else** — and you do not have to take that on trust, because the hashes are printed
-and the whole diff is printed under them. (Had the correction needed a deeper lead-in
-chamfer, the panel would have moved too, and should have: the panel carries that
-chamfer as well. Byte-identical here is a measurement, not a rule.)
+counts and classifies them so you can see that rather than take it on faith. **The
+amendment touched exactly the part it should and nothing else** — and you do not have
+to take that on trust, because the hashes are printed and the whole diff is printed
+under them. (Had the correction needed a deeper lead-in chamfer, the panel would have
+moved too, and should have: the panel carries that chamfer as well. Byte-identical
+here is a measurement, not a rule.)
 
 Every fit-table row this leans on is still unsigned, so the proposal comes back
 watermarked `DRAFT — NOT VERIFIED` with the pending rows named. That is the
@@ -197,6 +198,15 @@ a **person** (a drive root, a UNC share, a home directory — a machine-rooted p
 nobody, like `/var/tmp/scratch`, deliberately passes), an account identifier, a BOM, and CRLF
 in a committed blob. It plants a control leak of *every one of those kinds* in its own corpus
 first, and refuses to report *clean* unless all four come back reported.
+
+A second sweep, in the same spirit, checks the docs rather than the data. Every
+`file:line` citation in this README, `docs/ARCHITECTURE.md`, `docs/DECISION_LOG.md`,
+the amendment module and the printed output of `npm run amend` has to name a line that
+still holds the text it was cited for (`server/lib/doc-citations.mjs`, run as part of
+`npm test`). Insert a line near the top of a cited file and the citations that now point
+one line past the thing they name go red instead of going quietly wrong. **If you add a
+citation to one of those documents, the suite will ask you to pin it** — that is the
+check working, and the failure message says which file to add it to.
 
 **If you downloaded the ZIP instead of cloning, six tests will fail — and that is them
 doing their job.** All six belong to that same safety check. Three of them read every

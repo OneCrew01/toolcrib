@@ -168,7 +168,7 @@ it can still be stopped), every file of a freshly generated bundle plus its ledg
 and manifest warnings (server/pipeline/pipeline.test.mjs), and both HTTP channels
 (server/api/api.test.mjs).
 
-## D-009 · 2026-07-27 · The amendment ships as a pure module, and the wiring does not
+## D-009 · 2026-07-27 · The amendment ships as a pure module, and the wiring does not *(corrected in place 2026-07-27)*
 
 `server/revision/amend.mjs` — a caliper reading plus a cited band becomes an amended
 request — landed **unwired**: no route, no console control, no ledger row, and no
@@ -191,11 +191,11 @@ plan, not a limitation of Zoo's APIs:
 2. **The concurrency fix deadlocked every job.** Re-entering a job at `DRAFT` means
    two walks can touch one job, which argues for serialising `transition()`. It
    cannot be serialised naively: `runValidation()` calls `this.transition` twice
-   (`state/store.mjs:190` on the invalid branch, `state/store.mjs:198` on the valid
-   one), so a lock
-   taken around a transition and held across the call deadlocks the *happy path* of
-   every job in the repo, not just revised ones. The store is the load-bearing piece
-   of this build. It was put out of scope rather than rewritten in an afternoon.
+   (`state/store.mjs:190` on the invalid branch, `state/store.mjs:198` on the
+   valid one), so a lock taken around a transition and held across the call
+   deadlocks the *happy path* of every job in the repo, not just revised ones.
+   The store is the load-bearing piece of this build. It was put out of scope
+   rather than rewritten in an afternoon.
 3. **The resume path walked around the live-spend gate.** Re-entering a job at
    `DRAFT` re-enters it with its backend already chosen. `--backend=live` is gated on
    an explicit `TOOLCRIB_ALLOW_LIVE` at the two entry points that exist
