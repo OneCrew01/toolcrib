@@ -131,6 +131,18 @@ sha256 of the parent and amended KCL for both parts so the "only the insert move
 claim is a measurement a reader can reproduce rather than a sentence. `demo-amend.test.mjs`
 pins that demonstration against its own data.
 
+Read that as the measurement it is, not as a rule about the generator. The amendment
+writes **three** fields, not one — the clearance and both lead-in chamfer values
+(`revision/amend.mjs:832-837`) — and the panel emitter reads the chamfer even though it
+never reads the clearance (`generators/flushmount.mjs:272` rectangular,
+`generators/flushmount.mjs:411` round, both destructuring the angle and the depth). The
+panel comes out byte-identical in this demonstration because the two chamfer writes land
+on the parent's own numbers: the angle is unchanged at 45°, and the parent's 0.8 mm
+lead-in already clears the minimum for 0.2 mm per side, so the amendment keeps it. Had
+the correction needed a deeper lead-in, the panel program would have changed too — and
+should have. What the hashes prove is that clearance alone does not reach the panel; they
+do not promise the panel can never move.
+
 ## The fastening reference: rules as data, citations as schema, fail-closed verification
 
 Fastening rules live in `server/reference/` as frozen data, not prose: each rule is

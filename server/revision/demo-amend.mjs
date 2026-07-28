@@ -109,7 +109,8 @@ const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex")
 /**
  * The KCL line that DECLARES the clearance. flushmount.mjs emits it through
  * constLine("clearancePerSide", mm(c)) in both insert emitters
- * (../generators/flushmount.mjs:336 rect, :458 round). Matched on the emitted
+ * (../generators/flushmount.mjs:336 rect, ../generators/flushmount.mjs:458
+ * round). Matched on the emitted
  * text rather than on a line number so a shifted emitter cannot silently
  * relabel some other line as the edit.
  */
@@ -393,9 +394,10 @@ export function renderAmendmentDemo(demo) {
   L.push("  The amendment touched exactly the part it should and nothing else.");
   L.push("");
   L.push("  The PANEL program is byte-identical. Clearance is not one of the values a");
-  L.push("  panel emitter even reads (server/generators/flushmount.mjs:272 rect, :411");
-  L.push("  round) — the hole in the panel is the size it always was; what changes is");
-  L.push("  how much smaller than that hole the insert is made.");
+  L.push("  panel emitter even reads (rectangular: server/generators/flushmount.mjs:272;");
+  L.push("  round: server/generators/flushmount.mjs:411) — the hole in the panel is the");
+  L.push("  size it always was; what changes is how much smaller than that hole the");
+  L.push("  insert is made.");
   L.push("");
   L.push("  The lead-in did not move either, so the panel had no second reason to");
   L.push(`  change: the parent's ${mm(spec.chamfer.depthMm)} mm lead-in already clears the minimum for`);
@@ -415,7 +417,12 @@ export function renderAmendmentDemo(demo) {
   L.push("    - every reference row it leaned on is still unsigned, which is why the");
   L.push("      DRAFT watermark is above and not a formality.");
   L.push("");
-  L.push("  We build to a published standard. Nothing here has been graded against one.");
+  L.push("  A word on the standard, because this part does not have one. Where this repo");
+  L.push("  has a published document it cites it by paragraph — AC 43.13-1B and");
+  L.push("  FAA-H-8083-31A for holes and edge distance, FAA TC TN23-65 for burn");
+  L.push("  behaviour. Flush-mount fit is not one of those. Every row above cites bench");
+  L.push("  practice on one named printer and says so in its own citation, so CITED here");
+  L.push("  means cited to that. Nothing in this repo has been graded against anything.");
   L.push(`  ${p.measurement.measuredBy} has to read this and accept it before a part is printed from it.`);
   L.push("");
 

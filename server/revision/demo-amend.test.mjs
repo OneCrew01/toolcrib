@@ -220,26 +220,76 @@ test("and that disclosure is true of the state map it points at", () => {
   );
 });
 
-test("the README's quoted hashes are still the hashes this demonstration prints", () => {
-  // The README quotes hash prefixes as evidence for "only the insert moved".
-  // A quoted hash is the one kind of doc claim that can go silently false —
-  // change the generator's whitespace and the README is wrong with nothing to
-  // say so. This reads the section and checks every hash-shaped token in it
-  // against the live values. Removing the hashes from the README is allowed;
-  // keeping stale ones is not.
+// Hash-shaped: 8-64 hex characters carrying at least one digit AND at least one
+// a-f letter, so ordinary prose and bare numbers are not mistaken for one.
+const hashesIn = (s) =>
+  (String(s).match(/\b[0-9a-f]{8,64}\b/g) ?? []).filter((t) => /[0-9]/.test(t) && /[a-f]/.test(t));
+
+/** The README's `npm run amend` section, as lines. */
+function readmeAmendSection() {
   const lines = readFileSync(new URL("../../README.md", import.meta.url), "utf8").split("\n");
   const start = lines.findIndex((l) => l.startsWith("## ") && l.includes("npm run amend"));
   assert.ok(start >= 0, "the README no longer has a section headed with `npm run amend`");
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => l.startsWith("## "));
-  const section = (end === -1 ? rest : rest.slice(0, end)).join("\n");
+  return end === -1 ? rest : rest.slice(0, end);
+}
 
+test("the README attributes each quoted hash to the part it belongs to, with that part's verdict", () => {
+  // ATTRIBUTION, not membership — and the difference is the whole point of this
+  // test. An earlier version checked only that every hash-shaped token in the
+  // section was a prefix of one of the four live values. Measured: transposing
+  // the two rows of the block, so the README said the PANEL program changed and
+  // the INSERT program did not — the exact inverse of this repo's headline
+  // claim — left that version 19/19 green. Every hash was still "one of the
+  // four". So each row is now parsed on its own and matched against its own
+  // part's hashes and its own verdict.
+  const section = readmeAmendSection();
+
+  for (const p of demo.parts) {
+    const row = section.find((l) => new RegExp(`^\\s*${p.name}\\b`).test(l) && hashesIn(l).length > 0);
+    assert.ok(row, `the README's hash block no longer has a ${p.name} row quoting hashes`);
+
+    const iParent = row.indexOf("parent");
+    const iAmended = row.indexOf("amended");
+    assert.ok(
+      iParent >= 0 && iAmended > iParent,
+      `the ${p.name} row no longer labels its hashes "parent" then "amended", so neither can be ` +
+        `attributed to a side: ${row.trim()}`,
+    );
+
+    const [quotedParent] = hashesIn(row.slice(iParent, iAmended));
+    const [quotedAmended] = hashesIn(row.slice(iAmended));
+    assert.ok(quotedParent, `the ${p.name} row quotes no hash after "parent": ${row.trim()}`);
+    assert.ok(quotedAmended, `the ${p.name} row quotes no hash after "amended": ${row.trim()}`);
+    assert.ok(
+      p.parentSha256.startsWith(quotedParent),
+      `the README calls ${quotedParent} the ${p.name} PARENT hash; this demonstration prints ` +
+        `${p.parentSha256.slice(0, quotedParent.length)}`,
+    );
+    assert.ok(
+      p.amendedSha256.startsWith(quotedAmended),
+      `the README calls ${quotedAmended} the ${p.name} AMENDED hash; this demonstration prints ` +
+        `${p.amendedSha256.slice(0, quotedAmended.length)}`,
+    );
+
+    const right = p.identical ? "IDENTICAL" : "DIFFERS";
+    const wrong = p.identical ? "DIFFERS" : "IDENTICAL";
+    assert.ok(row.includes(right), `the README's ${p.name} row should read ${right}: ${row.trim()}`);
+    assert.ok(
+      !row.includes(wrong),
+      `the README's ${p.name} row reads ${wrong}; this demonstration measures ${right}`,
+    );
+  }
+});
+
+test("and no hash quoted anywhere else in that README section has gone stale", () => {
+  // The freshness half, kept: a quoted hash is the one kind of doc claim that
+  // can go silently false — change the generator's whitespace and the README is
+  // wrong with nothing to say so. Removing the hashes from the README is
+  // allowed; keeping stale ones is not.
   const live = demo.parts.flatMap((p) => [p.parentSha256, p.amendedSha256]);
-  // Hash-shaped: 8-64 hex characters carrying at least one digit AND at least
-  // one a-f letter, so ordinary prose and bare numbers are not mistaken for one.
-  const quoted = (section.match(/\b[0-9a-f]{8,64}\b/g) ?? []).filter(
-    (t) => /[0-9]/.test(t) && /[a-f]/.test(t),
-  );
+  const quoted = hashesIn(readmeAmendSection().join("\n"));
   assert.ok(quoted.length > 0, "the README section quotes no hashes — if that was deliberate, delete this assertion");
   for (const q of quoted) {
     assert.ok(

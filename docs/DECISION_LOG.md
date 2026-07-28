@@ -191,7 +191,8 @@ plan, not a limitation of Zoo's APIs:
 2. **The concurrency fix deadlocked every job.** Re-entering a job at `DRAFT` means
    two walks can touch one job, which argues for serialising `transition()`. It
    cannot be serialised naively: `runValidation()` calls `this.transition` twice
-   (`state/store.mjs:190` on the invalid branch, `:198` on the valid one), so a lock
+   (`state/store.mjs:190` on the invalid branch, `state/store.mjs:198` on the valid
+   one), so a lock
    taken around a transition and held across the call deadlocks the *happy path* of
    every job in the repo, not just revised ones. The store is the load-bearing piece
    of this build. It was put out of scope rather than rewritten in an afternoon.
@@ -202,12 +203,26 @@ plan, not a limitation of Zoo's APIs:
    resumes an existing job inherits the backend and does not pass either check. That
    is a revision that quietly spends real API minutes, which is exactly the class of
    surprise this repo exists to prevent.
-4. **The PDF assertions were unsatisfiable as specified.** "The amendment appears in
-   the manufacturing PDF" was to be pinned by asserting the amended clearance and its
-   citation appear in the rendered document. They cannot be: `package/pdf.mjs` wraps
-   text (`wrapText`, `pdf.mjs:35`) and emits each wrapped line as its own `Tj`
-   operator, so a multi-word string never appears contiguously in the file. Assert on
-   the model, not on the PDF.
+4. **The PDF assertion the plan leaned on was unsatisfiable.** "The amendment appears
+   in the manufacturing PDF" was to be pinned by asserting the amended clearance *and
+   its citation* appear verbatim in the rendered document. The citation cannot be, for
+   two measured reasons. `package/pdf.mjs` wraps text (`wrapText`,
+   `package/pdf.mjs:35`) and emits each wrapped line as its own `Tj` operator, and the
+   fit table's citation is long enough to wrap — rendered, it survives only as far as
+   `...Sec. Clearance`. And `esc()` rewrites the em-dash through `FALLBACK`
+   (`package/pdf.mjs:19`), so `Bench practice — FDM` is written to the file as
+   `Bench practice - FDM` and would not match the source string even unwrapped.
+
+   The narrow claim is the true one, and the first draft of this entry got it wrong in
+   a way worth recording: it said a multi-word string *never* appears contiguously.
+   That is false and was corrected the same day. Short strings survive whole — one
+   `putText` call is one `Tj` operator (`package/pdf.mjs:70`), the file is not
+   compressed, and `doc.text("clearance per side 0.200 mm")` lands in it as
+   `(clearance per side 0.200 mm) Tj`. The suite already leans on text reaching the
+   file, though only ever on single tokens (`package/package.test.mjs:214`), which is
+   why the overstatement survived review. So the rule is not "assert nothing about the
+   PDF"; it is that any PDF string assertion depends on the line width and on
+   `FALLBACK`, which is a brittle thing to hang a spec claim on. Assert on the model.
 
 **The decision.** Ship the reasoning, not the plumbing. A pure module is honest about
 what it is: it computes a proposal, it labels every number `cited` or `computed`, it
