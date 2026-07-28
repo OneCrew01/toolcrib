@@ -153,7 +153,7 @@ lining up, and requires the output to stop making the claim in each case.
 
 Read that as the measurement it is, not as a rule about the generator. The amendment
 writes **three** fields, not one — the clearance and both lead-in chamfer values
-(`revision/amend.mjs:832-837`) — and the panel emitter reads the chamfer even though it
+(`revision/amend.mjs:836-841`) — and the panel emitter reads the chamfer even though it
 never reads the clearance (`generators/flushmount.mjs:272` rectangular,
 `generators/flushmount.mjs:411` round, both destructuring the angle and the depth). The
 panel comes out byte-identical in this demonstration because the two chamfer writes land

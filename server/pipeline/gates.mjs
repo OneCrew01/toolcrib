@@ -24,14 +24,24 @@ export function evaluateGates({ analysis, machine, densityKgM3, expectedMassG })
   const { bboxMm, watertight, volumeMm3, triangles } = analysis;
   const env = machine?.buildVolumeMm;
   if (env) {
-    // Rotation is allowed on the plate: sorted part dims vs sorted envelope.
+    // Sorted part dims vs sorted envelope: the part may be stood on any of its
+    // sides and turned a quarter at a time, and the smallest dimension only has
+    // to clear the smallest side of the box.
+    //
+    // That is NOT "any orientation", which is what this said. Sorting compares
+    // the part square-on to the machine's axes; a part that would only fit
+    // lying at 45 degrees across the plate is refused here. The gate is more
+    // conservative than the old wording promised, so the wording moved to meet
+    // it — a reader who is told the check tried everything reads a rejection as
+    // "impossible" when it means "impossible without tilting it".
     const part = [bboxMm.x, bboxMm.y, bboxMm.z].sort((a, b) => a - b);
     const box = [env.x, env.y, env.z].sort((a, b) => a - b);
     const fits = part.every((d, i) => d <= box[i]);
     results.push({
       gate: "envelope",
       status: fits ? "pass" : "fail",
-      detail: `part ${fmtBox(bboxMm)} vs ${machine.id ?? "machine"} build volume ${fmtBox(env)} (any orientation)`,
+      detail: `part ${fmtBox(bboxMm)} vs ${machine.id ?? "machine"} build volume ${fmtBox(env)} ` +
+        `(stood square on any of its sides; the check never tilts the part on the plate)`,
     });
   } else {
     results.push({ gate: "envelope", status: "skipped:no-machine-profile", detail: "no buildVolumeMm in machine profile" });

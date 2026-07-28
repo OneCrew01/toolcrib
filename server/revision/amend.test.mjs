@@ -262,7 +262,17 @@ test("RULING 2: the wording is one findable constant, and it says what it has to
   assert.ok(amendmentDisclaimer.includes("{reviewer}"), "the disclaimer must name a human");
   // "aviation standard but not grade": we build to a published standard and
   // never claim to have been graded against one.
-  assert.match(amendmentDisclaimer, /not a certified/i);
+  //
+  // This used to assert /not a certified/, which pinned the denial to a word a
+  // stranger with a 3D printer would have to look up — and the reader this repo
+  // is written for is exactly that stranger. The property being tested is that
+  // the disclaimer says nobody has checked it; the assertion now tests that,
+  // and refuses the certification vocabulary coming back in.
+  assert.match(amendmentDisclaimer, /nobody has checked it/i);
+  assert.ok(
+    !/certif/i.test(amendmentDisclaimer),
+    "the amendment disclaimer denies itself in certification vocabulary again",
+  );
   assert.match(amendmentDisclaimer, /graded/i);
   assert.match(amendmentDisclaimer, /accept/i);
 });
@@ -956,7 +966,14 @@ test("wording placeholders are filled everywhere, and values are inserted litera
   assert.strictEqual(fillWording("{nope}", {}), "{nope}", "an unfilled placeholder stays visible");
 
   const r = draft({ measurement: { measuredBy: "R. $& Vasquez" } });
-  const said = r.warnings.find((w) => w.startsWith("PROPOSAL,"));
+  // Find the disclaimer by the label the constant itself declares, not by a
+  // hand-typed "PROPOSAL," prefix. That literal was a second, invisible pin on
+  // the operator's wording: rewording the disclaimer made find() return
+  // undefined and this test died with a TypeError about `.includes` — a crash
+  // that says nothing about the property under test, which is substitution.
+  const label = OPERATOR_FLAG_WORDING.amendmentDisclaimer.split(":")[0];
+  const said = r.warnings.find((w) => w.startsWith(label));
+  assert.ok(said, `no warning carries the amendment disclaimer (looked for "${label}:")`);
   assert.ok(said.includes("R. $& Vasquez"), said);
   assert.ok(!said.includes("{reviewer}"), said);
   for (const w of r.warnings) assert.ok(!/\{\w+\}/.test(w), `unsubstituted placeholder in: ${w}`);

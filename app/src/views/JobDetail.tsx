@@ -28,6 +28,20 @@ import { usePoll } from "../lib/usePoll.ts";
 const POLL_MS = 2000;
 const ACTOR_KEY = "toolcrib.actorName";
 
+// The sentence beside the Approve button, printed above the signature line in
+// the manufacturing PDF, and written into approvals/approvalRecord.json —
+// SIGNATURE_MEANING in server/package/assemble.mjs.
+//
+// It was a hand-typed reword of that constant, which meant the two guarded
+// surfaces could be re-worded after an operator ruling while this one — the
+// only one a reviewer actually reads before clicking — kept the old sentence,
+// with a green suite the whole time. This build cannot import a server module,
+// so the pin is a text one: server/package/package.test.mjs reads this file and
+// asserts the exact string is in it. Change one side and the suite goes red.
+// Keep it on a single line; that is what the test matches against.
+const SIGNATURE_MEANING =
+  "Putting your name on this records that one named person accepted this package and passed it to the next step. It is not approval of the part.";
+
 export function JobDetailView({
   jobId,
   onBack,
@@ -382,15 +396,11 @@ function ReviewBar({ jobId, onDecided }: { jobId: string; onDecided: () => void 
           Request revision
         </button>
       </div>
-      {/* What the button means, beside the button. The same sentence is printed
-          above the signature line in the manufacturing PDF and written into
-          approvals/approvalRecord.json (server/package/assemble.mjs,
-          SIGNATURE_MEANING) — a reviewer should not have to open the PDF to
-          learn what their name on this job records. */}
-      <div className="review-meaning">
-        Approving records that you, by name, accepted this package and passed it to the
-        next step. It is not approval of the part.
-      </div>
+      {/* What the button means, beside the button — a reviewer should not have
+          to open the PDF to learn what their name on this job records. Rendered
+          from the constant above so the string in this file is the string the
+          test compares against the server's. */}
+      <div className="review-meaning">{SIGNATURE_MEANING}</div>
       {error && <div className="review-error">{error}</div>}
     </div>
   );

@@ -266,8 +266,12 @@ export const OPERATOR_FLAG_WORDING = Object.freeze({
    * ALWAYS present, completely independent of rule-signing status. Signing the
    * FMF rows must never leave a dimensional correction standing unqualified.
    */
+  // "NOT A CERTIFIED CORRECTION" needed a footnote from the one reader this
+  // repo is written for — a stranger with a printer, who has no idea what
+  // certifying a correction would even involve. The denial is the same; the
+  // words are ones nobody has to look up.
   amendmentDisclaimer:
-    "PROPOSAL, NOT A CERTIFIED CORRECTION: this is a computed suggestion built from one " +
+    "A PROPOSAL, AND NOBODY HAS CHECKED IT: this is a computed suggestion built from one " +
     "measurement. We build to a published standard; nothing here has been graded against " +
     "one. {reviewer} has to read this, agree with it, and accept it before any part is " +
     "printed from it.",

@@ -383,3 +383,80 @@ test("the printed package disclaims itself, and says what signing it does not me
   const record = JSON.parse(readFileSync(join(bundleDir, "approvals/approvalRecord.json"), "utf8"));
   assert.strictEqual(record.whatSigningMeans, SIGNATURE_MEANING);
 });
+
+// There is a THIRD place a person puts their name on this job, and it is the
+// one most people use: the Approve button in the review console. assemble.mjs
+// carried a comment claiming all three said the same thing — and the console
+// string was a hand-typed reword ("Approving records that you, by name, ...").
+// Nothing reached it: every assertion above compares the PDF and the JSON to
+// the exported constant, and no test, type or self-check touches the .tsx. So
+// SIGNATURE_MEANING could be sharpened after an operator ruling, both guarded
+// surfaces would update, the suite would stay green, and the reviewer clicking
+// the button would be the only one reading a sentence nobody re-approved.
+//
+// The app is a separate vite build and cannot import a server module, so this
+// is a text pin: the console's copy is asserted to be this exact string. It is
+// a weaker mechanism than an import and a real one — it fails on either side.
+test("the review console's Approve explanation is the signature sentence, not a reword", () => {
+  const consoleSrc = readFileSync(
+    new URL("../../app/src/views/JobDetail.tsx", import.meta.url), "utf8");
+
+  assert.ok(
+    consoleSrc.includes(SIGNATURE_MEANING),
+    "the sentence beside the Approve button has drifted from SIGNATURE_MEANING — a reviewer and a " +
+    "signer are being told different things about what putting their name on this job means",
+  );
+  // The old reword, specifically: it read as a promise about "you" and dropped
+  // the record-keeping framing. If it comes back, it comes back knowingly.
+  assert.ok(
+    !consoleSrc.includes("Approving records that you, by name"),
+    "the superseded console wording is back beside the button",
+  );
+});
+
+// Section 12 tells a signer the decision record is the job's ledger and points
+// at section 13 for it. Two things about that were asserted and neither was
+// maintained: the section prints only the last 20 rows, and prints a job
+// summary instead when no ledger reaches the assembler. A long or resumed job
+// would silently drop its earliest transitions under a note calling the section
+// the ledger. So the page now states its own extent — and this test is what
+// keeps that true, since the demo's ledger is 5 rows and would never reach the
+// branch that truncates.
+test("Revision History says how much of the ledger it is showing — both branches", () => {
+  const row = (i) => ({
+    ts: `2026-07-28T0${i % 10}:00:00.000Z`, rev: 1, from: "PACKAGING", to: "PDF_GENERATION",
+    actor: { kind: "SYS", id: "pipeline-orchestrator" }, reason: `row ${i}`,
+  });
+
+  // 25 rows: more than the section can print.
+  const long = assemblePackage(
+    fakeJob(), { ...fixtureArtifacts(), ledger: Array.from({ length: 25 }, (_, i) => row(i)) },
+    [], { outRoot: newOut() });
+  const longProse = pdfProse(long.bundleDir);
+  assert.match(longProse, /held 25 rows when this package was assembled/);
+  assert.match(longProse, /most recent 20 are printed below/);
+  // The rows it kept are the LAST 20 — row 0..4 are the ones dropped.
+  assert.ok(longProse.includes("row 24"), "the newest transition is not on the page");
+  assert.ok(!longProse.includes("row 4 "), "the truncation note is there but nothing was truncated");
+
+  // Short ledger: no truncation claim, and an exact count.
+  const short = assemblePackage(
+    fakeJob(), { ...fixtureArtifacts(), ledger: [row(1), row(2)] }, [], { outRoot: newOut() });
+  const shortProse = pdfProse(short.bundleDir);
+  assert.match(shortProse, /All 2 ledger rows the job held/);
+  assert.ok(!shortProse.includes("most recent"), "a 2-row ledger claims to be truncated");
+
+  // No ledger at all: the fallback table is not the decision record, and says so.
+  const none = assemblePackage(fakeJob(), fixtureArtifacts(), [], { outRoot: newOut() });
+  const noneProse = pdfProse(none.bundleDir);
+  assert.match(noneProse, /No ledger reached this assembly/);
+  assert.match(noneProse, /job summary below is not the decision record/);
+
+  // And the file that points a reader here never promises more than that.
+  const record = JSON.parse(readFileSync(join(none.bundleDir, "approvals/approvalRecord.json"), "utf8"));
+  assert.match(record.note, /says on the page how much of it is shown/);
+  assert.ok(
+    !/the ledger as it stood at assembly is printed/.test(record.note),
+    "approvalRecord is asserting an invariant the assembler does not maintain",
+  );
+});

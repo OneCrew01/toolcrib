@@ -37,10 +37,12 @@ ToolCRIB attacks that gap two ways:
    lives in a dog-eared binder, exposed as a typed backend reference with every value
    carrying its source citation. The pipeline asks the reference about every request
    that passes validation, and gets an answer when the request is a prose prompt in mm
-   that puts the size right before the word *holes* — the demo's `four 5mm diameter
-   holes` is the shape it reads. Anything else comes back empty: a request built from
-   structured fields carries no prompt to read at all, and a prompt that words it
-   another way is not recognised. Either way the ledger row written once the files
+   that states the hole size in mm just before the word *holes*, with nothing in between
+   but an optional *diameter* or *dia.* — the demo's `four 5mm diameter holes` is the
+   shape it reads, and `four 5mm holes` reads the same. Anything else comes back
+   empty: a request built from structured fields carries no prompt to read at all,
+   and a prompt that words it another way — `four holes of 5mm`, `5 mm bolt holes` —
+   is not recognised. Either way the ledger row written once the files
    come back records which it was — the lookup count, or `reference consult skipped:`
    and the reason. A request rejected at validation never gets that far.
    `npm run amend` checks a clearance against it. (The flush-mount generator does

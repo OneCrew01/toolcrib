@@ -62,7 +62,7 @@ export const PINS = {
   "server/pipeline/backends.mjs:46": "fixturesDir",
   "server/state/store.mjs:190": "STATE.INPUT_ERROR",
   "server/state/store.mjs:198": "STATE.GENERATING",
-  "server/pipeline/run-job.mjs:339": "TOOLCRIB_ALLOW_LIVE",
+  "server/pipeline/run-job.mjs:343": "TOOLCRIB_ALLOW_LIVE",
   "server/api/server.mjs:255": "TOOLCRIB_ALLOW_LIVE",
   "server/package/pdf.mjs:19": "const FALLBACK",
   "server/package/pdf.mjs:35": "function wrapText",
@@ -87,7 +87,7 @@ export const PINS = {
   "server/generators/flushmount.mjs:458": 'constLine("clearancePerSide", mm(c))',
 
   // the amendment module's own internals, cited by ARCHITECTURE and its comments
-  "server/revision/amend.mjs:832-837": ["amendedSpec.clearancePerSideMm = amendedValue;", "};"],
+  "server/revision/amend.mjs:836-841": ["amendedSpec.clearancePerSideMm = amendedValue;", "};"],
   "server/reference/tables/flush-mount-fit.mjs:120-127": ["const FIT_CLASS_ALIASES = Object.freeze({", "});"],
   "server/reference/tables/flush-mount-fit.mjs:129-133": ["const FIT_CLASS_RULES = Object.freeze({", "});"],
   "server/reference/tables/flush-mount-fit.mjs:202": '["FMF-007", "FMF-008"].map((id) => getRule(table, id))',

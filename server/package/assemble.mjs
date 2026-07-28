@@ -63,19 +63,31 @@ const GATE_RESULTS = new Set(["PASS", "FAIL", "SKIPPED"]);
 // say, on the page, that it is not one.
 //
 // PDF_ADVISORY sits directly under the title so it is read before any number.
-// SIGNATURE_MEANING sits directly above the signature line, and the same
-// sentence is written into approvals/approvalRecord.json and shown beside the
-// Approve button in the review console (app/src/views/JobDetail.tsx) — the
-// three places a person can put their name on this job, all saying the same
-// thing. package.test.mjs asserts both as whole sentences on the rendered page.
+// It used to open "Every number in this document was computed by software",
+// and the section three inches below it prints "Stated in the request" and
+// "Material density (input)" — numbers a person typed, which software only
+// copied. The load-bearing half is "checked by nobody"; the half that was
+// wrong is now accurate, because a sweeping claim a reader can disprove by
+// scrolling discounts the sentence that follows it.
+//
+// SIGNATURE_MEANING sits directly above the signature line, is written into
+// approvals/approvalRecord.json, and is rendered beside the Approve button in
+// the review console (app/src/views/JobDetail.tsx) — the three places a person
+// can put their name on this job. "The same sentence" was a comment's claim
+// and nothing enforced it: the console copy was a hand-typed reword, so the
+// two guarded surfaces could be sharpened while the one a reviewer actually
+// reads kept the old words. package.test.mjs now asserts this string on the
+// rendered page, in the JSON, AND in the console source, so the three cannot
+// drift apart silently. Hence the wording works over a paper line and beside
+// a button both.
 export const PDF_ADVISORY =
-  "Every number in this document was computed by software and checked by nobody. Nothing here has been " +
-  "tested, approved, or signed off for any use. Check anything that matters against your own source before " +
-  "you cut, print, or fit a part.";
+  "Every number in this document was either typed into the request or computed by software, and checked " +
+  "by nobody. Nothing here has been tested, approved, or signed off for any use. Check anything that " +
+  "matters against your own source before you cut, print, or fit a part.";
 
 export const SIGNATURE_MEANING =
-  "Signing here records that one named person accepted this package and passed it to the next step. " +
-  "It is not approval of the part.";
+  "Putting your name on this records that one named person accepted this package and passed it to the " +
+  "next step. It is not approval of the part.";
 
 // A number in minutesUsed is a billing claim, and this bundle's whole value is
 // that every number in it was measured. There are THREE states here and they
@@ -323,11 +335,19 @@ export function assemblePackage(job, artifacts = {}, gates = [], opts = {}) {
     // looking for their own name, and finds "pending" beside a note claiming the
     // file was rewritten has been told the wrong thing twice. Say where the
     // record actually is instead.
+    // The pointer at Revision History used to be written as an invariant — "the
+    // ledger as it stood at assembly IS printed there" — which the assembler
+    // does not maintain: it prints the last 20 rows, and prints a job-summary
+    // table instead when no ledger reaches it. Fixing a false claim about where
+    // the record lives with a second claim the code does not guarantee is the
+    // same mistake one rung quieter. So the section now states its own extent on
+    // the page, and this note promises only that.
     note: "Approval is a HUMAN-gated state transition (WAITING_FOR_HUMAN_REVIEW -> APPROVED). " +
       "This file is written once, when the package is assembled, and nothing ever rewrites it: " +
       "the fields above are how the job stood at that moment and stay that way. Who decided what, " +
-      "and when, is recorded in the job's ledger (<jobId>.ledger.jsonl), and the ledger as it stood " +
-      "at assembly is printed in the Revision History section of reports/manufacturingPackage.pdf.",
+      "and when, is recorded in the job's ledger (<jobId>.ledger.jsonl). The Revision History " +
+      "section of reports/manufacturingPackage.pdf prints what that ledger held at assembly, and " +
+      "says on the page how much of it is shown.",
     whatSigningMeans: SIGNATURE_MEANING,
   }, null, 2) + "\n"), "json");
 
@@ -543,28 +563,55 @@ function buildManufacturingPdf({ job, req, part, files, validation, warnings, an
   // the record instead of at a snapshot that cannot change.
   doc.kv("State", "pending as of the moment this package was assembled")
     .kv("As issued", "approvals/approvalRecord.json — written once, never updated")
-    .kv("Decision record", "the job ledger; Revision History below is the ledger as it stood here")
+    .kv("Decision record", "the job's ledger — Revision History below prints what it held here")
     .kv("Gate", "WAITING_FOR_HUMAN_REVIEW -> APPROVED requires a HUMAN actor");
   doc.space(6).text(SIGNATURE_MEANING, { size: 9, bold: true });
   // "Approved by" over a line a person signs asserts exactly what the sentence
   // above it denies, and on paper the label is the louder of the two.
   doc.space(10).text("Signed by: ____________________________    Date: ______________", { size: 10 });
+  // The section directly above points a signer at the ledger. Nothing told them
+  // that the pen in their hand cannot reach it: a name written here is ink on
+  // paper and the ledger will never know, which is a surprise worth spending
+  // one line to prevent.
+  doc.space(4).text(
+    "A name written on this page stays on this page — nothing here is added to the job's ledger. " +
+    "Only a decision made in the review console is recorded there.",
+    { size: 8 },
+  );
 
   sec(PDF_SECTIONS[12]); // Revision History
   const ledger = Array.isArray(artifacts.ledger) ? artifacts.ledger : [];
-  if (ledger.length > 0)
+  const LEDGER_ROWS_PRINTED = 20;
+  if (ledger.length > 0) {
+    // Say which rows these are. slice(-20) silently drops the earliest
+    // transitions on a long or resumed job, and a reader sent here for "the
+    // decision record" would have no way to know a row was missing.
+    doc.text(
+      ledger.length > LEDGER_ROWS_PRINTED
+        ? `The job's ledger held ${ledger.length} rows when this package was assembled; the most ` +
+          `recent ${LEDGER_ROWS_PRINTED} are printed below. Nothing decided after assembly is here.`
+        : `All ${ledger.length} ledger row${ledger.length === 1 ? "" : "s"} the job held when this ` +
+          `package was assembled. Nothing decided after assembly is here.`,
+      { size: 8 },
+    ).space(4);
     doc.table(
       [["ts", "rev", "transition", "actor", "reason"],
-      ...ledger.slice(-20).map((r) => [r.ts, String(r.rev), `${r.from ?? "-"} -> ${r.to}`,
+      ...ledger.slice(-LEDGER_ROWS_PRINTED).map((r) => [r.ts, String(r.rev), `${r.from ?? "-"} -> ${r.to}`,
         `${r.actor?.kind ?? "?"}:${r.actor?.id ?? "?"}`, r.reason ?? ""])],
       [0.22, 0.06, 0.3, 0.2, 0.22],
     );
-  else
+  } else {
+    doc.text(
+      "No ledger reached this assembly, so there are no transitions to print. The job summary below " +
+      "is not the decision record — the job's ledger is.",
+      { size: 8 },
+    ).space(4);
     doc.table(
       [["rev", "created", "updated", "state"],
       [String(job.rev), job.createdAt ?? "n/a", job.updatedAt ?? "n/a", job.state ?? "n/a"]],
       [0.1, 0.32, 0.32, 0.26],
     );
+  }
 
   return doc.render();
 }

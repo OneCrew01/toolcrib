@@ -31,10 +31,22 @@ import { UnverifiedRuleError, DRAFT_WATERMARK } from "../lookup.mjs";
 
 const TOPIC = "burn-cert";
 
+// The disclaimer every burn-cert output carries, and it is printed verbatim
+// into the shipped samples.
+//
+// It used to deny the wrong thing in the wrong words: "compliance is
+// demonstrated only by physical specimen burn testing per 14 CFR 25.853 /
+// Appendix F" is a denial written in the vocabulary of the arena it denies, and
+// a reader who needs a footnote for "compliance is demonstrated" takes away
+// that this tool operates somewhere inside an aviation certification process.
+// The citation stays — it is a public document and naming it is the honest part
+// — and the sentence around it now says the same thing to somebody who owns a
+// printer and has never read a regulation.
 export const BURN_CERT_DISCLAIMER =
-  "ADVISORY — design-for-burn-cert, not certification. Nothing in this output certifies a part: " +
-  "compliance is demonstrated only by physical specimen burn testing per 14 CFR 25.853 / Appendix F. " +
-  "Material chemistry sets the floor; geometry cannot overcome it. Flag, don't certify.";
+  "ADVISORY. This compares a design against a wall thickness we read out of a published test report; " +
+  "it proves nothing about how a part burns. The only thing that proves that is burning a real sample " +
+  "of the real plastic in a lab (14 CFR 25.853 / Appendix F), and this is not that. The plastic you " +
+  "pick sets the floor and no shape gets around it. Read this as something to go and check, not as an answer.";
 
 const TN2365 = {
   document: "FAA TC TN23-65 — An Evaluation of the Flammability of 3D Printed Parts",

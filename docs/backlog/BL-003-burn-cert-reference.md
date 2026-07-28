@@ -56,14 +56,19 @@ the CAD cannot enforce but the package can REQUIRE.
 
 ## Demo money-shot — WITHDRAWN
 
-**The pitch that used to open this section is withdrawn.** Its first line claimed the
-bracket was graded against a published FAA wall-thickness finding. It was not, and
-nothing in this repo is graded by anybody. That sentence is described here rather than
-reprinted: quoted whole it reads as a claim, and a quote travels without the paragraph
-that corrects it. The rest of the pitch was accurate and is kept.
+**The pitch that used to open this section is withdrawn.** It opened by holding up a
+part and claiming it was graded against a published FAA wall-thickness finding. It was
+not, and nothing in this repo is graded by anybody. That sentence is described here
+rather than reprinted: quoted whole it reads as a claim, and a quote travels without the
+paragraph that corrects it. The rest of the pitch was accurate and is kept — it went on
+from that first part to the thinner of the two samples, the one the gate rejects:
 
 > "...here's the same bracket 0.7 mm thinner, caught by the gate before it ever printed.
 > The traveler tells the shop the half the CAD can't enforce: PC-ABS-FR, ≥25% infill."
+
+The quote says "bracket" because the pitch was written before the samples existed. What
+actually shipped in `samples/burn-cert/` is a pair of flat coupon plates — same footprint,
+one wall-thickness change — not a bracket.
 
 *Correction (2026-07-28).* FAA TC TN23-65 is a public research report. This repo read a
 wall-thickness number out of it, cited the paragraph the number came from, and built a

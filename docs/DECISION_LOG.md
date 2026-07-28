@@ -199,7 +199,7 @@ plan, not a limitation of Zoo's APIs:
 3. **The resume path walked around the live-spend gate.** Re-entering a job at
    `DRAFT` re-enters it with its backend already chosen. `--backend=live` is gated on
    an explicit `TOOLCRIB_ALLOW_LIVE` at the two entry points that exist
-   (`pipeline/run-job.mjs:339`, `api/server.mjs:255`); a third entry point that
+   (`pipeline/run-job.mjs:343`, `api/server.mjs:255`); a third entry point that
    resumes an existing job inherits the backend and does not pass either check. That
    is a revision that quietly spends real API minutes, which is exactly the class of
    surprise this repo exists to prevent.
