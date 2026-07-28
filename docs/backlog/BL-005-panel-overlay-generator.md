@@ -89,5 +89,5 @@ kerning perfection, or any change to the demo path. One good backlit two-tone pa
 working snap edge proves the whole idea.
 
 *Operator note (2026-07-23): filed at operator request; operator is a few days ahead and
-will decide with the team whether this becomes a feature project or a post-makeathon HAS
-capability. Makeathon scope stays frozen either way.*
+will decide with the team whether this becomes a feature project or gets picked up later.
+Makeathon scope stays frozen either way.*

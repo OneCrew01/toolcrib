@@ -49,6 +49,17 @@ number there is — and no generative-CAD demo shows it.
 > number any aviator checks — computed from the same meshes the trust layer already
 > verifies, calibrated by a kitchen scale."
 
+*Correction (2026-07-28).* The pitch above says the gate "refuses the package," and
+that is not what shipped. What it refuses is a **weight-and-balance report**.
+`assemblyWB` is a standalone function: nothing under `server/pipeline/`,
+`server/package/` or `server/api/` imports it, so no job package is ever in its
+hands, and it is not on the `npm run demo` path. The gate itself is real and
+fail-closed, and the pass/fail pair in `samples/wb-demo/` is the proof — one assembly
+inside the window with its report written out, and the same assembly with the ballast
+slid outboard, where the refusal is what got written instead. The pitch's wording was
+aspirational; it is corrected here rather than quietly edited out, and the README says
+the accurate version.
+
 ## Post-contest runway (recorded, NOT in scope now)
 RC airframe sectioned to the print bed with design-CG validation (25–33% MAC
 convention); inertia-tensor flight-dynamics handoff; measured-mass database per

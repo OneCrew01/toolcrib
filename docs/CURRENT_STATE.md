@@ -11,12 +11,12 @@ was last counted.
 
 ## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
 
-**Works (`npm test` on 2026-07-28: 285 server tests + `self-checks: 40 passed` +
-`leak audit: CLEAN` over 242 tracked files, 0 failures; app builds clean)**
+**Works (`npm test` on 2026-07-28: 290 server tests + `self-checks: 40 passed` +
+`leak audit: CLEAN` over 243 tracked files, 0 failures; app builds clean)**
 
 *The count above is the only figure in this file the header promises to keep current,
 and it has moved a long way since this block's prose was written: 187 when it was last
-counted on 2026-07-26, 285 today. Measured at this commit, 81 of those tests are in
+counted on 2026-07-26, 290 today. Measured at this commit, 81 of those tests are in
 `server/revision/` — the amendment module and its demonstration, D-009 — and 6 are the
 citation-freshness sweep (`server/lib/doc-citations.mjs`); neither directory existed on
 2026-07-26. The rest is hardening either side of them. None of it appears in the

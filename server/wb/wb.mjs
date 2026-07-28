@@ -3,9 +3,14 @@
 // CG is pure arithmetic over numbers the trust layer already produces:
 // per-part volume and centroid (server/wb/mesh-props.mjs, the FN-021
 // integral family). This module combines parts placed in a shared assembly
-// frame and, when a CG window is armed, refuses the package outright if the
-// combined CG leaves it — fail-closed, same contract as the reference
+// frame and, when a CG window is armed, refuses to return a report at all if
+// the combined CG leaves it — fail-closed, same contract as the reference
 // tables. Advisory otherwise: it flags, it does not certify.
+//
+// Standalone by design, and the README says so too: nothing under
+// server/pipeline/, server/package/ or server/api/ imports this module, so
+// what the gate below refuses is THIS REPORT, never a job package. The only
+// two callers in the repo are wb.test.mjs and run-wb-demo.mjs.
 //
 // Honest boundaries (BL-004): modeled mass is solid/nominal — printed mass
 // depends on infill and filament density, so a part's measuredMassG

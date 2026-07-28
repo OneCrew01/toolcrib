@@ -20,8 +20,11 @@ ToolCRIB attacks that gap two ways:
 1. **A codified fastening reference.** Machine-readable rules and tables for holes,
    fasteners, edge distances, and flush mounting, derived from public-domain FAA
    acceptable-practice data (AC 43.13-1B) — the kind of shop knowledge that normally
-   lives in a dog-eared binder, exposed as a typed backend reference any generator can
-   consult, with every value carrying its source citation.
+   lives in a dog-eared binder, exposed as a typed backend reference with every value
+   carrying its source citation. The pipeline consults it on every job, and
+   `npm run amend` checks a clearance against it. (The flush-mount generator does not
+   — it builds from the numbers you hand it. That boundary is stated again below,
+   where the generator is.)
 2. **A traceable generate → validate → document → revise loop.** Intent goes in; Zoo's
    Agent API drafts editable parametric CAD (KCL, not a dead mesh); Zoo's Engine API
    executes and *validates* it (mass properties, geometry checks); Zoo's File Format API
@@ -57,12 +60,15 @@ Running findings, bugs, and doc gaps are logged in
 
 `server/generators/flushmount.mjs` generates a **flush-mount pair** — panel with a
 chamfered opening plus the insert that sits flush in it — from a parameter spec:
-clearance per side (backed by the fit-rule table), 45° lead-in chamfers sized
-`≥ 2 × clearance`, optional rear registration lip, each part in its own color so the
-fit reads visually. Output is remixer-friendly KCL 2.0: your numbers are named
-constants, every derived dimension carries its formula as a comment, and the
-generator refuses to emit geometry that violates its own arithmetic gates. Printable
-fit-coupon sets at four clearances live in `samples/flush-mount/coupons/`.
+clearance per side (a number you supply — the generator does not look it up, and it
+imports nothing; the fit table's bands are what
+[`npm run amend`](#when-the-print-comes-back-wrong-npm-run-amend) checks a clearance
+against), 45° lead-in chamfers sized `≥ 2 × clearance`, optional rear registration
+lip, each part in its own color so the fit reads visually. Output is
+remixer-friendly KCL 2.0: your numbers are named constants, every derived dimension
+carries its formula as a comment, and the generator refuses to emit geometry that
+violates its own arithmetic gates. Printable fit-coupon sets at four clearances live
+in `samples/flush-mount/coupons/`.
 
 Why deterministic generation instead of prompting? Campaign C003 (FN-020): text-to-cad
 *can* build this pair — when the prompt pre-chews the engineering. Phrase it like a
@@ -319,23 +325,42 @@ enforcing the policy, and wiring a real gate is the prerequisite for doing so.
 
 ## Beyond fastening: the same pattern, two more domains
 
-Two additive backlog items (`docs/backlog/BL-003`, `BL-004`) point the same
-trust-layer pattern — cited rule, deterministic gate, honest disclaimer — at two
-more aviation-adjacent problems. **Design-for-flammability** (`server/reference/
-tables/burn-cert.mjs`, `server/generators/burncert-validate.mjs`) codifies FAA
-TC TN23-65 / UL-94 wall-thickness findings as a sampled min-wall gate over an STL
-(ray-cast local thickness, float32-aware); `server/generators/burncert-recipe.mjs`
-(`printRecipe`) emits the print recipe for the half the CAD can't enforce —
-material, minimum infill, orientation. Nothing here
-certifies anything: real certification is a physical coupon in a burn chamber per
-14 CFR 25.853, and every rule ships watermarked accordingly. Sample pass/fail pair
-in [`samples/burn-cert/`](samples/burn-cert/). **Assembly weight & balance**
-(`server/wb/`) computes a mass-weighted combined CG across an assembly's parts,
-labels each part's mass basis as `modeled` or `measured` (a kitchen-scale reading
-overrides the modeled value and the report says which one it used), and arms a
-fail-closed CG-window gate — `CgWindowError` refuses the package outright when the
-combined CG lands outside the declared window. Sample pass/fail pair in
-[`samples/wb-demo/`](samples/wb-demo/).
+Two extra items from the backlog (`docs/backlog/BL-003`, `BL-004`) point the same
+pattern — a rule with its source printed beside it, a check that either passes or
+refuses, and a plain statement of what the answer is not — at two more problems.
+
+**Read these two as side tools, because that is what they are.** Each has its own
+command, its own tests and its own pass/fail sample pair, and neither one is on the
+`npm run demo` path: nothing under `server/pipeline/` imports either module, and the
+pipeline runs exactly three checks on a part — does it fit the printer, is the mesh
+closed, does it weigh what the request said. Neither of these is one of them.
+
+**Design-for-flammability** (`server/reference/tables/burn-cert.mjs`,
+`server/generators/burncert-validate.mjs`) turns published wall-thickness findings
+(FAA TC TN23-65 / UL-94) into a wall-thickness check over an STL: it samples points
+on the mesh and measures how thick the plastic is there, against the floor the table
+names. `server/generators/burncert-recipe.mjs` (`printRecipe`) writes out the half a
+CAD file cannot control — material, minimum infill, print orientation. Run it
+yourself on the pair in [`samples/burn-cert/`](samples/burn-cert/) (commands in that
+folder's README): the 2.0 mm plate passes, and the same plate at 0.8 mm fails and
+exits 1. Nothing here certifies anything — that takes a physical coupon burned in a
+lab per 14 CFR 25.853 — and every rule ships stamped as unverified until a person
+signs it off.
+
+**Assembly weight & balance** (`server/wb/`) adds up an assembly's parts and works
+out where the combined center of gravity lands. It labels each part's mass `modeled`
+(computed from the volume and a density you give it) or `measured` (you weighed it on
+a kitchen scale, which wins), and the report says which one each row used. Give it a
+window the CG has to stay inside and the check is fail-closed: land outside it and
+`assemblyWB` raises `CgWindowError` instead of returning anything, so there is no
+report to skim past. Be exact about what that refuses — **a weight-and-balance
+report, not a job package.** No job, no ledger row, nothing sealed: `assemblyWB` is a
+function, and the only two callers in this repo are its own test file and its own
+runner, `node server/wb/run-wb-demo.mjs`. The pair in
+[`samples/wb-demo/`](samples/wb-demo/) is that runner's real output, and it is what
+shows the check works: one assembly inside the window, written up as a passing
+report, and the same assembly with the ballast slid outboard, where the check refused
+and the refusal is what got written instead.
 
 ## Safety note
 

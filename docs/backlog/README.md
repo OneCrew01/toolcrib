@@ -59,9 +59,9 @@ remain frozen-until-idle.*
 *BL-005 filed 2026-07-23 at operator request: replaceable backlit panel overlays. The
 text-path fork (font glyph geo-map, OFL-licensed font) MUST be locked before build.
 Operator is a few days ahead and will decide with the team whether it becomes a feature
-project or a post-makeathon HAS capability. Frozen-until-idle unless the operator calls
-it up — it is the closest of the backlog to the existing flush-mount generator and the
-most visually demo-worthy.*
+project or gets picked up later. Frozen-until-idle unless the operator calls it up — it
+is the closest of the backlog to the existing flush-mount generator and the most
+visually demo-worthy.*
 
 *Origin: operator ideas, 2026-07-23 — both born from real panel-fab friction. Filed for
 the night team; operator scope stays frozen.*

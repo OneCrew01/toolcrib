@@ -54,6 +54,10 @@ export const PINS = {
   "server/state/state.test.mjs:66": "REVISION_REQUESTED -> DRAFT opens rev 2",
   "server/api/server.mjs:335": "STATE.REVISION_REQUESTED",
 
+  // the OTHER dead branch — CAPABILITY_MISSING, cited by ARCHITECTURE
+  "server/state/states.mjs:52": "next: [S.GENERATING, S.INPUT_ERROR, S.CAPABILITY_MISSING]",
+  "app/src/lib/api.ts:30": '"CAPABILITY_MISSING",',
+
   // D-009's four findings
   "server/pipeline/backends.mjs:46": "fixturesDir",
   "server/state/store.mjs:190": "STATE.INPUT_ERROR",

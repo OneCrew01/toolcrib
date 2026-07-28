@@ -78,6 +78,22 @@ does is walk it: `POST /api/jobs/:id/decision {action: "revise"}` writes
 re-enters a job at `DRAFT`. The edge is built and unused, which is a different thing
 from planned.
 
+`VALIDATING -> CAPABILITY_MISSING` is the **second** branch drawn above that nothing
+walks, and it gets its own paragraph for the same reason the revise leg got one: a
+diagram that flags one dead branch and draws another in silence reads as selective,
+and a reader is right to grade the whole picture by the branch that was not flagged.
+The state is declared, the machine permits the move
+(`server/state/states.mjs:52`), and the console knows how to color it if it ever
+arrives (`app/src/lib/api.ts:30`) — but grep the tree for the name and every hit is a
+declaration: the state constant, the comment above the branch, the branch itself, its
+terminal entry, the console's failure-state list, and the diagram above. Nothing
+*sets* it, so no job can reach it. It is a hook for an idea that is not built: a
+measured capability ledger, where a request naming a feature class this repo has
+*not* proven Zoo can produce reliably would park here instead of generating. Nothing
+measures that today. So unlike the revision edge — which is half-built, and whose
+halves are named above — this one has no half: it is a reserved name and an empty
+branch, drawn because deleting it would hide the intent, not because it runs.
+
 ## The revision half: amendment as a pure module
 
 `server/revision/amend.mjs` answers the question the bench asks after a print: *the
