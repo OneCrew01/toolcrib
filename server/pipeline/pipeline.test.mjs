@@ -14,6 +14,7 @@ import { STATE } from "../state/states.mjs";
 import { MACHINE_PATH } from "../lib/repo-path.mjs";
 import { scanIdentity, describeHits, NIL_UUID } from "../lib/identity.mjs";
 import { runJob } from "./run-job.mjs";
+import { consultReference } from "./consult.mjs";
 import { analyzeStl, ExportError, PdfError } from "./contract-stubs.mjs";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
@@ -437,7 +438,8 @@ test("the gate console column is computed, so a long status cannot break it", as
 // --- the reference consult's SKIP branch, and the words README quotes for it ---
 //
 // consultReference() is asked on every request that gets past validation, but it
-// only has an answer when the prompt names hole sizes in mm. Otherwise it returns
+// only has an answer when a PROSE PROMPT in mm puts the size right before the word
+// "holes" (the shape below pins). Otherwise it returns
 // zero lookups plus a reason, and that reason reaches exactly one surface: the
 // GEOMETRY_CHECK ledger row, via run-job.mjs's `reference consult skipped: ...`.
 // README quotes that fragment verbatim as the reason the consult is not
@@ -468,6 +470,51 @@ test("consult skip: the ledger says so in the words the README quotes", async ()
   assert.equal(bad.finalState, STATE.INPUT_ERROR);
   assert.equal(bad.consult, null);
   assert.equal(bad.ledger.find((row) => row.to === STATE.GEOMETRY_CHECK), undefined);
+});
+
+// --- which requests the reference can actually answer, pinned to README bullet 1 ---
+//
+// The test above proves a skip is REPORTED. This one proves the README's account of
+// WHEN a skip happens, because that sentence has already drifted once: it used to say
+// the reference answers "when the request names hole sizes in mm", which is false for
+// two whole input shapes. consultReference sniffs a prose prompt for one phrasing —
+// the size immediately before the word "holes" — so a structuredIntent request (a
+// first-class request shape per server/state/request.mjs, and what the flush-mount
+// fixture is) is never answered no matter how it names holes, and neither is a prose
+// prompt that words it the other way round. Each case below is a sentence the README
+// now makes; if someone widens or narrows the sniff, the doc and this test fail
+// together instead of the doc drifting alone.
+test("consult: the request shapes README says get an answer are the ones that do", () => {
+  const answered = consultReference({ units: "mm", prompt: "A plate with four 5mm diameter holes" });
+  assert.equal(answered.lookups.length, 2, "the demo's phrasing must reach edge-distance + pitch");
+  assert.equal(answered.reason, undefined);
+  assert.equal(answered.fastenerDiaMm, 5);
+
+  // The README anchors that claim on the shipped demo request by quoting it, so the
+  // quote has to keep matching the file a reader will actually run.
+  const demoPrompt = JSON.parse(readFileSync(PLAIN_PLATE, "utf8")).prompt;
+  assert.ok(
+    demoPrompt.includes("four 5mm diameter holes"),
+    `README quotes "four 5mm diameter holes" as the demo's phrasing; plain-plate.json now reads: ${demoPrompt}`,
+  );
+
+  // Shape 1: no prompt at all. Holes stated in mm in structured fields, still a skip.
+  const structured = consultReference({
+    units: "mm",
+    structuredIntent: { plate: { widthMm: 50 }, holes: [{ diaMm: 5 }] },
+  });
+  assert.deepEqual(structured.lookups, []);
+  assert.match(structured.reason, /structuredIntent, not a prose prompt/);
+
+  // Shape 2: a prose prompt in mm that names the same hole the other way round.
+  const reworded = consultReference({ units: "mm", prompt: "A plate with four holes of 5 mm diameter" });
+  assert.deepEqual(reworded.lookups, []);
+  assert.match(reworded.reason, /no fastener-hole features detected/);
+
+  // Shape 3: the right phrasing, wrong units — "in mm" in the README is load-bearing.
+  const inches = consultReference({ units: "in", prompt: "A plate with four 5mm diameter holes" });
+  assert.deepEqual(inches.lookups, []);
+  assert.match(inches.reason, /wired for mm prompts only/);
 });
 
 test("backend failure lands in GENERATION_FAILED", async () => {

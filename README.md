@@ -22,12 +22,16 @@ ToolCRIB attacks that gap two ways:
    acceptable-practice data (AC 43.13-1B) — the kind of shop knowledge that normally
    lives in a dog-eared binder, exposed as a typed backend reference with every value
    carrying its source citation. The pipeline asks the reference about every request
-   that passes validation — the reference has an answer when the request names hole
-   sizes in mm, and when it does not, the ledger row written once the files come back
-   says so in as many words (`reference consult skipped:` and the reason). A request
-   rejected at validation never gets that far. `npm run amend` checks a clearance
-   against it. (The flush-mount generator does not — it builds from the numbers you
-   hand it. That boundary is stated again below, where the generator is.)
+   that passes validation, and gets an answer when the request is a prose prompt in mm
+   that puts the size right before the word *holes* — the demo's `four 5mm diameter
+   holes` is the shape it reads. Anything else comes back empty: a request built from
+   structured fields carries no prompt to read at all, and a prompt that words it
+   another way is not recognised. Either way the ledger row written once the files
+   come back records which it was — the lookup count, or `reference consult skipped:`
+   and the reason. A request rejected at validation never gets that far.
+   `npm run amend` checks a clearance against it. (The flush-mount generator does
+   not — it builds from the numbers you hand it. That boundary is stated again below,
+   where the generator is.)
 2. **A traceable generate → validate → document → revise loop.** Intent goes in; Zoo's
    Agent API drafts editable parametric CAD (KCL, not a dead mesh); Zoo's Engine API
    executes and *validates* it (mass properties, geometry checks); Zoo's File Format API
@@ -63,8 +67,8 @@ Running findings, bugs, and doc gaps are logged in
 
 `server/generators/flushmount.mjs` generates a **flush-mount pair** — panel with a
 chamfered opening plus the insert that sits flush in it — from a parameter spec:
-clearance per side (a number you supply — the generator does not look it up, and it
-imports nothing; the fit table's bands are what
+clearance per side (a number you supply — the generator does not look it up; the fit
+table's bands are what
 [`npm run amend`](#when-the-print-comes-back-wrong-npm-run-amend) checks a clearance
 against), 45° lead-in chamfers sized `≥ 2 × clearance`, optional rear registration
 lip, each part in its own color so the fit reads visually. Output is
@@ -367,7 +371,7 @@ and the refusal is what got written instead.
 
 ## Safety note
 
-This repo is a reference and a drawing generator. It proposes numbers and writes down
+This repo is a reference and a CAD generator. It proposes numbers and writes down
 where each one came from. It approves nothing, and **nothing in this repo has been
 graded against anything.** Where a published document gave us a number we cite it by
 paragraph and mark the row unverified until a person has read the source and signed it
