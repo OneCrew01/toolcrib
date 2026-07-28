@@ -21,10 +21,12 @@ ToolCRIB attacks that gap two ways:
    fasteners, edge distances, and flush mounting, derived from public-domain FAA
    acceptable-practice data (AC 43.13-1B) — the kind of shop knowledge that normally
    lives in a dog-eared binder, exposed as a typed backend reference with every value
-   carrying its source citation. The pipeline consults it on every job, and
-   `npm run amend` checks a clearance against it. (The flush-mount generator does not
-   — it builds from the numbers you hand it. That boundary is stated again below,
-   where the generator is.)
+   carrying its source citation. The pipeline asks it about every job — it has an
+   answer when the request names hole sizes in mm, and when it does not, the ledger
+   row says so in as many words (`reference consult skipped:` and the reason).
+   `npm run amend` checks a clearance against it. (The flush-mount generator does
+   not — it builds from the numbers you hand it. That boundary is stated again
+   below, where the generator is.)
 2. **A traceable generate → validate → document → revise loop.** Intent goes in; Zoo's
    Agent API drafts editable parametric CAD (KCL, not a dead mesh); Zoo's Engine API
    executes and *validates* it (mass properties, geometry checks); Zoo's File Format API
@@ -364,8 +366,14 @@ and the refusal is what got written instead.
 
 ## Safety note
 
-Outputs are advisory fabrication aids. Nothing this tool produces is approved data for
-aircraft repair; determinations of airworthiness stay with certificated humans.
+This repo is a reference and a drawing generator. It proposes numbers and writes down
+where each one came from. It approves nothing, and **nothing in this repo has been
+graded against anything.** Where a published document gave us a number we cite it by
+paragraph and mark the row unverified until a person has read the source and signed it
+off; where no published document exists we say so and cite our own bench work on one
+named printer. Whether a finished part is fit for the job it is going into is a
+judgement for a qualified person holding that part — not for a generator, and not for
+the citation printed next to a number.
 
 ## License
 

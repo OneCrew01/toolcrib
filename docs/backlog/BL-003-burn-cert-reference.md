@@ -60,6 +60,18 @@ the CAD cannot enforce but the package can REQUIRE.
 > here's the same bracket 0.7 mm thinner, caught by the gate before it ever printed.
 > The traveler tells the shop the half the CAD can't enforce: PC-ABS-FR, ≥25% infill."
 
+*Correction (2026-07-28).* The pitch above says the bracket "passes the FAA's own
+wall-thickness findings," and that reads as though a document graded it. Nothing here
+is graded by anyone. FAA TC TN23-65 is a public research report; this repo read a
+wall-thickness number out of it, cited the paragraph the number came from, and built a
+checker that measures an STL against that number. Passing our checker is passing our
+checker, and the row stays marked unverified until a person has read the source and
+signed it off — a real burn rating comes from a physical coupon burned in a lab, never
+from a mesh. The pitch is corrected here rather than quietly edited out, and the README
+says the accurate version. ("Traveler" is shop shorthand for the printed sheet that
+travels with a part; it carries the things a CAD file cannot, like which plastic to use
+and how solid to print it.)
+
 ## Sources
 FAA TC TN23-65 (fire.tc.faa.gov/pdf/tctn23-65.pdf) · UL-94 thickness data ·
 FAR 25.853 (context only) · existing repo patterns: `flush-mount-fit.mjs`,

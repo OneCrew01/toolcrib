@@ -19,12 +19,15 @@
 
 import { meshProperties } from "./mesh-props.mjs";
 
-/** Thrown when the combined CG lands outside the declared window. */
+/**
+ * Thrown when the combined CG lands outside the declared window. What it refuses
+ * is THIS report — the function returns nothing. No job, no package, no ledger row.
+ */
 export class CgWindowError extends Error {
   constructor({ axis, cgOnAxisMm, minMm, maxMm, cgMm, totalMassG }) {
     super(
       `combined CG ${cgOnAxisMm.toFixed(3)} mm on ${axis} is outside the declared window ` +
-        `[${minMm}, ${maxMm}] mm — package refused`,
+        `[${minMm}, ${maxMm}] mm — report refused`,
     );
     this.name = "CgWindowError";
     this.code = "CG_OUTSIDE_WINDOW";

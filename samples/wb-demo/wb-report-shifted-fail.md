@@ -24,15 +24,17 @@ box via `server/wb/box-stl.mjs`), not an API export — documented per BL-004.
 
 Armed window: axis **x**, [0.0, 8.0] mm.
 
-Combined CG on x = **13.426 mm** → **FAIL — package refused.**
+Combined CG on x = **13.426 mm** → **FAIL — report refused.**
 
 ```
-CgWindowError: combined CG 13.426 mm on x is outside the declared window [0, 8] mm — package refused
+CgWindowError: combined CG 13.426 mm on x is outside the declared window [0, 8] mm — report refused
 ```
 
 The gate is fail-closed: `assemblyWB` throws `CgWindowError` — there is no report object to
-ship. The rows above come from the same assembly computed WITHOUT the window armed, shown
-here so the operator can see how far out the CG landed.
+ship. What that refuses is this report and nothing else: `server/wb/` is a standalone tool,
+off the `npm run demo` path, so no job, no package and no ledger row is involved. The rows
+above come from the same assembly computed WITHOUT the window armed, shown here so the
+operator can see how far out the CG landed.
 
 ## Honest boundaries (verbatim from BL-004)
 

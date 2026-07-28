@@ -15,7 +15,7 @@
     "error": {
       "name": "CgWindowError",
       "code": "CG_OUTSIDE_WINDOW",
-      "message": "combined CG 13.426 mm on x is outside the declared window [0, 8] mm — package refused",
+      "message": "combined CG 13.426 mm on x is outside the declared window [0, 8] mm — report refused",
       "axis": "x",
       "minMm": 0,
       "maxMm": 8

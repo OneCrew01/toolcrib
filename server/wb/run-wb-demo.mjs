@@ -90,15 +90,17 @@ Armed window: axis **${w.axis}**, [${fmt(w.minMm, 1)}, ${fmt(w.maxMm, 1)}] mm.
 
 ${gate.result === "PASS"
     ? `Combined CG on ${w.axis} = **${fmt(gate.cgOnAxisMm)} mm** → **PASS** (inside the window).`
-    : `Combined CG on ${w.axis} = **${fmt(gate.cgOnAxisMm)} mm** → **FAIL — package refused.**
+    : `Combined CG on ${w.axis} = **${fmt(gate.cgOnAxisMm)} mm** → **FAIL — report refused.**
 
 \`\`\`
 ${gate.error.name}: ${gate.error.message}
 \`\`\`
 
 The gate is fail-closed: \`assemblyWB\` throws \`CgWindowError\` — there is no report object to
-ship. The rows above come from the same assembly computed WITHOUT the window armed, shown
-here so the operator can see how far out the CG landed.`}
+ship. What that refuses is this report and nothing else: \`server/wb/\` is a standalone tool,
+off the \`npm run demo\` path, so no job, no package and no ledger row is involved. The rows
+above come from the same assembly computed WITHOUT the window armed, shown here so the
+operator can see how far out the CG landed.`}
 
 ## Honest boundaries (verbatim from BL-004)
 
