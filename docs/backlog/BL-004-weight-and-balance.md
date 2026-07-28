@@ -44,22 +44,22 @@ pointed at a number nobody currently checks, and no generative-CAD demo shows it
   per-part rows, total, CG, and a deliberately armed window that PASSES — plus the
   same assembly with the ballast moved, FAILING the gate. Pass/fail pair = the demo.
 
-## Demo money-shot — WITHDRAWN, kept only so the correction has something to point at
+## Demo money-shot — WITHDRAWN
 
-**Do not quote the paragraph below. It is wrong twice. The correction under it is the
-accurate version.**
+**The pitch that used to open this section is withdrawn, and it was wrong twice.** It
+called the balance point the first number a pilot checks, and it said the gate refuses
+the *package*. Both are described here rather than reprinted: quoted whole they read as
+claims, and a quote travels without the paragraph that corrects it. What was accurate:
 
-> "Three printed parts, one command: total mass, combined CG, and a gate that refuses
-> the package when the CG leaves the declared window. Weight and balance — the first
-> number any aviator checks — computed from the same meshes the trust layer already
-> verifies, calibrated by a kitchen scale."
+> "Three printed parts, one command: total mass, combined CG, computed from the same
+> meshes the trust layer already verifies, calibrated by a kitchen scale."
 
-*Correction (2026-07-28).* Two things are wrong with it. Second first: "the first
-number any aviator checks" dresses an arithmetic tool up in a cockpit. This adds up
-masses and works out where the balance point lands. That is useful to anyone bolting
-printed parts together — a camera rig, a robot arm, a shelf bracket — and the word
-"aviator" only told a reader who this was really built for. Now the main one: the pitch
-says the gate "refuses the package," and that is not what shipped. What it refuses is a
+*Correction (2026-07-28).* Second one first: putting this in a cockpit dressed an
+arithmetic tool up as something it is not. It adds up masses and works out where the
+balance point lands. That is useful to anyone bolting printed parts together — a camera
+rig, a robot arm, a shelf bracket — and the flying language only told a reader who the
+tool was really built for. Now the main one: the withdrawn line said the gate refuses
+the package, and that is not what shipped. What it refuses is a
 **weight-and-balance report**.
 `assemblyWB` is a standalone function: nothing under `server/pipeline/`,
 `server/package/` or `server/api/` imports it, so no job package is ever in its

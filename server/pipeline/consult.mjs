@@ -21,6 +21,22 @@ import { VERIFIED } from "../reference/schema.mjs";
 // make — and the loudest word in the sentence was the one least entitled to be
 // there, since the "preferred" figure comes from HED-003, which is not in
 // AC 43.13-1B at all but handbook practice with an UNCONFIRMED paragraph.
+// Comparators that survive the boundary.
+//
+// The branch that fired on `statedEdge >= minMm` printed "is above the {min}mm
+// minimum", which is false the moment the two are equal — and the demo request
+// lands EXACTLY there: a 5mm fastener with its hole center 10mm from the edge,
+// against an HED-001 minimum of 2 x dia = 10mm. A hole sitting on the minimum
+// has no margin at all, and the one page in this repo built to be printed and
+// signed is the last place to tell somebody it has some. Every comparison a
+// finding makes now goes through here, so the word matches the arithmetic in
+// all three cases and not just the two anyone thought to read.
+function relation(value, threshold) {
+  if (value > threshold) return "above";
+  if (value < threshold) return "below";
+  return "exactly on";
+}
+
 function basisNote(res, ids) {
   const rows = res.verification?.rules ?? [];
   const unsigned = ids.filter((id) => (rows.find((r) => r.id === id)?.status ?? null) !== VERIFIED);
@@ -66,16 +82,15 @@ export function consultReference(request) {
   const findings = [];
   const statedEdge = matchMm(prompt, /hole\s+center\s+([\d.]+)\s*mm\s+from/i);
   if (statedEdge !== null) {
-    const bothRules = basisNote(ed, ["HED-001", "HED-003"]);
+    const vsMin = `${relation(statedEdge, ed.minMm)} the ${ed.minMm}mm minimum (HED-001)`;
     findings.push(
-      statedEdge >= ed.preferredMm
-        ? `stated edge distance ${statedEdge}mm is at or above the ${ed.preferredMm}mm preferred figure ` +
-          `(HED-003) and above the ${ed.minMm}mm minimum (HED-001) — ${bothRules}`
-        : statedEdge >= ed.minMm
-          ? `stated edge distance ${statedEdge}mm is above the ${ed.minMm}mm minimum (HED-001) and below ` +
-            `the ${ed.preferredMm}mm preferred figure (HED-003) — ${bothRules}`
-          : `stated edge distance ${statedEdge}mm is below the ${ed.minMm}mm minimum (HED-001) — ` +
-            `${basisNote(ed, ["HED-001"])}`,
+      // Under the minimum, the preferred figure is not worth naming: the reader
+      // has one thing to fix and HED-003 is not it.
+      statedEdge < ed.minMm
+        ? `stated edge distance ${statedEdge}mm is ${vsMin} — ${basisNote(ed, ["HED-001"])}`
+        : `stated edge distance ${statedEdge}mm is ${vsMin} and ` +
+          `${relation(statedEdge, ed.preferredMm)} the ${ed.preferredMm}mm preferred figure (HED-003) — ` +
+          `${basisNote(ed, ["HED-001", "HED-003"])}`,
     );
   }
   findings.push(

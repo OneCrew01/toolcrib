@@ -534,6 +534,45 @@ test("consult: the request shapes README says get an answer are the ones that do
   assert.match(inches.reason, /wired for mm prompts only/);
 });
 
+// The guard in the run-job test locks the DISCLAIMER; this one locks the claim
+// the disclaimer is wrapped around. A finding can name its rule ids, admit they
+// are unsigned, avoid the word VIOLATES, and still state a comparison that is
+// arithmetically false — and one did. `statedEdge >= minMm` was printed as "is
+// above the {min}mm minimum", which is wrong the moment the two are equal, and
+// the shipped demo request sits EXACTLY on the minimum (5mm fastener, hole
+// center 10mm out, HED-001 minimum 2 x dia = 10mm). So the false version was
+// the one that reached the printed page, past a green suite, in the direction of
+// more confidence than the geometry has. This walks every comparison clause a
+// finding makes and checks the word against the two numbers it sits between, so
+// a swapped threshold or a loosened boundary fails here and not on a bench.
+test("consult: every comparison a finding states is arithmetically true", () => {
+  const RELATION = /\b(above|below|exactly on) the ([\d.]+)mm/g;
+  const truthful = (a, b) => (a > b ? "above" : a < b ? "below" : "exactly on");
+
+  // For a 5mm fastener HED-001's minimum is 10mm and HED-003's preferred figure
+  // is 12.5mm. Both boundaries are in the list on purpose.
+  for (const stated of [8, 9.9, 10, 11, 12.5, 20]) {
+    const r = consultReference({
+      units: "mm",
+      prompt: `A plate with four 5mm diameter holes, hole center ${stated}mm from both adjacent edges`,
+    });
+    const finding = r.findings.find((f) => f.startsWith("stated edge distance"));
+    assert.ok(finding, `a stated ${stated}mm edge distance produced no edge-distance finding`);
+    assert.ok(
+      finding.startsWith(`stated edge distance ${stated}mm is `),
+      `finding does not restate the distance it was given: ${finding}`,
+    );
+    const claims = [...finding.matchAll(RELATION)];
+    assert.ok(claims.length > 0, `finding states no comparison at all: ${finding}`);
+    for (const [, word, threshold] of claims)
+      assert.equal(
+        word,
+        truthful(stated, Number(threshold)),
+        `${stated}mm is not "${word}" ${threshold}mm — ${finding}`,
+      );
+  }
+});
+
 test("backend failure lands in GENERATION_FAILED", async () => {
   const { dataDir, outRoot, root } = dirs("genfail");
   const empty = join(root, "empty-fixtures");

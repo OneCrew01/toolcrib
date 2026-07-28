@@ -316,8 +316,18 @@ export function assemblePackage(job, artifacts = {}, gates = [], opts = {}) {
     approver: null,
     decidedAt: null,
     decision: null,
+    // This note used to say the approval step rewrites this file. It does not.
+    // Nothing does — server/api/server.mjs decide() records the decision as
+    // ledger transitions and never touches the bundle, so the fields above stay
+    // pending forever. A reviewer who approves in the console, opens this file
+    // looking for their own name, and finds "pending" beside a note claiming the
+    // file was rewritten has been told the wrong thing twice. Say where the
+    // record actually is instead.
     note: "Approval is a HUMAN-gated state transition (WAITING_FOR_HUMAN_REVIEW -> APPROVED). " +
-      "The approval step rewrites this file; the assembler never does.",
+      "This file is written once, when the package is assembled, and nothing ever rewrites it: " +
+      "the fields above are how the job stood at that moment and stay that way. Who decided what, " +
+      "and when, is recorded in the job's ledger (<jobId>.ledger.jsonl), and the ledger as it stood " +
+      "at assembly is printed in the Revision History section of reports/manufacturingPackage.pdf.",
     whatSigningMeans: SIGNATURE_MEANING,
   }, null, 2) + "\n"), "json");
 
@@ -528,8 +538,12 @@ function buildManufacturingPdf({ job, req, part, files, validation, warnings, an
   doc.check("Compare features against the design intent statement (section 2).");
 
   sec(PDF_SECTIONS[11]); // Approval Record
-  doc.kv("State", "pending")
-    .kv("Record", "approvals/approvalRecord.json")
+  // "Record" pointed a signer at a file that stays pending forever, because
+  // nothing rewrites the bundle after a decision. Point at what actually keeps
+  // the record instead of at a snapshot that cannot change.
+  doc.kv("State", "pending as of the moment this package was assembled")
+    .kv("As issued", "approvals/approvalRecord.json — written once, never updated")
+    .kv("Decision record", "the job ledger; Revision History below is the ledger as it stood here")
     .kv("Gate", "WAITING_FOR_HUMAN_REVIEW -> APPROVED requires a HUMAN actor");
   doc.space(6).text(SIGNATURE_MEANING, { size: 9, bold: true });
   // "Approved by" over a line a person signs asserts exactly what the sentence

@@ -4,10 +4,10 @@
 
 ## Why
 
-The structural aluminum panel stays in the airplane — it carries the mounting loads and
-isn't ours to touch. The **overlay** that sits over/around it is a wear-and-style item
-that should be **replaceable and plug-and-play**: swap the face without touching
-structure. This is the flush-mount generator grown up — it already does pairs,
+The structural panel — the metal plate the gauges and switches actually bolt through —
+carries the mounting loads and isn't ours to touch. The **overlay** that sits over/around
+it is a wear-and-style item that should be **replaceable and plug-and-play**: swap the
+face without touching anything that holds a load. This is the flush-mount generator grown up — it already does pairs,
 per-side clearance, chamfers, two colors, and cited fit rules (`flushmount.mjs`,
 FMF-001..010). A panel overlay is the same spine plus light channels, legends, and
 modular click/slide connectors.
