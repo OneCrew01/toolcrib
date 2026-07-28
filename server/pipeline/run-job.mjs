@@ -59,10 +59,10 @@ function gateThreshold(gate, machine, expectedMassG) {
   if (gate === "envelope" && machine?.buildVolumeMm) {
     const b = machine.buildVolumeMm;
     // "any orientation" overstated the check (see the envelope gate in
-    // gates.mjs): square-on only, never tilted. This string is a PDF table cell
-    // truncated at 28 characters, so it says the short true thing and the
-    // gate's own detail line carries the full sentence.
-    return { threshold: `fit ${b.x}x${b.y}x${b.z}mm, any side` };
+    // gates.mjs): square-on only, never tilted. "any side" was the first fix
+    // and is one reading away from the phrase it replaced — a stranger takes it
+    // as "any way up". PDF table cell, truncated ~28 chars; detail carries the rest.
+    return { threshold: `fit ${b.x}x${b.y}x${b.z}mm, no tilt` };
   }
   if (gate === "watertight") return { threshold: "closed 2-manifold" };
   if (gate === "mass" && expectedMassG) return { threshold: `${expectedMassG.minG}-${expectedMassG.maxG}g` };

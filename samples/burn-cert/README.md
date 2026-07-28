@@ -24,9 +24,11 @@ Everything here is watermarked `DRAFT — NOT VERIFIED`: every burn-cert rule is
 the rows in `docs/VERIFICATION_LOG.md` (FAA TC TN23-65 could not be fetched at
 build time — 503/403 on both official mirrors).
 
-> ADVISORY. This compares a design against a wall thickness we read out of a
-> published test report; it proves nothing about how a part burns. The only
-> thing that proves that is burning a real sample of the real plastic in a lab
+> ADVISORY. This compares a design against a wall thickness written down in
+> this repo's own reference table. The rows it used are printed beside this
+> result — where each number is claimed to come from, and whether anybody has
+> signed it off. It proves nothing about how a part burns. The only thing that
+> proves that is burning a real sample of the real plastic in a lab
 > (14 CFR 25.853 / Appendix F), and this is not that. The plastic you pick sets
 > the floor and no shape gets around it. Read this as something to go and check,
 > not as an answer.

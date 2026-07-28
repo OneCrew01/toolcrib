@@ -4,7 +4,7 @@ Floor under test: PC-ABS-FR minimum wall 1.5 mm (BC-003, PENDING operator
 sign-off — docs/VERIFICATION_LOG.md). Passing our gate is passing our gate;
 nothing here has been graded against anything. Edit the named parameters; the
 geometry follows.
-ADVISORY — design-for-burn-cert, not certification.
+ADVISORY — this is a design aid. It proves nothing about how a part burns.
 */
 @settings(defaultLengthUnit = mm, kclVersion = 2.0)
 

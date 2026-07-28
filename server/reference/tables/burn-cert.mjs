@@ -42,11 +42,27 @@ const TOPIC = "burn-cert";
 // The citation stays — it is a public document and naming it is the honest part
 // — and the sentence around it now says the same thing to somebody who owns a
 // printer and has never read a regulation.
+//
+// The first attempt at that plain rewrite opened "a wall thickness we read out
+// of a published test report", which was worse than the jargon it replaced,
+// because it was false. Nobody read one. The floor the gate actually compares
+// against is BC-001/BC-003 = 1.5 mm, sourced below to a fetched blog post that
+// labels itself a secondary source and asks in its own paragraph field to be
+// checked against the UL Yellow Card. The one published test report in this
+// domain — TN23-65 — was never retrieved at all (503/403; see the provenance
+// note at the top of this file). A disclaimer whose only job is honest
+// provenance is the last string in this repo that may upgrade a source.
+//
+// So it claims nothing about where the number came from. It points at the rows
+// printed beside every result, which carry their own claimed source and their
+// own sign-off state, and it stays true whether those rows are signed or not.
 export const BURN_CERT_DISCLAIMER =
-  "ADVISORY. This compares a design against a wall thickness we read out of a published test report; " +
-  "it proves nothing about how a part burns. The only thing that proves that is burning a real sample " +
-  "of the real plastic in a lab (14 CFR 25.853 / Appendix F), and this is not that. The plastic you " +
-  "pick sets the floor and no shape gets around it. Read this as something to go and check, not as an answer.";
+  "ADVISORY. This compares a design against a wall thickness written down in this repo's own reference " +
+  "table. The rows it used are printed beside this result — where each number is claimed to come from, " +
+  "and whether anybody has signed it off. It proves nothing about how a part burns. The only thing that " +
+  "proves that is burning a real sample of the real plastic in a lab (14 CFR 25.853 / Appendix F), and " +
+  "this is not that. The plastic you pick sets the floor and no shape gets around it. Read this as " +
+  "something to go and check, not as an answer.";
 
 const TN2365 = {
   document: "FAA TC TN23-65 — An Evaluation of the Flammability of 3D Printed Parts",

@@ -11,15 +11,16 @@ was last counted.
 
 ## 2026-07-24 · Day 5 — the live lane survives a real crash; Zookeeper joins the console
 
-**Works (`npm test` on 2026-07-28: 296 server tests + `self-checks: 40 passed` +
+**Works (`npm test` on 2026-07-28: 297 server tests + `self-checks: 40 passed` +
 `leak audit: CLEAN` over 243 tracked files, 0 failures; app builds clean)**
 
 *The count above is the only figure in this file the header promises to keep current,
 and it has moved a long way since this block's prose was written: 187 when it was last
-counted on 2026-07-26, 296 today. It read 292 under today's date while the suite
+counted on 2026-07-26, 297 today. It read 292 under today's date while the suite
 actually ran 294: two commits added tests and neither came back here, which is exactly
-the failure this file's header is written against. Nothing enforces this number — it is
-prose, and `npm test` is the only thing that settles it.
+the failure this file's header is written against. It moved again in the next commit
+too, 296 to 297 — the figure is only ever true at the commit that measured it. Nothing
+enforces it; it is prose, and `npm test` is the only thing that settles it.
 Measured at this commit, 81 of those tests are in
 `server/revision/` — the amendment module and its demonstration, D-009 — and 6 are the
 citation-freshness sweep (`server/lib/doc-citations.mjs`); neither directory existed on

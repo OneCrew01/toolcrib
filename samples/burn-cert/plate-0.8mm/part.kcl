@@ -3,7 +3,7 @@ ToolCRIB burn-cert coupon plate — DELIBERATELY THIN wall (0.8 mm).
 Built to FAIL the sampled min-wall gate against the PC-ABS-FR 1.5 mm floor
 (BC-003, PENDING operator sign-off — docs/VERIFICATION_LOG.md). The same
 plate 0.7 mm thicker passes; this one is caught before it ever prints.
-ADVISORY — design-for-burn-cert, not certification.
+ADVISORY — this is a design aid. It proves nothing about how a part burns.
 */
 @settings(defaultLengthUnit = mm, kclVersion = 2.0)
 

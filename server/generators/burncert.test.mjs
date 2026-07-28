@@ -103,6 +103,61 @@ test("draft results carry watermark, disclaimer, and consulted rules", () => {
   assert.deepEqual(r.verification.rules.map((x) => x.id), ["BC-001", "BC-003", "BC-006"]);
 });
 
+// BURN_CERT_DISCLAIMER makes exactly one claim of its own, and it has to hold
+// wherever the disclaimer is printed: "The rows it used are printed beside this
+// result — where each number is claimed to come from, and whether anybody has
+// signed it off."
+//
+// It earns that narrow shape. An earlier plain-English rewrite claimed
+// provenance instead — "a wall thickness we read out of a published test
+// report" — and nobody read one: the floor is BC-001/BC-003, sourced to a
+// self-labelled secondary source that asks in its own paragraph field to be
+// checked against the UL Yellow Card, and the one published report in this
+// domain (TN23-65) answered 503/403 and was never retrieved. That sentence
+// shipped verbatim into three sample artifacts, three lines under a README line
+// saying the report could not be fetched.
+//
+// So the disclaimer no longer says where a number came from; it says the rows
+// are beside it. This asserts they are, on every surface that prints it,
+// including the FAIL path — a reader looking at a rejection is exactly the
+// reader who goes looking for the source.
+test("every surface carrying the disclaimer also carries the rows it used", () => {
+  const cites = (c) => (typeof c === "string" ? [c] : Object.values(c ?? {}));
+  const surfaces = [
+    ["minWallFloor", minWallFloor({ material: "PC-ABS-FR", allowDraft: true }), (r) => cites(r.citation)],
+    ["minInfillPercent", minInfillPercent({ allowDraft: true }), (r) => cites(r.citation)],
+    ["wallFlameTimeDatum", wallFlameTimeDatum({ allowDraft: true }), (r) => cites(r.citation)],
+    ["designRules", designRules({ allowDraft: true }), (r) => r.rules.map((x) => x.citation)],
+    ["gate PASS", burnCertGate(PASS_BOX, { material: "PC-ABS-FR", allowDraft: true }), (r) => cites(r.citation)],
+    ["recipe", printRecipe({ material: "PC-ABS-FR", allowDraft: true }).recipe, (r) => cites(r.citations)],
+  ];
+  try {
+    burnCertGate(THIN_BOX, { material: "PC-ABS-FR", allowDraft: true });
+    assert.fail("the 0.8 mm box should have failed the gate");
+  } catch (e) {
+    assert.ok(e instanceof BurnCertError);
+    surfaces.push(["gate FAIL", e.report, (r) => cites(r.citation)]);
+  }
+  // The FAIL push happened and nothing below is looping over a short list: a
+  // surface silently dropped out of this table is the way this test goes quiet.
+  assert.equal(surfaces.length, 7, "a surface that prints the disclaimer is not being checked");
+
+  for (const [name, result, citationsOf] of surfaces) {
+    assert.equal(result.disclaimer, BURN_CERT_DISCLAIMER, `${name}: disclaimer missing`);
+    assert.ok(result.verification.rules.length > 0, `${name}: the disclaimer points at rows that are not there`);
+    for (const row of result.verification.rules) {
+      assert.match(row.id, /^BC-\d{3}$/, `${name}: a row is printed without its rule id`);
+      assert.ok(row.status, `${name}: ${row.id} does not say whether anybody signed it off`);
+    }
+    const citations = citationsOf(result);
+    assert.ok(citations.length > 0, `${name}: no citation printed beside the result`);
+    for (const c of citations) {
+      assert.equal(typeof c, "string", `${name}: a citation is not printable text`);
+      assert.ok(c.length > 20, `${name}: a citation is too short to say where a number came from`);
+    }
+  }
+});
+
 test("material floors: listed materials get their listing, unknown gets the general floor", () => {
   const pcabs = minWallFloor({ material: "PC-ABS-FR" }, signedTable);
   assert.equal(pcabs.floorMm, 1.5);

@@ -7,7 +7,7 @@
 - **Minimum infill:** 25% — print-time — package requirement; CAD geometry cannot enforce infill
 - **Orientation:** Record the actual build orientation on the traveler. TN23-65 treated orientation as an interaction effect with material, thickness, and infill (UNCONFIRMED — verify against the printed source); do not rotate the part off its modeled orientation without re-running the min-wall gate on thin features.
 
-> ADVISORY. This compares a design against a wall thickness we read out of a published test report; it proves nothing about how a part burns. The only thing that proves that is burning a real sample of the real plastic in a lab (14 CFR 25.853 / Appendix F), and this is not that. The plastic you pick sets the floor and no shape gets around it. Read this as something to go and check, not as an answer.
+> ADVISORY. This compares a design against a wall thickness written down in this repo's own reference table. The rows it used are printed beside this result — where each number is claimed to come from, and whether anybody has signed it off. It proves nothing about how a part burns. The only thing that proves that is burning a real sample of the real plastic in a lab (14 CFR 25.853 / Appendix F), and this is not that. The plastic you pick sets the floor and no shape gets around it. Read this as something to go and check, not as an answer.
 
 > Material chemistry sets the floor and geometry cannot overcome it: a flammable filament in a perfect shape still fails, and a rating held at 3 mm does not follow the material down to 1 mm.
 

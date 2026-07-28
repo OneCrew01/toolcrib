@@ -63,12 +63,24 @@ const GATE_RESULTS = new Set(["PASS", "FAIL", "SKIPPED"]);
 // say, on the page, that it is not one.
 //
 // PDF_ADVISORY sits directly under the title so it is read before any number.
-// It used to open "Every number in this document was computed by software",
-// and the section three inches below it prints "Stated in the request" and
-// "Material density (input)" — numbers a person typed, which software only
-// copied. The load-bearing half is "checked by nobody"; the half that was
-// wrong is now accurate, because a sweeping claim a reader can disprove by
-// scrolling discounts the sentence that follows it.
+// It went through two false versions before this one, and both failed the same
+// way: they described HOW the numbers got here, and then the page printed a
+// number the description did not cover.
+//
+//   v1 "Every number in this document was computed by software" — section 3
+//      prints "Stated in the request" and "Material density (input)", typed by
+//      a person and only copied by software.
+//   v2 "...either typed into the request or computed by software" — section 6
+//      prints "Build volume 256 x 256 x 256 mm" and section 10 "Confirm nozzle
+//      0.4 mm installed", hand-authored constants in the machine profile that
+//      are in neither category, and section 9's edge-distance figures come from
+//      multipliers transcribed out of a handbook.
+//
+// The enumeration was never the load-bearing part; "checked by nobody" was. An
+// exhaustive list is a claim, it has to be defended against every number on the
+// page, and a reader who disproves the first sentence discounts the ones after
+// it. This version makes no claim about provenance at all, so there is nothing
+// left to disprove by scrolling.
 //
 // SIGNATURE_MEANING sits directly above the signature line, is written into
 // approvals/approvalRecord.json, and is rendered beside the Approve button in
@@ -80,14 +92,30 @@ const GATE_RESULTS = new Set(["PASS", "FAIL", "SKIPPED"]);
 // rendered page, in the JSON, AND in the console source, so the three cannot
 // drift apart silently. Hence the wording works over a paper line and beside
 // a button both.
+//
+// It also has to say the same TRUE thing on both, which ruled out the first
+// version. "records that one named person accepted this package and passed it
+// to the next step" is a claim about effect, and on paper there is no effect:
+// the state machine never learns the signature exists, and two lines below the
+// signature rule the page says exactly that. A signer read that signing records
+// an acceptance, then that it records nothing anywhere, and was left with no
+// answer to "what did my signature just do?". So this sentence says what a name
+// MEANS — the same on a printed line and beside a button — and each surface
+// states its own effect separately: the page says the pen cannot reach the
+// ledger, and a button does not need telling that clicking it works.
 export const PDF_ADVISORY =
-  "Every number in this document was either typed into the request or computed by software, and checked " +
-  "by nobody. Nothing here has been tested, approved, or signed off for any use. Check anything that " +
-  "matters against your own source before you cut, print, or fit a part.";
+  "Nothing in this document has been checked by anybody. Nothing here has been tested, approved, or " +
+  "signed off for any use. Check anything that matters against your own source before you cut, print, " +
+  "or fit a part.";
 
+//
+// No em dash in this one, deliberately: pdf.mjs's WinAnsi escaper maps "—" to
+// "-" (FALLBACK, pdf.mjs:19), so an em dash here renders as a hyphen and the
+// test that asserts this exact sentence on the RENDERED page can never match.
+// Found by that test going red, which is the test doing its job.
 export const SIGNATURE_MEANING =
-  "Putting your name on this records that one named person accepted this package and passed it to the " +
-  "next step. It is not approval of the part.";
+  "Your name on this job means one person read this package and passed it on. It is not approval of " +
+  "the part. Nothing here has been tested or signed off by anybody.";
 
 // A number in minutesUsed is a billing claim, and this bundle's whole value is
 // that every number in it was measured. There are THREE states here and they
@@ -572,10 +600,18 @@ function buildManufacturingPdf({ job, req, part, files, validation, warnings, an
   // The section directly above points a signer at the ledger. Nothing told them
   // that the pen in their hand cannot reach it: a name written here is ink on
   // paper and the ledger will never know, which is a surprise worth spending
-  // one line to prevent.
+  // one line to prevent. This is where "what did my signature just do?" gets
+  // answered, so the sentence above it does not have to guess.
+  //
+  // "Only a decision made in the review console" named a UI as the sole route
+  // to the ledger, and the code is narrower than that: the row is written by
+  // POST /api/jobs/:id/decision (server/api/server.mjs), and the console is one
+  // client of that endpoint, not a gate in front of it. A reader told the
+  // console is the only way reads a row that arrived over the API as tampering.
   doc.space(4).text(
-    "A name written on this page stays on this page — nothing here is added to the job's ledger. " +
-    "Only a decision made in the review console is recorded there.",
+    "Signing this page does not move the job. A name written here stays on this page and never reaches " +
+    "the job's ledger. The job moves only when someone records a decision against it in the software — " +
+    "the Approve button in the review console is the usual way to do that, and not the only one.",
     { size: 8 },
   );
 

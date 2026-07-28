@@ -40,7 +40,7 @@ const ACTOR_KEY = "toolcrib.actorName";
 // asserts the exact string is in it. Change one side and the suite goes red.
 // Keep it on a single line; that is what the test matches against.
 const SIGNATURE_MEANING =
-  "Putting your name on this records that one named person accepted this package and passed it to the next step. It is not approval of the part.";
+  "Your name on this job means one person read this package and passed it on. It is not approval of the part. Nothing here has been tested or signed off by anybody.";
 
 export function JobDetailView({
   jobId,
