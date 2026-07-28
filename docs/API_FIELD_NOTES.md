@@ -521,6 +521,141 @@ and confirmed to resolve before it was written down.
   per-call cost is not retrievable per call today. FN-003 asked for the grant to be labeled; this
   is the same gap one level down — an entrant metered in minutes cannot attribute minutes to a job.
 
+## FN-032 · Boolean-built solids report an inflated bounding box — XY × 1.2, Z + 0.1 × chamferDepth, exact on 5 of 5
+- **Surface:** Engine · bounding box over executed KCL (`calculate_bounding_box`)
+- **Date:** 2026-07-28 · 5 parameter sets on the live engine, two agents independently
+- **Type:** bug (silent — the number is plausible, and it is wrong)
+- **Expected:** the bounding box of an executed solid is the box that solid occupies. FN-015
+  measured exactly that: a path-built 10 mm extrusion returned centre (5,5,5) and dimensions
+  (10,10,10) mm, exact, in ~450 ms.
+- **Actual:** for a solid built by SUBTRACTING cutters — this repo's chamfer route, forced by
+  FN-024 — the reported box is bigger than the part, and bigger by a fixed ratio rather than by
+  noise. A native `chamfer()` call on the same nominal part returns the true part every time.
+
+  | case | boolean-built | native `chamfer()` | true part |
+  |---|---|---|---|
+  | base_c015 | 23.64 × 23.64 × 3.08 | 19.70 × 19.70 × 3.00 | 19.7 × 19.7 × 3 |
+  | deep_chamfer | 23.64 × 23.64 × 3.28 | 19.70 × 19.70 × 3.00 | 19.7 × 19.7 × 3 |
+  | tiny_scale | 4.752 × 4.752 × 0.96 | 3.96 × 3.96 × 0.90 | 3.96 × 3.96 × 0.9 |
+  | micro_clear | 23.976 × 23.976 × 3.005 | 19.98 × 19.98 × 3.00 | 19.98 × 19.98 × 3 |
+
+- **The pattern is the reportable part:** XY = **1.2 × the true part**, Z = **part + 0.1 ×
+  chamferDepth**, arithmetic-exact on every row. It is checkable end to end on the one row whose
+  parameters this repo ships: base_c015's true part matches
+  `samples/flush-mount/coupons/c0.15/insert.kcl` on all four numbers — a 19.7 × 19.7 × 3 insert at
+  `chamferDepth = 0.8` — and 19.7 × 1.2 = 23.64, 3 + 0.1 × 0.8 = 3.08, both to the digit. Run the same arithmetic backwards on the other three and the implied depths
+  are 2.8, 0.6 and 0.05, which match what their case names say they are; those are *implied*, not
+  read off the spec. Five parameter sets were measured and the pattern held in all five; the four
+  with recorded numbers are tabulated.
+- **Mechanism: UNKNOWN, and deliberately not guessed.** One thing it is *not* is the raw extent of
+  the cutters: for base_c015 the wedge prisms reach ±15.8 mm, while half the reported box is
+  11.82 mm. Beyond that we have two round factors — 1.2 and 0.1 — that track the part and the
+  chamfer depth rather than the tool, and nothing that says why. Naming a cause we did not measure
+  would be the defect this repo exists to stop.
+- **What it does NOT touch:** the exported mesh. Both meshes — boolean-built and native — are
+  watertight, 0 degenerate, 0 sliver, 20 triangles, 12 vertices, and agree on volume to
+  2.4e-9 mm³ (1139.7366463938852 vs 1139.7366440254093). The part is right; only the measurement
+  of it is wrong, which is what makes this dangerous rather than annoying — nothing downstream fails.
+- **Impact:** any consumer that trusts `calculate_bounding_box` is silently corrupted, and a 20 %
+  XY inflation is exactly the size that reads as plausible rather than broken. The concrete
+  casualty here is the printer-envelope check FN-015 closed: a 23.64 mm box on a 19.7 mm part
+  rejects nothing today, but on a part near the plate limit it rejects a job that would have
+  printed — and a build-volume rejection is precisely the kind of answer nobody re-derives by hand.
+  Counting this one, the same measurement now has three behaviours: exact on path-built solids
+  (FN-015), null dimensions on imported ones (FN-022), inflated on boolean-built ones (here). Only
+  the third lies quietly.
+- **Repro:** execute `samples/flush-mount/coupons/c0.15/insert.kcl` — shipped, and the base_c015
+  row — and ask for its bounding box → 23.64 × 23.64 × 3.08. Measure the same part from its shipped
+  mesh `samples/flush-mount/coupons/c0.15/insert.stl` (`server/package/stl-analyze.mjs`, the
+  offline analyzer FN-021 pinned against `/file/mass`) → 19.7 × 19.7 × 3.0. The other three rows
+  are the same generator at other parameters (`server/generators/flushmount.mjs`).
+- **Suggested fix:** return the bounding box of the resulting solid after a boolean. If the value
+  is instead a deliberate conservative envelope, say so in the response and on the docs page — an
+  unlabelled envelope is indistinguishable from a measurement, and gets used as one.
+
+## FN-033 · `chamfer()` with a bare profile tag chamfers the WRONG END — and volume, area and bounding box all agree with the right part
+- **Surface:** Engine · KCL `chamfer(tags = [...])` on an extruded solid
+- **Date:** 2026-07-28
+- **Type:** bug (silent-wrong-result) + doc-gap — the silence is the finding, not the offset
+- **Expected:** `tags = [solid.sketch.tags.s0 … s3]` on a solid extruded from that sketch chamfers
+  the four side edges at the end you extruded toward. A contract written against this call
+  elsewhere recorded it as passing on exactly that reading.
+- **Actual:** it chamfers the **z = 0 end** — on a flush-mount insert, the show face, the one face
+  on the part that must stay flat. `getOppositeEdge(...)` is required to reach the other end.
+  The [chamfer page](https://zoo.dev/docs/kcl-std/functions/std-solid-chamfer) uses
+  [`getOppositeEdge`](https://zoo.dev/docs/kcl-std/functions/std-sketch-getOppositeEdge) in its
+  examples but never states the rule, and nothing in the response says which end you got.
+- **Why this is a trap rather than an inconvenience — every scalar check passes:**
+
+  | measurement | correct part | wrong-end part |
+  |---|---|---|
+  | volume mm³ | 1139.7366 | 1139.7366 |
+  | surface area mm² | 974.5916 | 974.5916 |
+  | bounding box mm | 19.70 × 19.70 × 3.00 | 19.70 × 19.70 × 3.00 |
+  | centre of mass, z mm | **1.473491907119751** | **1.52650785446167** |
+
+  Only the first moment separates them, and the reason is arithmetic rather than luck: chamfering
+  the other end of the same prism yields the **mirror image about the mid-plane**, so every
+  symmetric measurement is invariant by construction. The two z values sum to 2.999999761581421 —
+  3.000 mm to within 2.4e-7, i.e. to float32, which is FN-030's quantisation showing up as
+  confirmation.
+- **Impact:** this is a generated-KCL problem specifically. A human in Design Studio sees the
+  chamfer on the wrong face immediately; a generator does not look. And it defeats the check this
+  repo was built on: FN-010's thesis is that a `completed` status means nothing and downstream
+  measurement is what you trust — but mass, volume, area and envelope are all identical here, so
+  every gate ToolCRIB shipped before this note passes a part whose show face is chamfered and whose
+  lead-in is flat. It prints, it looks correct, and it does not sit flush. The one check that
+  separates them is centre of mass, which we compute locally and cross-check (FN-029) — and which
+  has to be computed in the right frame to be worth anything, per that same note.
+- **Repro:** extrude a rectangular profile; `chamfer(tags = [solid.sketch.tags.s0, s1, s2, s3])`;
+  read the centre of mass (mapping the axis convention per FN-029). Repeat with each tag wrapped in
+  `getOppositeEdge()`. Everything except the centroid matches.
+- **Suggested doc edit:** the chamfer page's `tags` parameter should say in prose which end of an
+  extruded solid a bare profile-edge tag resolves to, and that `getOppositeEdge()` addresses the
+  other one. The examples demonstrate the call; they do not say what happens when you omit it.
+  Stronger version of the same ask: when an operation can return a valid, plausible, *different*
+  part depending on tag resolution, the response should name the edges it actually chamfered.
+
+## FN-034 · Native `chamfer()` cannot reach an interior opening rim — `tags` yields a sketch-edge tag, the operation wants a face tag, and the alternative is marked do-not-use
+- **Surface:** Engine · KCL `chamfer()` edge selection on an inner-loop (hole / opening) profile
+- **Date:** first hit 2026-07-23 while building `server/generators/flushmount.mjs`; filed 2026-07-28
+- **Type:** documented limitation — **Zoo already knows**. This note is a timeline question, not a
+  bug report.
+- **The feature:** a panel with a rectangular opening and a chamfered lead-in on the opening rim.
+  The chamfer is on the INTERIOR — the rim of the hole, not the outside of the plate.
+- **Actual — two routes, two distinct executor errors, verbatim:**
+  1. tags taken straight off the inner-loop sketch segments →
+     `Entity found but wrong type / no edges match`
+  2. those same tags through `getOppositeEdge()` (the FN-033 fix) →
+     `Tag i0 refers to a sketch edge, but this operation requires a face tag`
+
+  The second error is the useful one and it names the whole problem: `chamfer()` wants a **face**
+  tag, an inner loop hands you a **sketch-edge** tag, and no documented conversion connects them.
+- **Why this is filed as a gap and not as news:** the third route — the experimental `edges`
+  selector on the same page — carries Zoo's own warning in the kcl-std docs: *"Experimental.
+  Experimental face API. Do not use in generated or user-facing KCL yet; prefer `tags` until
+  point-and-click and migration support ships."* So the published advice is to prefer `tags`, and
+  `tags` is precisely the route that cannot address an interior rim. That is a known, deliberately
+  staged gap; we are not reporting a surprise, we are asking about the schedule.
+- **Impact:** every chamfered hole, counterbore lead-in, bore break-edge and flush-mount opening in
+  *generated* KCL is outside `chamfer()`'s reach today — and in fastening work the interior chamfer
+  is the common one, not the exotic one. You break the edge of a hole far more often than you
+  chamfer the corner of a plate. Our workaround is the boolean decomposition already documented in
+  FN-024 (straight opening prism + a 2-profile frustum loft), which is why this repo does not call
+  `chamfer()` anywhere.
+- **The question for Zoo, which is the only thing we actually want:** when the face API leaves
+  experimental, will an inner loop be addressable through it — and until it does, is there a
+  supported way to get from a sketch-edge tag on an inner loop to the face tag `chamfer()`
+  requires? If the answer is "no, decompose into booleans", one line saying so on the chamfer page
+  would have saved us a day and would save it for everyone generating KCL.
+- **Repro:** sketch a rectangle with an inner rectangular loop; extrude; tag the inner-loop
+  segments; call `chamfer()` on them → error 1. Wrap each tag in `getOppositeEdge()` → error 2.
+- **Suggested doc edit:** state on the chamfer page that `tags` addresses the outer-profile edges
+  of an extruded solid and does not reach inner-loop rims, and cross-link the supported route for
+  interior edges — or say plainly that there isn't one yet. The experimental warning already tells
+  a reader not to use `edges`; it does not tell them what to do instead when `tags` cannot express
+  the feature they came for.
+
 ## FN-007 · `outputs` only exists on the async-operations surface (and it's unpadded base64)
 - **API:** Agent/ML · `GET /user/text-to-cad/{id}` vs `GET /async/operations/{id}`
 - **Date:** 2026-07-22 (id `86102d0e-ccbf-40bd-a60e-3bc79e38cfd2`)
@@ -634,9 +769,14 @@ documentation only.
 | FN-008 · FN-010 · FN-021 | Mass / volume validation | [Get CAD file mass](https://zoo.dev/docs/developer-tools/api/file/get-cad-file-mass) | confirms — 0.02% agreement; reproduced offline to every digit |
 | FN-019 | `POST /file/execute/{lang}` | [Executor API](https://zoo.dev/docs/developer-tools/api/executor) | confirms lang enum · fills — no `kcl` variant, endpoints 500 |
 | FN-024 | KCL boolean `subtract()` | [`subtract()` standard library](https://zoo.dev/docs/kcl-std/functions/std-solid-subtract) | fills — no note on cut-crossing / absolute-scale failure |
-| FN-009 · FN-013 · FN-014 · FN-015 · FN-022 · FN-023 | Modeling command websocket | [Engine API](https://zoo.dev/docs/developer-tools/engine-api) | fills — post-upgrade auth frame + protocol not in the overview |
+| FN-033 · FN-034 | KCL `chamfer()` edge selection | [`chamfer()` standard library](https://zoo.dev/docs/kcl-std/functions/std-solid-chamfer) | fills — which end a bare profile tag resolves to is shown by example but never stated; inner-loop rims are unreachable via `tags`, and the `edges` alternative is marked "do not use in generated or user-facing KCL yet" |
+| FN-033 | `getOppositeEdge()` | [`getOppositeEdge()` standard library](https://zoo.dev/docs/kcl-std/functions/std-sketch-getOppositeEdge) | confirms — takes a `TaggedEdge`, which is exactly why the inner-loop route in FN-034 is refused |
+| FN-009 · FN-013 · FN-014 · FN-015 · FN-022 · FN-023 · FN-032 | Modeling command websocket / engine geometry queries | [Engine API](https://zoo.dev/docs/developer-tools/engine-api) | fills — post-upgrade auth frame + protocol not in the overview; nothing states that the bounding box of a boolean result is not the bounding box of the part |
 | FN-025 · FN-026 · FN-027 · FN-028 | Copilot websocket / agent client | [Agent API](https://zoo.dev/docs/developer-tools/agent-api) | fills — copilot ws lifecycle + encodings undocumented |
 
 *Method note: doc pages were verified by fetching each URL; two candidate deep-links
 (`/api/executor/get-an-async-operation`, `/api/file/get-mass`) returned 404 during
-verification and were replaced with the correct paths above rather than cited blind.*
+verification and were replaced with the correct paths above rather than cited blind.
+The two kcl-std pages added on 2026-07-28 (`std-solid-chamfer`, `std-sketch-getOppositeEdge`)
+were fetched the same day; the experimental-selector warning quoted in FN-034 was read off the
+chamfer page rather than paraphrased from memory.*

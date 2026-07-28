@@ -166,7 +166,7 @@ export function generateFlushMountPair(spec) {
   const ow = round ? opening.diameterMm : opening.widthMm;
   const oh = round ? opening.diameterMm : opening.heightMm;
   gate(ow > 0 && oh > 0, "opening dims must be positive");
-  gate(!(opening.cornerRadiusMm > 0), "cornerRadiusMm > 0 not supported in v1 — rect panel openings emit sharp chamfered corners (lofted cutter); insert wedges add slight corner relief");
+  gate(!(opening.cornerRadiusMm > 0), "cornerRadiusMm > 0 not supported in v1 — rect panel openings emit sharp chamfered corners (lofted cutter), and the insert's wedge cutters give the same clean miter; nothing in v1 rounds or relieves a corner");
   gate(c > 0, "clearancePerSideMm must be positive — a flush fit is a deliberate clearance, not zero");
   const { angleDeg: A, depthMm: d } = chamfer;
   gate(A > 5 && A < 80, `chamfer.angleDeg must be in (5, 80), got ${A}`);
@@ -217,7 +217,7 @@ export function generateFlushMountPair(spec) {
       modelOrientation: "both parts modeled with the chamfered lead-in at +Z top; flat show face on z=0 — print as exported, no supports",
       cornerTreatment: round
         ? "exact revolved chamfer"
-        : "panel opening: single lofted cutter — sharp chamfered corners; insert: wedge cutters overshoot the corners — slight corner relief, deliberate, eases the fit like a machinist's relief cut",
+        : "clean miter, both parts: four flat chamfer faces meeting at sharp corners, and no corner relief anywhere. The panel opening is cut by one lofted cutter; the insert by four wedge cutters aimed chamferBite outside the part, so a boolean never has to cut a face that is already there — that margin is air and removes no material. Measured: the insert mesh carries 12 vertices and 4 chamfer faces, matching an ideal mitered chamfer to 1e-13. So the fit comes from clearancePerSideMm alone; nothing here relieves the corners to help it.",
     },
     formulas: {
       insertWidth: round

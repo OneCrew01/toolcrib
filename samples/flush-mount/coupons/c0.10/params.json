@@ -39,7 +39,7 @@
     "totalLateralPlayMm": 0.2,
     "entrySide": "front",
     "modelOrientation": "both parts modeled with the chamfered lead-in at +Z top; flat show face on z=0 — print as exported, no supports",
-    "cornerTreatment": "panel opening: single lofted cutter — sharp chamfered corners; insert: wedge cutters overshoot the corners — slight corner relief, deliberate, eases the fit like a machinist's relief cut"
+    "cornerTreatment": "clean miter, both parts: four flat chamfer faces meeting at sharp corners, and no corner relief anywhere. The panel opening is cut by one lofted cutter; the insert by four wedge cutters aimed chamferBite outside the part, so a boolean never has to cut a face that is already there — that margin is air and removes no material. Measured: the insert mesh carries 12 vertices and 4 chamfer faces, matching an ideal mitered chamfer to 1e-13. So the fit comes from clearancePerSideMm alone; nothing here relieves the corners to help it."
   },
   "formulas": {
     "insertWidth": "insertWidth = openingWidth - 2 x clearance = 19.80mm; insertHeight = openingHeight - 2 x clearance = 19.80mm",

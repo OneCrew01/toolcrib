@@ -237,3 +237,73 @@ revision" and watch rev 2 appear cannot, and README, ARCHITECTURE and D-002 now 
 so in those words rather than leaving the diagram to imply otherwise. Closing it is the
 next increment, and the order it has to happen in is: serialise the store safely
 (finding 2), give the resume path its own spend gate (finding 3), then wire the route.
+
+## D-010 · 2026-07-28 · Native `chamfer()` was measured against the boolean chamfer and REJECTED — the generator does not change
+
+The idea arrived from another project: KCL has a stdlib `chamfer()`, this repo builds its
+chamfers out of booleans instead (FN-024), so the boolean route is presumably a workaround
+we should retire. The operator set one test for it — **does it make the prints better? If
+yes we must. If not, leave it out** — and it was run on the live engine, 35 calls, by two
+agents, with a third briefed to refute the result. It could not.
+
+**Rejected. The generator ships exactly as it was.** Three measurements, in the order they
+mattered:
+
+1. **The geometry is identical at every parameter this repo ships.** At 45° — every coupon
+   and every sample here — boolean and native produce the same solid: volume
+   1139.7366463938852 vs 1139.7366440254093 mm³ (2.4e-9 apart), 20 triangles, 12 vertices,
+   watertight, 0 degenerate, 0 sliver, 4 chamfer faces of 21.382909 mm² at exactly 45.000°,
+   depth 0.800 and run 0.800 with zero error, both. Twenty triangles is the topological
+   minimum for a chamfered box and every face is planar, so there is no tessellation freedom
+   here — the parity is forced, not lucky. A change that moves nothing does not clear a bar
+   phrased as *better prints*.
+2. **There is no robustness to gain, because native chamfer cannot reach the part that
+   matters.** The exposed geometry in a flush mount is the panel's opening rim — an interior
+   loop — and `chamfer()` cannot address one (FN-034: `tags` yields a sketch-edge tag, the
+   operation demands a face tag, and Zoo's own docs mark the `edges` alternative "do not use
+   in generated or user-facing KCL yet"). Adopting it would have meant two chamfer
+   implementations in one generator, boolean for the panel and native for the insert, to buy
+   nothing on the insert.
+3. **The contract we would have adopted chamfers the wrong end.** The recorded native call —
+   logged elsewhere as passing — puts the chamfer on the z = 0 flush show face (FN-033).
+   Volume, surface area and bounding box are all identical to the correct part; only the
+   centre of mass moves (1.52650785446167 vs 1.473491907119751). Every gate this repo owns
+   would have passed it.
+
+**The case against this decision, since it exists.** At 70° the boolean is measurably off and
+native is exact: depth +2.55 µm, run +5.9 µm, angle −0.009°. That is real and it is recorded
+here rather than left out. It does not change the answer for two reasons: nothing in this repo
+ships a non-45° chamfer, and 2.55 µm is roughly two orders of magnitude below what an FDM
+machine can put on a part. If a non-45° angle is ever shipped, this entry is where the
+re-evaluation starts — and native's exactness there is the reason it would be a real question
+rather than a formality.
+
+**What the evaluation found in our own repo, which is the part worth admitting.** The measurement
+was pointed at Zoo and came back holding one of ours. Every rect `params.json` shipped a
+`cornerTreatment` string claiming the insert's wedge cutters "overshoot the corners — slight
+corner relief, deliberate, eases the fit like a machinist's relief cut." **There is no corner
+relief.** The production mesh has 12 vertices and 4 chamfer trapezoids and matches a pure
+mitered solid to 1e-13; a relieved corner needs extra facets and would perturb volume and area,
+and neither is perturbed. The chamfer-face area settles it arithmetically: ((19.7 + 18.1) / 2) ×
+0.8√2 = 21.3829091 mm², which is the measured 21.382909 to every printed digit — the exact area
+of an ideal miter, with no material removed at the corner to shorten the inner edge.
+`chamferBite` (0.35 mm) never removes material at all: the wedge's inner edge sits at
+half + bite, *outside* the part wall, so it is pure air margin that keeps the boolean off
+coincident faces. The generator's internal comment always said that correctly; only the
+customer-facing string overclaimed, and only the string was changed — the numbers it describes
+are byte-identical, which the regenerated `.kcl` files prove by not differing.
+
+That is a documentation defect of the same family as FN-031's fabricated `minutesUsed: 0`: a
+sentence nobody measured, shipped inside an artifact whose entire pitch is that its numbers are
+real. It is **not** filed as a field note, and the reason is a rule rather than a preference —
+API_FIELD_NOTES.md is about the Zoo API, and Zoo's API did nothing wrong here. FN-031 earned its
+slot because it has a Zoo-facing half (no surface exposes per-run minutes) with our defect as the
+consequence; this has no Zoo-facing half at all. It belongs where the evaluation that found it is
+recorded, which is here.
+
+**Why this entry exists at all.** Three field notes came out of a rejected change — FN-032
+(boolean-built solids report an inflated bounding box), FN-033, FN-034 — and so did the correction
+above. An idea was mined from another project, tested against reality, and dropped on measurement
+rather than on taste. Recording the rejection is worth as much as recording an adoption: without
+it, the next reader sees a repo that hand-builds chamfers next to a stdlib call that does it, and
+concludes nobody checked.
