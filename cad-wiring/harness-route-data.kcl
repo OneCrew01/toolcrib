@@ -5,15 +5,20 @@
 // cavity at the other. This table is that.
 //
 //   from   cavity on connector A  (e.g. GI 275 J2751)
-//   to     cavity on connector B  (e.g. the mating airframe harness connector)
+//   to     cavity on connector B
+//   lane   routing lane — sets this conductor's own crossing height so every
+//          wire gets its OWN path instead of being merged into a bundle
 //   awg    gauge, drives conductor and insulation diameter
 //   colour insulation colour
 //   sig    signal name
 //
-// Contacts are generated per END from this table, so a pin appears at
-// hd78X(from) on A and at hd78X(to) on B — independently. Delete a route and
-// BOTH contacts disappear together, which is the correct behaviour: a wire
-// that does not exist cannot be terminated at either end.
+// WHY `lane` EXISTS
+//   Wires are only bundled some of the time. On the bench they are loose, and
+//   each conductor is an individual run. Bundling is an operation applied to
+//   individual wires LATER — it is not what a wire fundamentally is. Each
+//   route therefore gets its own lane and its own swept path.
+//   See main-harness-loose.kcl (loose, primary) and main-harness-run.kcl
+//   (the same routes gathered into a bundle).
 //
 // [C] GFC 500: signal min 24 AWG, load-carrying min 22 AWG
 // [C] Power/ground 20 AWG on 28 V, 18 AWG on 14 V
@@ -22,20 +27,20 @@
 @settings(defaultLengthUnit = in, kclVersion = 2.0)
 
 export routes = [
-  { from = 1, to = 41, awg = 22, colour = "#c62828", sig = "28V PWR" },
-  { from = 2, to = 42, awg = 22, colour = "#212121", sig = "PWR GND" },
-  { from = 5, to = 45, awg = 24, colour = "#1565c0", sig = "RS-232 TX" },
-  { from = 6, to = 46, awg = 24, colour = "#f9f9f9", sig = "RS-232 RX" },
-  { from = 9, to = 21, awg = 24, colour = "#2e7d32", sig = "429 IN A" },
-  { from = 10, to = 22, awg = 24, colour = "#f9a825", sig = "429 IN B" },
-  { from = 14, to = 60, awg = 24, colour = "#6a1b9a", sig = "DISC IN 1" },
-  { from = 18, to = 64, awg = 24, colour = "#00838f", sig = "DISC IN 2" },
-  { from = 25, to = 50, awg = 24, colour = "#2e7d32", sig = "429 OUT A" },
-  { from = 26, to = 51, awg = 24, colour = "#f9a825", sig = "429 OUT B" },
-  { from = 33, to = 70, awg = 28, colour = "#4e342e", sig = "CFG MOD DATA" },
-  { from = 34, to = 71, awg = 28, colour = "#8d6e63", sig = "CFG MOD CLK" },
-  { from = 44, to = 12, awg = 22, colour = "#212121", sig = "SIG GND" },
-  { from = 55, to = 30, awg = 24, colour = "#1565c0", sig = "ETH TX+" },
-  { from = 56, to = 31, awg = 24, colour = "#f9f9f9", sig = "ETH TX-" },
-  { from = 65, to = 75, awg = 24, colour = "#c62828", sig = "LIGHTING HI" }
+  { from = 1, to = 41, lane = 0, awg = 22, colour = "#c62828", sig = "28V PWR" },
+  { from = 2, to = 42, lane = 1, awg = 22, colour = "#212121", sig = "PWR GND" },
+  { from = 5, to = 45, lane = 2, awg = 24, colour = "#1565c0", sig = "RS-232 TX" },
+  { from = 6, to = 46, lane = 3, awg = 24, colour = "#f9f9f9", sig = "RS-232 RX" },
+  { from = 9, to = 21, lane = 4, awg = 24, colour = "#2e7d32", sig = "429 IN A" },
+  { from = 10, to = 22, lane = 5, awg = 24, colour = "#f9a825", sig = "429 IN B" },
+  { from = 14, to = 60, lane = 6, awg = 24, colour = "#6a1b9a", sig = "DISC IN 1" },
+  { from = 18, to = 64, lane = 7, awg = 24, colour = "#00838f", sig = "DISC IN 2" },
+  { from = 25, to = 50, lane = 8, awg = 24, colour = "#2e7d32", sig = "429 OUT A" },
+  { from = 26, to = 51, lane = 9, awg = 24, colour = "#f9a825", sig = "429 OUT B" },
+  { from = 33, to = 70, lane = 10, awg = 28, colour = "#4e342e", sig = "CFG MOD DATA" },
+  { from = 34, to = 71, lane = 11, awg = 28, colour = "#8d6e63", sig = "CFG MOD CLK" },
+  { from = 44, to = 12, lane = 12, awg = 22, colour = "#212121", sig = "SIG GND" },
+  { from = 55, to = 30, lane = 13, awg = 24, colour = "#1565c0", sig = "ETH TX+" },
+  { from = 56, to = 31, lane = 14, awg = 24, colour = "#f9f9f9", sig = "ETH TX-" },
+  { from = 65, to = 75, lane = 15, awg = 24, colour = "#c62828", sig = "LIGHTING HI" }
 ]

@@ -465,7 +465,54 @@ was not a safe assumption to make without testing.
 
 ---
 
-## 11. Honest gaps
+## 11. ADDENDUM — loose conductors are the base case, not bundles
+
+New file: `main-harness-loose.kcl`. New field on every route: `lane`.
+
+### 11.1 The modelling error
+
+The bundled run treated **the bundle as the thing** and the wires as its
+contents. That is backwards.
+
+A conductor is an individual run. **Bundling is an operation applied to a set
+of conductors later, and only sometimes.** On the bench — where a harness is
+actually built, tested and repaired — wires are loose. A model that can only
+express "bundled" cannot express the normal state of the article.
+
+`main-harness-loose.kcl` is therefore now the **primary** representation:
+every route swept as its own path, in its own routing lane, at its own height.
+Nothing merged. `main-harness-run.kcl` shows the same route table gathered
+into a bundle and is the **derived** view.
+
+### 11.2 `lane` is real harness data
+
+Each route carries a `lane` integer that sets its crossing height:
+
+```kcl
+{ from = 1, to = 41, lane = 0, awg = 22, colour = "#c62828", sig = "28V PWR" }
+```
+
+Lane assignment is a genuine harness concept, not a rendering trick — it is
+how you keep runs separable, traceable and serviceable. Putting it in the data
+means the loose view and any future bundled or bundled-in-groups view all
+derive from one table.
+
+### 11.3 Known simplification, stated not hidden
+
+A KCL sweep path must be planar, so each conductor is routed in the vertical
+plane of its **origin row**. Where a route crosses rows, the lateral step to
+the destination row is not modelled.
+
+Row spacing is 0.082, so the largest possible unmodelled step is 3 rows =
+**0.246 in on a 5.2 in run**. Real conductors drift laterally in any case, but
+this is an approximation and should not be read as an exact path.
+
+Fixing it properly needs either a non-planar sweep path or a per-wire custom
+plane computed from both endpoints. Neither is done here.
+
+---
+
+## 12. Honest gaps
 
 - **Pins only, no sockets.** Gender is confirmed to be LRU-driven, so a real
   harness needs both. Not modelled yet.
