@@ -1,0 +1,364 @@
+{
+  "schemaVersion": "1.0",
+  "generated": "2026-07-30",
+  "title": "AN/MS standard aircraft hardware reference",
+  "sources": [
+    "FAA AC 43.13-1B/CHG 1, Chapters 7 and 9",
+    "FAA-H-8083-30A, Aviation Maintenance Technician Handbook - General"
+  ],
+  "provenanceKey": {
+    "C": "CONFIRMED - stated in the cited FAA sources",
+    "A": "ASSUMPTION - general knowledge, explicitly NOT found in those sources",
+    "X": "CONFLICTED - sources disagree; do not rely on"
+  },
+
+  "criticalWarnings": [
+    {
+      "id": "AN-DASH-COLLISION",
+      "severity": "high",
+      "provenance": "C",
+      "title": "The AN dash number means two different things",
+      "detail": "For BOLTS the dash number is the shank DIAMETER in sixteenths of an inch. For FLUID FITTINGS the dash number is the TUBE OUTSIDE DIAMETER in sixteenths of an inch. They are unrelated systems that share a naming convention.",
+      "worked_example": {
+        "AN4_bolt": { "meaning": "1/4 inch shank diameter", "thread": "1/4-28", "provenance": "C" },
+        "AN4_fitting": { "meaning": "1/4 inch tube OD", "thread": "7/16-20", "provenance": "A" }
+      },
+      "consequence": "An 'AN-4' bolt and an 'AN-4' fitting do not share a thread and are not interchangeable in any sense. Torque tables for one must never be applied to the other."
+    },
+    {
+      "id": "FITTING-THREAD-UNVERIFIED",
+      "severity": "medium",
+      "provenance": "A",
+      "title": "Fluid fitting thread sizes are not mapped in the FAA sources",
+      "detail": "AC 43.13-1B and FAA-H-8083-30A list 7/16-20 and 9/16-18 in generic thread tables but never map them to AN-4 or AN-6 fittings. The mapping used elsewhere in this repo is an assumption pending SAE AS50881, AS4841 or MIL-F-5509."
+    }
+  ],
+
+  "bolts": {
+    "family": "AN3 - AN20 standard hex head bolt",
+    "provenance": "C",
+    "purpose": "All-purpose structural fastener for tension or shear where a light drive fit is acceptable.",
+    "sizing": {
+      "diameterCode": { "rule": "dash number = nominal diameter in SIXTEENTHS of an inch", "provenance": "C" },
+      "lengthCode": { "rule": "length designated in EIGHTHS of an inch", "provenance": "C" },
+      "suffixA": { "meaning": "undrilled shank", "provenance": "C" },
+      "prefixH": { "meaning": "drilled head", "provenance": "C" }
+    },
+    "diameterTable": [
+      { "designation": "AN3", "diameterIn": 0.1875, "thread": "10-32", "provenance": "C" },
+      { "designation": "AN4", "diameterIn": 0.25, "thread": "1/4-28", "provenance": "C" },
+      { "designation": "AN5", "diameterIn": 0.3125, "thread": "5/16-24", "provenance": "C" },
+      { "designation": "AN6", "diameterIn": 0.375, "thread": "3/8-24", "provenance": "C" },
+      { "designation": "AN7", "diameterIn": 0.4375, "thread": "7/16-20", "provenance": "C" },
+      { "designation": "AN8", "diameterIn": 0.5, "thread": "1/2-20", "provenance": "C" },
+      { "designation": "AN9", "diameterIn": 0.5625, "thread": "9/16-18", "provenance": "C" },
+      { "designation": "AN10", "diameterIn": 0.625, "thread": "5/8-18", "provenance": "C" },
+      { "designation": "AN20", "diameterIn": 1.25, "thread": null, "provenance": "C" }
+    ],
+    "headMarkings": [
+      { "marking": "raised dash or asterisk", "material": "standard alloy steel", "provenance": "C" },
+      { "marking": "single raised or recessed dash", "material": "corrosion-resistant steel (CRES)", "provenance": "C" },
+      { "marking": "two raised dashes", "material": "aluminium alloy 2024-T", "provenance": "C" },
+      { "marking": "raised or recessed triangle", "material": "close-tolerance NAS", "provenance": "C" },
+      { "marking": "SPEC", "material": "special purpose / high strength, heat treated", "provenance": "C" },
+      { "marking": "none", "material": "low strength", "provenance": "C", "note": "PROHIBITED in structural use" }
+    ],
+    "prohibitions": [
+      { "rule": "Steel bolts smaller than No. 10-32 must not be used in primary structure", "provenance": "C" },
+      { "rule": "Aluminium alloy bolts smaller than 1/4 inch must not be used in primary structure", "provenance": "C" },
+      { "rule": "Aluminium alloy bolts and nuts must not be used where frequent removal for inspection or maintenance is required", "provenance": "C" },
+      { "rule": "Aluminium alloy bolts are PROHIBITED on seaplanes (dissimilar metal galvanic corrosion)", "provenance": "C" },
+      { "rule": "Aluminium alloy bolts are permitted with cadmium-plated steel bolts loaded in shear on landplanes", "provenance": "C" }
+    ],
+    "gripRules": [
+      { "rule": "Grip length is the thickness of the material the bolt is designed to hold", "provenance": "C" },
+      { "rule": "Washers may shim the grip to a standard size, but total washer stack must NOT exceed 1/8 inch", "provenance": "C", "severity": "high" },
+      { "rule": "Measure the physical bolt before installation rather than relying on the parts manual", "provenance": "C" }
+    ]
+  },
+
+  "nuts": [
+    {
+      "designation": "AN310",
+      "name": "castle nut",
+      "loadType": "tension",
+      "locking": "cotter pin or safety wire through castellations",
+      "usedWith": "drilled-shank hex bolts, clevis bolts, drilled-head bolts, studs",
+      "provenance": "C"
+    },
+    {
+      "designation": "AN315",
+      "name": "plain nut",
+      "loadType": "tension",
+      "locking": "none - requires auxiliary locking device (checknut or safety wire)",
+      "note": "Structural use on aircraft is highly limited",
+      "provenance": "C"
+    },
+    {
+      "designation": "AN365 / MS20365",
+      "name": "self-locking nut, regular height",
+      "loadType": "tension",
+      "maxTempF": 250,
+      "restrictions": [
+        "Never use on any joint where the nut or bolt is subject to rotation",
+        "Not on turbine engines where a loose nut could enter the air intake",
+        "Not on access panels routinely opened before or after flight",
+        "Repeated removal degrades prevailing torque - replace when below minimum"
+      ],
+      "provenance": "C"
+    },
+    {
+      "designation": "AN364 / MS20364",
+      "name": "self-locking nut, thin pattern",
+      "loadType": "shear only",
+      "maxTempF": 250,
+      "provenance": "C"
+    }
+  ],
+
+  "reusedSelfLockingNutMinPrevailingTorque": {
+    "units": "in-lb",
+    "note": "Minimum prevailing torque a reused self-locking nut must still exhibit. Below this, discard.",
+    "provenance": "C",
+    "rows": [
+      { "threadSize": "7/16", "fine": 8, "coarse": 8 },
+      { "threadSize": "1/2", "fine": 10, "coarse": 10 },
+      { "threadSize": "9/16", "fine": 13, "coarse": 14 },
+      { "threadSize": "5/8", "fine": 18, "coarse": 20 },
+      { "threadSize": "3/4", "fine": 27, "coarse": 27 },
+      { "threadSize": "7/8", "fine": 40, "coarse": 40 },
+      { "threadSize": "1", "fine": 55, "coarse": 51 },
+      { "threadSize": "1-1/8", "fine": 73, "coarse": 68 },
+      { "threadSize": "1-1/4", "fine": 94, "coarse": 88 }
+    ]
+  },
+
+  "boltTorque": {
+    "source": "AC 43.13-1B Table 7-1",
+    "units": "in-lb",
+    "condition": "dry, oil-free cadmium-plated threads",
+    "provenance": "C",
+    "columns": {
+      "tension": "AN310, AN365 tension nuts",
+      "shear": "AN320, AN364 shear nuts"
+    },
+    "fineThread": [
+      { "thread": "8-36", "tension": [12, 15], "shear": [7, 9] },
+      { "thread": "10-32", "an": "AN3", "tension": [20, 25], "shear": [12, 15] },
+      { "thread": "1/4-28", "an": "AN4", "tension": [50, 70], "shear": [30, 40] },
+      { "thread": "5/16-24", "an": "AN5", "tension": [100, 140], "shear": [60, 85] },
+      { "thread": "3/8-24", "an": "AN6", "tension": [160, 190], "shear": [95, 110] },
+      { "thread": "7/16-20", "an": "AN7", "tension": [450, 500], "shear": [270, 300] },
+      { "thread": "1/2-20", "an": "AN8", "tension": [480, 690], "shear": [290, 410] },
+      { "thread": "9/16-18", "an": "AN9", "tension": [800, 1000], "shear": [480, 600] },
+      { "thread": "5/8-18", "an": "AN10", "tension": [1100, 1300], "shear": [600, 780] },
+      { "thread": "3/4-16", "tension": [2300, 2500], "shear": [1300, 1500] },
+      { "thread": "7/8-14", "tension": [2500, 3000], "shear": [1500, 1800] },
+      { "thread": "1-14", "tension": [3700, 5500], "shear": [2200, 3300] }
+    ],
+    "coarseThread": [
+      { "thread": "8-32", "tension": [12, 15], "shear": [7, 9] },
+      { "thread": "10-24", "tension": [20, 25], "shear": [12, 15] },
+      { "thread": "1/4-20", "tension": [40, 50], "shear": [25, 30] },
+      { "thread": "5/16-18", "tension": [80, 90], "shear": [48, 55] },
+      { "thread": "3/8-16", "tension": [160, 185], "shear": [95, 100] },
+      { "thread": "7/16-14", "tension": [235, 255], "shear": [140, 155] },
+      { "thread": "1/2-13", "tension": [400, 480], "shear": [240, 290] },
+      { "thread": "9/16-12", "tension": [500, 700], "shear": [300, 420] },
+      { "thread": "5/8-11", "tension": [700, 900], "shear": [420, 540] },
+      { "thread": "3/4-10", "tension": [1150, 1600], "shear": [700, 950] },
+      { "thread": "7/8-9", "tension": [2200, 3000], "shear": [1300, 1800] }
+    ]
+  },
+
+  "washers": [
+    {
+      "designation": "AN960",
+      "alt": "NAS1149",
+      "name": "plain flat washer",
+      "uses": [
+        "smooth bearing surface under a hex nut",
+        "shim to obtain proper grip length",
+        "position a castellated nut relative to the drilled cotter-pin hole"
+      ],
+      "rules": [
+        { "rule": "Always use a plain washer under a lockwasher to prevent gouging the bearing surface", "provenance": "C" },
+        { "rule": "Cadmium-plated steel washers required under steel bolt heads and nuts on aluminium alloy or magnesium structure, to prevent galvanic corrosion", "provenance": "C", "severity": "high" }
+      ],
+      "thicknessSeries": {
+        "standard": "AN960-<size>",
+        "light": "AN960-<size>L (half thickness)",
+        "provenance": "C"
+      },
+      "crossReference": [
+        { "nominal": "#6", "standard": "AN960-6 / NAS1149FN632P", "light": "AN960-6L / NAS1149FN616P" },
+        { "nominal": "#8", "standard": "AN960-8 / NAS1149FN832P", "light": "AN960-8L / NAS1149FN816P" },
+        { "nominal": "#10 or 3/16", "standard": "AN960-10 / NAS1149F0363P", "light": "AN960-10L / NAS1149F0332P" },
+        { "nominal": "5/16", "standard": "AN960-516 / NAS1149F0563P", "light": "AN960-516L / NAS1149F0532P" }
+      ],
+      "provenance": "C"
+    },
+    {
+      "designation": "AN970",
+      "alt": "NASM970",
+      "name": "large-diameter plain washer",
+      "uses": [
+        "wooden structure, under bolt heads and nuts, to prevent crushing wood fibres",
+        "bonding stud buildups, to hold tinned copper braid and lugs flush to the airframe"
+      ],
+      "provenance": "C"
+    }
+  ],
+
+  "cotterPins": {
+    "designations": [
+      { "designation": "AN380 / MS24665", "material": "carbon steel or CRES", "provenance": "C" },
+      { "designation": "AN381", "material": "corrosion-resistant non-magnetic steel", "use": "where nonmagnetic properties or superior corrosion resistance are required", "provenance": "C" }
+    ],
+    "rules": [
+      { "rule": "NEVER reuse a cotter pin - always install new", "provenance": "C", "severity": "high" },
+      { "rule": "Select the largest diameter pin that fits the bolt shank hole and the castellation slots", "provenance": "C" },
+      { "rule": "Install clevis pins head up or forward, so gravity retains the pin if the cotter pin fails", "provenance": "C" }
+    ]
+  },
+
+  "fluidFittings": {
+    "note": "See criticalWarnings.AN-DASH-COLLISION before using anything in this section alongside the bolt data.",
+    "sizing": { "rule": "dash number = tube OUTSIDE DIAMETER in sixteenths of an inch", "provenance": "C" },
+    "flareAngleDeg": { "value": 37, "provenance": "C", "warning": "45 degree automotive flaring tools are PROHIBITED - they cause misfit, stress and system failure" },
+    "doubleFlareRule": { "rule": "Double flare mandatory on soft aluminium alloy tubing 3/8 inch OD and under", "provenance": "C" },
+    "components": [
+      { "designation": "AN815", "name": "male union", "provenance": "C" },
+      { "designation": "AN818 / MS20818", "name": "coupling nut", "provenance": "C" },
+      { "designation": "AN819 / MS20819", "name": "sleeve", "provenance": "C" },
+      { "designation": "AN833", "name": "bulkhead elbow, flared tube, 90 degree", "provenance": "C" },
+      { "designation": "AN832", "name": "bulkhead union, flared tube", "provenance": "C" }
+    ],
+    "materialCodes": [
+      { "code": "D", "material": "aluminium alloy", "colour": "blue anodised", "provenance": "C" },
+      { "code": "(none)", "material": "carbon steel", "colour": "black", "provenance": "C" },
+      { "code": "B", "material": "brass", "provenance": "C" },
+      { "code": "Z", "material": "aluminium bronze (AN819 sleeve only)", "colour": "cadmium plated / natural", "provenance": "C" }
+    ],
+    "tubeData": {
+      "units": { "torque": "in-lb", "length": "in" },
+      "source": "AC 43.13-1B Table 9-2",
+      "provenance": "C",
+      "rows": [
+        { "dash": 2, "tubeOD": 0.125, "torqueAlum": [20, 30], "torqueSteel": [75, 85], "bendRadiusAlum": 0.375, "bendRadiusSteel": null },
+        { "dash": 3, "tubeOD": 0.1875, "torqueAlum": [25, 35], "torqueSteel": [95, 105], "bendRadiusAlum": 0.4375, "bendRadiusSteel": 0.65625 },
+        { "dash": 4, "tubeOD": 0.25, "torqueAlum": [50, 65], "torqueSteel": [135, 150], "bendRadiusAlum": 0.5625, "bendRadiusSteel": 0.875 },
+        { "dash": 5, "tubeOD": 0.3125, "torqueAlum": [70, 90], "torqueSteel": [170, 200], "bendRadiusAlum": 0.75, "bendRadiusSteel": 1.125 },
+        { "dash": 6, "tubeOD": 0.375, "torqueAlum": [110, 130], "torqueSteel": [270, 300], "bendRadiusAlum": 0.9375, "bendRadiusSteel": 1.3125 },
+        { "dash": 8, "tubeOD": 0.5, "torqueAlum": [230, 260], "torqueSteel": [450, 500], "bendRadiusAlum": 1.25, "bendRadiusSteel": 1.75 },
+        { "dash": 10, "tubeOD": 0.625, "torqueAlum": [330, 360], "torqueSteel": [650, 700], "bendRadiusAlum": 1.5, "bendRadiusSteel": 2.1875 },
+        { "dash": 12, "tubeOD": 0.75, "torqueAlum": [460, 500], "torqueSteel": [900, 1000], "bendRadiusAlum": 1.75, "bendRadiusSteel": 2.625 }
+      ]
+    },
+    "assemblyRules": [
+      { "rule": "Slip the AN818 nut and AN819 sleeve onto the tube BEFORE flaring", "provenance": "C" },
+      { "rule": "Lubricate the flare faces and threads with clean hydraulic fluid only", "provenance": "C" },
+      { "rule": "NEVER apply thread compound to the flare face - it destroys the metal-to-metal seal", "provenance": "C", "severity": "high" },
+      { "rule": "Never use nut torque to pull a misaligned line into place", "provenance": "C" },
+      { "rule": "Any crack or deformity in a flare is cause for immediate rejection", "provenance": "C" }
+    ]
+  },
+
+  "clamps": [
+    {
+      "designation": "MS21919",
+      "name": "cushioned loop clamp (Adel)",
+      "use": "primary support for wire bundles, coax and plumbing lines",
+      "construction": "metal band with elastomeric or synthetic rubber cushion liner",
+      "rules": [
+        { "rule": "Cushioned clamps required wherever vibration exists; plain clamps only where there is none", "provenance": "C" },
+        { "rule": "Bonded cushioned clamps MANDATORY on metal hydraulic, fuel or oil lines; unbonded clamps are for electrical wiring ONLY", "provenance": "C", "severity": "high" },
+        { "rule": "Teflon cushion required where Skydrol, hydraulic fluid or fuel exposure is expected - but Teflon is less resilient and damps vibration worse than rubber", "provenance": "C" },
+        { "rule": "Mounting bolt angular offset max 45 degrees from the loop axis", "provenance": "C" },
+        { "rule": "Mount attachment hardware ABOVE the clamp wherever practicable, so line weight cannot rotate it into chafing", "provenance": "C" },
+        { "rule": "Back of the clamp should rest against a structural member where practical", "provenance": "C" }
+      ],
+      "provenance": "C"
+    },
+    {
+      "designation": "AN735",
+      "name": "bare metal bonding clamp",
+      "use": "electrical bonding of metallic conduit or tube structure - NOT a fluid line clamp",
+      "rules": [
+        { "rule": "PROHIBITED in lightning zones 1A, 1B and 2B", "provenance": "C", "severity": "high" },
+        { "rule": "Only AN735-6 and larger permitted for instrument panel bonding", "provenance": "C" },
+        { "rule": "Cadmium-plated steel clamp, nut and washers", "provenance": "C" }
+      ],
+      "provenance": "C"
+    },
+    {
+      "designation": "AN742",
+      "name": "plain uncushioned loop clamp",
+      "use": "securing rigid plumbing or bundles in non-vibration zones where metal-to-metal contact is acceptable",
+      "materials": ["steel", "aluminium", "CRES"],
+      "provenance": "C"
+    },
+    {
+      "designation": "AN737",
+      "name": "worm-drive / radial hose clamp",
+      "provenance": "X",
+      "conflictNote": "One source quoted radial (28 TPI) ~25 in-lb and worm screw (10 TPI) ~15 in-lb, and recommended re-torque checks for several days to allow for cold flow. Two other sources state AN737 is entirely absent from their text. Values are NOT to be relied on without a real AN737 drawing.",
+      "torqueRadialInLb": 25,
+      "torqueWormInLb": 15
+    }
+  ],
+
+  "lineSupport": {
+    "conflictWarning": "Two different rigid-line support spacing tables exist in the FAA literature and they DISAGREE. Both are recorded. AC 43.13-1B bands by OD; the AMT Handbook splits by material. Known examiner trap.",
+    "provenance": "C",
+    "ac4313_byOD": {
+      "units": "in",
+      "rows": [
+        { "odRange": "1/8 to 3/16", "maxSpacing": 9 },
+        { "odRange": "1/4 to 5/16", "maxSpacing": 12 },
+        { "odRange": "3/8 to 1/2", "maxSpacing": 16 },
+        { "odRange": "5/8 to 3/4", "maxSpacing": 22 },
+        { "odRange": "1 to 1-1/4", "maxSpacing": 30 },
+        { "odRange": "1-1/2 to 2", "maxSpacing": 40 }
+      ]
+    },
+    "amtHandbook_byMaterial": {
+      "units": "in",
+      "rows": [
+        { "od": 0.125, "alum": 9.5, "steel": 11.5 },
+        { "od": 0.1875, "alum": 12, "steel": 14 },
+        { "od": 0.25, "alum": 13.5, "steel": 16 },
+        { "od": 0.3125, "alum": 15, "steel": 18 },
+        { "od": 0.375, "alum": 16.5, "steel": 20 },
+        { "od": 0.5, "alum": 19, "steel": 23 },
+        { "od": 0.625, "alum": 22, "steel": 25.5 },
+        { "od": 0.75, "alum": 24, "steel": 27.5 },
+        { "od": 1.0, "alum": 26.5, "steel": 30 }
+      ]
+    },
+    "flexibleHose": [
+      { "rule": "Support flexible hose at least every 24 inches; 18 inches preferred", "provenance": "C" },
+      { "rule": "Install with 5 to 8 percent slack - never stretched tight between fittings", "provenance": "C", "severity": "high" },
+      { "rule": "Hose must run straight for at least TWO HOSE DIAMETERS from the end of the metal fitting before any bend or support clamp", "provenance": "C", "severity": "high" },
+      { "rule": "Clamp to prevent twisting - a twisted pressurised hose torsionally loads its fittings", "provenance": "C" }
+    ],
+    "bonding": [
+      { "rule": "Metallic fuel lines bonded to structure at EVERY clamp point", "provenance": "C" },
+      { "rule": "DC resistance 1 ohm or less to main structure for fuel line supports and connections", "provenance": "C" },
+      { "rule": "Remove paint/anodise between clamp and tube over the clamp width and at least 1 inch of circumference; re-prime after bonding check", "provenance": "C" },
+      { "rule": "Apply Alodine conversion coating to bare aluminium within 24 hours of finish removal", "provenance": "C" },
+      { "rule": "Never ground or bond electrical wires directly to magnesium parts", "provenance": "C" }
+    ]
+  },
+
+  "knownGaps": [
+    { "item": "Fastener edge distance rule (e.g. 2D minimum)", "status": "NOT present in AC 43.13-1B Ch.7 or FAA-H-8083-30A per query" },
+    { "item": "Safety wire twist rate, wire gauge, max run length, direction of pull", "status": "NOT present - refer to AMM/SRM" },
+    { "item": "MS24665 cotter pin dash-number to dimension table", "status": "NOT present" },
+    { "item": "AN960 / AN970 washer physical dimensions (ID, OD, thickness)", "status": "NOT present" },
+    { "item": "AN fluid fitting thread sizes mapped to dash number", "status": "NOT present - see criticalWarnings.FITTING-THREAD-UNVERIFIED" },
+    { "item": "AN737 dimensional specifications", "status": "NOT present - see clamps AN737 conflictNote" },
+    { "item": "Flare nut hex across-flats dimensions", "status": "NOT present" },
+    { "item": "AC 43.13-1B Table 7-2 (prevailing torque, reused self-locking nuts)", "status": "Listed in contents but table body absent from one source; values recovered from another - cross-check before use" }
+  ]
+}
