@@ -1,0 +1,41 @@
+// AN818-4 COUPLING NUT — modelled at LOCAL ORIGIN
+//
+// LOCAL FRAME: bearing face at z = 0, axis +Z. main.kcl places it.
+//
+// [C] AN818 (MS20818) = coupling nut
+// [C] torque AN-4: aluminium 50-65 in-lb · steel 135-150 in-lb
+//
+// COSMETIC THREAD NOTICE — the female thread is a plain bore held one
+// threadClearance oversize. A true internal helix is omitted because the
+// mating male thread cannot be unioned into its own solid (engine rejects
+// union([extrude, sweep])), so a meshing pair cannot be evaluated at all.
+// This is NOT a mechanically validated threaded connection.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export nutAxisDir = [0, 0, 1]
+export nutBearingLocalZ = 0
+export nutTubeExitLocalZ = nutH
+
+hexBody = startSketchOn(XY)
+  |> polygon(radius = hexCircR, numSides = 6, center = [0, 0])
+  |> extrude(length = nutHexH)
+
+collar = startSketchOn(offsetPlane(XY, offset = nutHexH - bodyOverlap))
+  |> circle(center = [0, 0], radius = nutCollarR)
+  |> extrude(length = nutCollarH + bodyOverlap)
+
+body = union([hexBody, collar])
+
+threadBore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = threadMinorR + threadClearance)
+  |> extrude(length = nutHexH + 0.02)
+
+tubeHole = startSketchOn(offsetPlane(XY, offset = nutHexH - 0.05))
+  |> circle(center = [0, 0], radius = tubeOR + hoseClearance)
+  |> extrude(length = nutCollarH + 0.10)
+
+export an818Nut = subtract([body], tools = [threadBore, tubeHole])
+  |> appearance(color = colAlum, metalness = 75, roughness = 30)

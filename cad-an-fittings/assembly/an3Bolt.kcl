@@ -1,0 +1,39 @@
+// AN3 BOLT — a single purchased part, modelled at LOCAL ORIGIN
+//
+// CORRECTION (review #3): previously part of a four-body `an3Fastener.kcl`
+// whose positions were derived from the clamp and bracket. Bolt, washer and
+// nut are now three separate files, each at its own local origin, positioned
+// by main-rev2.kcl.
+//
+// CORRECTION (review #3): the shank no longer stretches to match the stack.
+// The assembly computes requiredGrip; parameters.kcl SELECTS a discrete
+// standard grip (boltGripSelected) at or above it and reports gripMargin.
+// A purchased AN bolt is chosen, not morphed.
+//
+// LOCAL FRAME
+//   shaft axis        = local origin, direction +Y
+//   head bearing face = local y = 0   (underside of the head)
+//   head occupies       y = -boltHeadT .. 0
+//   shank occupies      y = 0 .. boltShankLen
+//
+// [A] all AN3 dimensions — not present in the FAA sources consulted
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export boltAxisDir = [0, 1, 0]
+export boltHeadBearingLocalY = 0
+export boltGrip = boltGripSelected
+export boltGripMargin = gripMargin
+
+head = startSketchOn(offsetPlane(XZ, offset = boltHeadT))
+  |> polygon(radius = boltHeadR, numSides = 6, center = [0, 0])
+  |> extrude(length = -boltHeadT)
+
+shank = startSketchOn(offsetPlane(XZ, offset = bodyOverlap))
+  |> circle(center = [0, 0], radius = boltR)
+  |> extrude(length = -(boltShankLen + bodyOverlap))
+
+export an3Bolt = union([head, shank])
+  |> appearance(color = colSteel, metalness = 90, roughness = 25)

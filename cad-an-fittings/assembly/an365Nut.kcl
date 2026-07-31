@@ -1,0 +1,26 @@
+// AN365 SELF-LOCKING NUT — a single purchased part, modelled at LOCAL ORIGIN
+//
+// LOCAL FRAME
+//   axis         = local origin, direction +Y
+//   bearing face = local y = 0      (bears on the washer)
+//   back face    = local y = nutT
+//
+// [A] dimensions — not present in the FAA sources consulted
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export an365AxisDir = [0, 1, 0]
+export an365BearingFaceLocalY = 0
+
+body = startSketchOn(XZ)
+  |> polygon(radius = nutR, numSides = 6, center = [0, 0])
+  |> extrude(length = -nutT)
+
+hole = startSketchOn(offsetPlane(XZ, offset = 0.02))
+  |> circle(center = [0, 0], radius = boltR + 0.004)
+  |> extrude(length = -(nutT + 0.04))
+
+export an365Nut = subtract([body], tools = [hole])
+  |> appearance(color = colSteel, metalness = 90, roughness = 25)

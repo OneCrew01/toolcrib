@@ -1,0 +1,76 @@
+// AN-6 JOINT — ASSEMBLED. AN818-6 nut torqued onto AN815-6 union.
+// Tube and AN819 sleeve are captive inside the nut and not visible externally,
+// so they are omitted here; see an6-flare-joint.kcl for the full exploded set.
+//
+// Provenance identical to an6-flare-joint.kcl:
+//   AN-6 = 3/8" tube OD, 37° flare, AN815/AN818/AN819 part numbers,
+//   torque 110-130 in-lb aluminium / 270-300 in-lb steel   [CONFIRMED, AC 43.13-1B]
+//   9/16-18 UNF thread and 11/16" hex across flats         [ASSUMPTION, not in sources]
+
+@settings(defaultLengthUnit = in)
+
+pitch = 0.055556
+majorR = 0.28125
+minorR = 0.2450
+hexCirc = 0.3969
+tubeIR = 0.1525
+tubeOR = 0.1875
+
+// ================= AN815-6 UNION =================
+unionHex = startSketchOn(XY)
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.35)
+
+unionShank = startSketchOn(offsetPlane(XY, offset = 0.34))
+  |> circle(center = [0, 0], radius = minorR)
+  |> extrude(length = 0.51)
+
+unionHelix = helix(angleStart = 0, ccw = true, revolutions = 9, length = 0.50, radius = majorR, axis = Z)
+
+unionThread = startSketchOn(XZ)
+  |> startProfile(at = [minorR, 0.348])
+  |> line(end = [majorR - minorR, 0.026])
+  |> line(end = [-(majorR - minorR), 0.026])
+  |> close()
+  |> sweep(path = unionHelix)
+
+unionBore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 1.0)
+
+unionSolid = union([unionHex, unionShank])
+union815 = subtract([unionSolid], tools = [unionBore])
+
+// ================= AN818-6 NUT, THREADED ON =================
+zN = 0.44
+
+nutHex = startSketchOn(offsetPlane(XY, offset = zN))
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.34)
+
+nutCollar = startSketchOn(offsetPlane(XY, offset = zN + 0.33))
+  |> circle(center = [0, 0], radius = 0.235)
+  |> extrude(length = 0.26)
+
+nutBody = union([nutHex, nutCollar])
+
+nutBore = startSketchOn(offsetPlane(XY, offset = zN - 0.05))
+  |> circle(center = [0, 0], radius = minorR + 0.006)
+  |> extrude(length = 0.42)
+
+nutTubeHole = startSketchOn(offsetPlane(XY, offset = zN + 0.30))
+  |> circle(center = [0, 0], radius = tubeOR + 0.012)
+  |> extrude(length = 0.35)
+
+nut818 = subtract([nutBody], tools = [nutBore, nutTubeHole])
+
+// ================= 3/8" TUBE EXITING THE NUT =================
+tubeShaft = startSketchOn(offsetPlane(XY, offset = zN + 0.30))
+  |> circle(center = [0, 0], radius = tubeOR)
+  |> extrude(length = 0.95)
+
+tubeBore = startSketchOn(offsetPlane(XY, offset = zN + 0.25))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 1.10)
+
+tube = subtract([tubeShaft], tools = [tubeBore])

@@ -1,0 +1,174 @@
+// AN-4 HOSE ASSEMBLY + MS21919 CUSHIONED (ADEL) SUPPORT CLAMP
+// ToolCRIB CAD reference
+//
+// ============================ PROVENANCE ============================
+// CONFIRMED — AC 43.13-1B / FAA-H-8083-30A, via NotebookLM cross-notebook query:
+//   MS21919 = standard cushioned loop clamp; metal band + elastomeric cushion
+//   flexible hose supported at least every 24"; 18" preferred
+//   hose must run STRAIGHT for at least TWO HOSE DIAMETERS from the end of the
+//     metal fitting before any bend or support clamp   <-- drives clamp placement
+//   clamp attachment hardware mounted ABOVE the clamp wherever practicable, so
+//     line weight cannot rotate/sag the clamp into chafing
+//   back of clamp rests against a structural member where practical
+//   bonded cushioned clamps mandatory on metal fluid lines; unbonded clamps are
+//     for electrical wiring ONLY
+//   cushioned clamps required where vibration exists; plain clamps only where none
+//   Teflon cushion required in Skydrol/hydraulic/fuel areas, but is LESS resilient
+//     than rubber and damps vibration worse
+//   hose installed with 5-8% slack; never stretched tight
+//   MS21919 mounting bolt angular offset max 45° from loop axis
+//   AN735 = bare metal bonding clamp, NOT for fluid lines, and PROHIBITED in
+//     lightning zones 1A/1B/2B
+//   AN742 = plain uncushioned loop clamp, non-vibration zones only
+//
+// CONFLICTED — reported by one notebook, contradicted by another. DO NOT rely on:
+//   AN737 worm/radial hose clamp torque, quoted as ~25 in-lb (radial, 28 TPI) and
+//   ~15 in-lb (worm screw, 10 TPI). Two other notebooks state AN737 is entirely
+//   absent from the sources. Treat as UNVERIFIED pending a real AN737 drawing.
+//
+// UNVERIFIED — my general knowledge, NOT in sources:
+//   all clamp dimensions (band thickness, cushion thickness, tab size, bolt hole)
+//   7/16-20 thread and 9/16" hex for AN-4                    [ASSUMPTION]
+// ====================================================================
+
+@settings(defaultLengthUnit = in)
+
+majorR = 0.21875
+minorR = 0.1875
+thLen = 0.43
+tubeIR = 0.095
+tubeOR = 0.125
+hexCirc = 0.3248
+
+hoseOR = 0.250 // -4 hose, ~1/2" OD
+hoseIR = 0.125
+zHose = 1.12
+
+// ================= AN815-4 UNION =================
+unionHex = startSketchOn(XY)
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.30)
+
+unionShank = startSketchOn(offsetPlane(XY, offset = 0.29))
+  |> circle(center = [0, 0], radius = minorR)
+  |> extrude(length = thLen + 0.01)
+
+unionHelix = helix(angleStart = 0, ccw = true, revolutions = 8, length = thLen, radius = majorR, axis = Z)
+
+unionThread = startSketchOn(XZ)
+  |> startProfile(at = [minorR, 0.298])
+  |> line(end = [majorR - minorR, 0.022])
+  |> line(end = [-(majorR - minorR), 0.022])
+  |> close()
+  |> sweep(path = unionHelix)
+
+unionBore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 0.90)
+
+unionSolid = union([unionHex, unionShank])
+union815 = subtract([unionSolid], tools = [unionBore])
+
+// ================= AN818-4 NUT =================
+zN = 0.36
+nutHex = startSketchOn(offsetPlane(XY, offset = zN))
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.30)
+nutCollar = startSketchOn(offsetPlane(XY, offset = zN + 0.29))
+  |> circle(center = [0, 0], radius = 0.190)
+  |> extrude(length = 0.22)
+nutBody = union([nutHex, nutCollar])
+nutBore = startSketchOn(offsetPlane(XY, offset = zN - 0.05))
+  |> circle(center = [0, 0], radius = minorR + 0.005)
+  |> extrude(length = 0.37)
+nutTubeHole = startSketchOn(offsetPlane(XY, offset = zN + 0.26))
+  |> circle(center = [0, 0], radius = tubeOR + 0.010)
+  |> extrude(length = 0.30)
+nut818 = subtract([nutBody], tools = [nutBore, nutTubeHole])
+
+// ================= CRIMPED HOSE SOCKET =================
+socket = startSketchOn(offsetPlane(XY, offset = 0.86))
+  |> polygon(radius = 0.300, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.28)
+socketBore = startSketchOn(offsetPlane(XY, offset = 0.81))
+  |> circle(center = [0, 0], radius = hoseOR - 0.02)
+  |> extrude(length = 0.40)
+hoseSocket = subtract([socket], tools = [socketBore])
+
+// ================= -4 FLEX HOSE =================
+// straight run off the fitting, 90° bend, then a horizontal run
+hosePath = startSketchOn(XZ)
+  |> startProfile(at = [0, zHose])
+  |> line(end = [0, 0.55])
+  |> tangentialArc(angle = -90, radius = 0.85)
+  |> line(end = [1.45, 0])
+
+hoseOuter = startSketchOn(offsetPlane(XY, offset = zHose))
+  |> circle(center = [0, 0], radius = hoseOR)
+  |> sweep(path = hosePath)
+hoseInner = startSketchOn(offsetPlane(XY, offset = zHose))
+  |> circle(center = [0, 0], radius = hoseIR)
+  |> sweep(path = hosePath)
+hose = subtract([hoseOuter], tools = [hoseInner])
+
+// ==================================================================
+// MS21919 CUSHIONED (ADEL) CLAMP
+//
+// PLACEMENT IS RULE-DRIVEN, not arbitrary:
+//   hose OD = 0.50", so the confirmed "two hose diameters" minimum = 1.00"
+//   of straight hose from the metal fitting before a clamp may be applied.
+//   Path length from socket top to this clamp:
+//     0.53 straight + 1.335 arc + 0.75 horizontal = ~2.6"  >>  1.00" minimum.
+//   Clamp is therefore compliant, and sits on the straight horizontal run
+//   rather than on the bend.
+// ==================================================================
+clampX = 1.45 // along the horizontal run
+clampZ = 2.52 // height of the horizontal run
+clampW = 0.30 // band width
+
+cushOR = 0.310 // cushion outer
+bandOR = 0.350 // metal band outer
+
+// cushion sleeve
+cushOuter = startSketchOn(offsetPlane(YZ, offset = clampX))
+  |> circle(center = [0, clampZ], radius = cushOR)
+  |> extrude(length = clampW)
+cushCut = startSketchOn(offsetPlane(YZ, offset = clampX - 0.05))
+  |> circle(center = [0, clampZ], radius = hoseOR)
+  |> extrude(length = clampW + 0.10)
+cushion = subtract([cushOuter], tools = [cushCut])
+
+// metal band over the cushion, slightly narrower
+bandOuter = startSketchOn(offsetPlane(YZ, offset = clampX + 0.03))
+  |> circle(center = [0, clampZ], radius = bandOR)
+  |> extrude(length = clampW - 0.06)
+bandCut = startSketchOn(offsetPlane(YZ, offset = clampX - 0.02))
+  |> circle(center = [0, clampZ], radius = cushOR)
+  |> extrude(length = clampW + 0.10)
+band = subtract([bandOuter], tools = [bandCut])
+
+// mounting tab — rises ABOVE the loop so the bolt sits above the line,
+// per the confirmed "attachment hardware above the clamp" rule
+tabPlate = startSketchOn(offsetPlane(YZ, offset = clampX + 0.03))
+  |> startProfile(at = [-0.12, clampZ + 0.30])
+  |> line(end = [0.24, 0])
+  |> line(end = [0, 0.52])
+  |> line(end = [-0.24, 0])
+  |> close()
+  |> extrude(length = clampW - 0.06)
+
+tabHole = startSketchOn(offsetPlane(YZ, offset = clampX - 0.02))
+  |> circle(center = [0, clampZ + 0.66], radius = 0.098)
+  |> extrude(length = clampW + 0.10)
+
+tab = subtract([tabPlate], tools = [tabHole])
+
+// AN3 bolt through the tab, head above
+boltShank = startSketchOn(offsetPlane(YZ, offset = clampX - 0.10))
+  |> circle(center = [0, clampZ + 0.66], radius = 0.093)
+  |> extrude(length = 0.52)
+boltHead = startSketchOn(offsetPlane(YZ, offset = clampX - 0.10))
+  |> polygon(radius = 0.180, numSides = 6, center = [0, clampZ + 0.66])
+  |> extrude(length = -0.11)
+
+// NOTE: no final union — engine rejects unions of this many bodies.

@@ -1,0 +1,212 @@
+// AN-4 HOSE / ADEL CLAMP ASSEMBLY — shared parameters
+// Rev 3, 2026-07-30 — corrections from Zoo Keeper review #3.
+//
+// ARCHITECTURE
+//   Part files model at their OWN LOCAL ORIGIN and contain no assembly
+//   coordinates. All transforms live in main-rev2.kcl.
+//
+// TERMINOLOGY (corrected)
+//   Each file represents a LOGICAL ASSEMBLY COMPONENT. Several components are
+//   still MULTI-BODY because the engine cannot union the required primitives
+//   (see ENGINE-LIMITS.md §1-2). This package does NOT claim one manufactured
+//   solid per file.
+//
+// MODEL STATE: ASSEMBLED AND TIGHTENED.
+//   Bearing surfaces are in exact contact (gap = 0). The only clearances that
+//   remain are true running/slip fits.
+//
+// PROVENANCE KEY
+//   [C] CONFIRMED  — AC 43.13-1B Ch.9 / FAA-H-8083-30A via NotebookLM
+//   [A] ASSUMPTION — my general knowledge; stated ABSENT from those sources
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+// ===================================================================
+// CLEARANCE POLICY
+//
+//   BEARING CONTACT between parts: exactly 0. Surfaces touch.
+//   SLIP FIT between parts: a named clearance, because relative motion or
+//     assembly access genuinely requires it.
+//   BOOLEAN OVERLAP inside one part: bodyOverlap, required because the
+//     engine rejects union() on coincident faces. Never crosses a part
+//     boundary. This is NOT an assembly clearance.
+// ===================================================================
+export bearingContact = 0.000 // tightened: nut/union, bracket/ear, ear/ear
+export clampCushionClearance = 0.010 // slip fit — clamp must slide, criterion 4
+export threadClearance = 0.005 // slip fit — nut bore over thread minor
+export hoseClearance = 0.010 // slip fit — nut collar over tube
+export bodyOverlap = 0.020 // intra-part boolean ONLY
+
+// ===================================================================
+// AN-4 SIZING
+// ===================================================================
+export tubeOR = 0.125 // [C] AN-4 = 1/4" OD, dash no. = sixteenths
+export tubeOD = 2.0 * tubeOR
+export tubeIR = 0.095
+
+export threadMajorR = 0.21875 // [A] 7/16-20 UNF
+export threadMinorR = 0.1875 // [A]
+export threadLen = 0.430 // [A]
+export threadRevs = 8
+export hexCircR = 0.3248 // [A] 9/16" across flats
+
+export unionHexH = 0.300
+export unionThreadStart = 0.290
+export unionThreadEnd = unionThreadStart + threadLen // 0.720
+
+export nutHexH = 0.300
+export nutCollarR = 0.190
+export nutCollarH = 0.220
+export nutH = nutHexH + nutCollarH // 0.520
+
+// ===================================================================
+// HOSE  (-4)   — every size derived from hoseOR, single source of truth
+// ===================================================================
+export hoseOR = 0.250 // [A]
+export hoseIR = 0.125 // [A]
+export hoseOD = 2.0 * hoseOR // DERIVED — was a duplicated literal
+export socketR = 0.300
+export socketH = 0.280
+
+// [C] hose must run STRAIGHT for >= 2 hose diameters from the end of the
+//     metal fitting before any bend or support clamp
+export minStraightFromFitting = 2.0 * hoseOD // 1.000
+
+// CORRECTION (review #3): hoseStraight was 0.550, which VIOLATED the rule
+// above. The straight run is now derived from the requirement itself, with
+// a deliberate margin, so the rule cannot silently be broken again.
+export straightMargin = 0.100
+export hoseStraight = minStraightFromFitting + straightMargin // 1.100
+
+export hoseBendR = 0.850
+export hoseHorizLen = 1.450
+export quarterTurn = 1.5707963
+export hoseArcLen = hoseBendR * quarterTurn
+
+export hoseHorizX0 = hoseBendR
+export hoseHorizZ = hoseStraight + hoseBendR
+
+// [C] 5-8% slack; never taut
+export hoseSlackPct = 6.5
+// [C] flexible hose supported at least every 24"
+export maxSupportSpacing = 24.0
+
+// ===================================================================
+// MS21919 CUSHIONED (ADEL) CLAMP
+// [C] cushioned clamp required where vibration exists
+// [C] bonded cushioned clamps mandatory on metal fluid lines
+// [C] attachment hardware ABOVE the clamp wherever practicable
+// [C] mounting bolt angular offset max 45° from loop axis
+// [A] all dimensions
+// ===================================================================
+export clampBandW = 0.300
+export clampCushT = 0.060
+export clampBandT = 0.040
+export clampEarT = 0.050
+export clampEarH = 0.560
+export clampEarW = 0.260
+export clampSplitW = 0.070
+
+export clampBoreR = hoseOR + clampCushionClearance
+export clampCushOR = clampBoreR + clampCushT
+export clampBandOR = clampCushOR + clampBandT
+
+export clampEarBaseZ = clampBandOR - 0.060
+export clampBoltLocalZ = clampEarBaseZ + clampEarH * 0.55
+
+// ===================================================================
+// CLAMP SLIDE — the controlled degree of freedom, now BOUNDED
+// ===================================================================
+export clampSlideMin = clampBandW / 2 // 0.150
+export clampSlideMax = hoseHorizLen - clampBandW / 2 // 1.300
+export clampSlide = 0.600
+
+// VALIDATION: clampSlideMin <= clampSlide <= clampSlideMax
+//   0.150 <= 0.600 <= 1.300   PASS
+// Outside this range the clamp band would hang off the end of the straight
+// horizontal run. KCL has no assert in this context, so this is a documented
+// range check — see ASSEMBLY-ACCEPTANCE-TEST.md §4 criterion 4.
+export clampSlideValid = 1 // set to 0 if the check above fails
+
+export clampLocalX = hoseHorizX0 + clampSlide
+export clampLocalZ = hoseHorizZ
+export clampPathDistance = hoseStraight + hoseArcLen + clampSlide
+
+// ===================================================================
+// SUPPORT BRACKET  (declared before the fastener stack, which derives from it)
+// [C] back of the clamp should rest against a structural member
+// [C] metallic fluid lines bonded at EVERY clamp point, <= 1 ohm
+// ===================================================================
+export bracketT = 0.080
+export bracketW = 1.100
+export bracketH = 1.300
+
+// ===================================================================
+// AN3 FASTENER DIMENSIONS
+// Declared before the stack derivation, which consumes washerT and nutT.
+// ===================================================================
+export boltR = 0.093 // [A] AN3 = 3/16" shank
+export boltHoleR = 0.098
+export boltHeadR = 0.180
+export boltHeadT = 0.110
+export washerOR = 0.190
+export washerT = 0.032
+export nutR = 0.180
+export nutT = 0.130
+
+// ===================================================================
+// FASTENER STACK — positions live HERE (assembly scope), not in part files.
+// Origin y = 0 is the clamp split plane. Tightened, so ear/ear and
+// bracket/ear are in exact contact.
+// ===================================================================
+export earAInnerY = -bearingContact / 2 // 0.000
+export earAOuterY = earAInnerY - clampEarT // -0.050
+export earBInnerY = bearingContact / 2 // 0.000
+export earBOuterY = earBInnerY + clampEarT // 0.050
+export bracketFaceY = earBOuterY + bearingContact // 0.050 — seated
+export bracketBackY = bracketFaceY + bracketT // 0.130
+export washerBackY = bracketBackY + washerT // 0.162
+export nutBackY = washerBackY + nutT // 0.292
+
+// ===================================================================
+// AN3 BOLT LENGTH — SELECTED from standard sizes, not morphed to fit
+// ===================================================================
+// Required grip = everything clamped between the bolt head and the washer:
+//   ear A 0.050 + ear B 0.050 + bracket 0.080 = 0.180
+export requiredGrip = clampEarT + clampEarT + bracketT // 0.180
+
+// AN3 bolts come in discrete grip lengths in 1/16" steps. The next standard
+// size at or above requiredGrip is 3/16" = 0.1875. A purchased fastener is a
+// DISCRETE SELECTION, not a part that stretches to fit.
+export boltGripSelected = 0.1875 // AN3-3A nominal grip  [A]
+export gripMargin = boltGripSelected - requiredGrip // 0.0075
+
+// Shank must additionally carry the washer and nut beyond the grip.
+export boltThreadProjection = washerT + nutT + 0.030
+export boltShankLen = boltGripSelected + boltThreadProjection
+
+// ===================================================================
+// ASSEMBLY TRANSFORMS — consumed by main-rev2.kcl only
+// ===================================================================
+export nutBaseZ = unionHexH + bearingContact // 0.300, seated on union hex
+export nutTopZ = nutBaseZ + nutH // 0.820
+
+// CORRECTION (review #3): the hose socket now seats on a REAL solid face —
+// the top of the AN818 nut collar — not on the schematic `unionSeatZ` datum,
+// which had no geometry at it and sat 0.110 above the end of the union body.
+export socketBaseZ = nutTopZ // 0.820, exact contact
+export hoseStartZ = socketBaseZ + socketH
+
+export clampWorldX = clampLocalX
+export clampWorldZ = hoseStartZ + clampLocalZ
+export boltWorldZ = clampWorldZ + clampBoltLocalZ
+
+// ===================================================================
+// COLOURS — [C] AN material colour code:
+//   aluminium = BLUE anodised · steel = BLACK · alu-bronze = cad/natural
+// ===================================================================
+export colAlum = "#3f6fb5"
+export colSteel = "#b9bec5"
+export colHose = "#242424"
+export colCushion = "#101010"
+export colBracket = "#8d9298"

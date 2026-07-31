@@ -1,0 +1,127 @@
+// AN-4 HOSE ASSEMBLY — AN815-4 union + AN818-4 nut + crimped socket + -4 flex hose
+// ToolCRIB CAD reference
+//
+// ============================ PROVENANCE ============================
+// CONFIRMED — AC 43.13-1B Ch.9 / FAA AMT Handbook, via NotebookLM:
+//   dash number = tube OD in sixteenths, so AN-4 = 1/4" OD        [confirmed]
+//   flare angle 37°; 45° automotive tools PROHIBITED               [confirmed]
+//   double flare mandatory on soft aluminium alloy 3/8" and under  [confirmed]
+//   AN818 nut + AN819 sleeve; AN815 male union                     [confirmed]
+//   torque AN-4: aluminium 50-65 in-lb · steel 135-150 in-lb       [confirmed]
+//   min bend radius AN-4: aluminium 9/16" · steel 7/8"             [confirmed]
+//   flexible hose must be installed with 5-8% SLACK — never
+//     stretched tight between fittings, it fails prematurely       [confirmed]
+//
+// UNVERIFIED — my general knowledge, NOT found in the sources:
+//   thread 7/16-20 UNF mapped to AN-4        [ASSUMPTION]
+//   hex across flats 9/16"                   [ASSUMPTION]
+//   hose OD, socket length, all part lengths [ASSUMPTION]
+// ====================================================================
+
+@settings(defaultLengthUnit = in)
+
+// ---- AN-4 thread (ASSUMPTION: 7/16-20 UNF) ----
+majorR = 0.21875 // 7/16 major dia / 2
+minorR = 0.1875
+thLen = 0.43
+thRevs = 8
+
+// ---- confirmed ----
+tubeOR = 0.125 // 1/4" OD  [confirmed]
+tubeIR = 0.095
+
+// ---- hex (ASSUMPTION: 9/16 across flats) ----
+hexCirc = 0.3248
+
+// ---- hose (ASSUMPTION) ----
+hoseOR = 0.250 // -4 braided hose, ~1/2" OD
+hoseIR = 0.125 // 1/4" I.D.
+zHose = 1.12
+
+// ==================================================================
+// 1 · AN815-4 MALE UNION
+// ==================================================================
+unionHex = startSketchOn(XY)
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.30)
+
+unionShank = startSketchOn(offsetPlane(XY, offset = 0.29))
+  |> circle(center = [0, 0], radius = minorR)
+  |> extrude(length = thLen + 0.01)
+
+unionHelix = helix(angleStart = 0, ccw = true, revolutions = thRevs, length = thLen, radius = majorR, axis = Z)
+
+unionThread = startSketchOn(XZ)
+  |> startProfile(at = [minorR, 0.298])
+  |> line(end = [majorR - minorR, 0.022])
+  |> line(end = [-(majorR - minorR), 0.022])
+  |> close()
+  |> sweep(path = unionHelix)
+
+unionBore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 0.90)
+
+unionSolid = union([unionHex, unionShank])
+union815 = subtract([unionSolid], tools = [unionBore])
+
+// ==================================================================
+// 2 · AN818-4 COUPLING NUT (threaded on)
+// ==================================================================
+zN = 0.36
+
+nutHex = startSketchOn(offsetPlane(XY, offset = zN))
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.30)
+
+nutCollar = startSketchOn(offsetPlane(XY, offset = zN + 0.29))
+  |> circle(center = [0, 0], radius = 0.190)
+  |> extrude(length = 0.22)
+
+nutBody = union([nutHex, nutCollar])
+
+nutBore = startSketchOn(offsetPlane(XY, offset = zN - 0.05))
+  |> circle(center = [0, 0], radius = minorR + 0.005)
+  |> extrude(length = 0.37)
+
+nutTubeHole = startSketchOn(offsetPlane(XY, offset = zN + 0.26))
+  |> circle(center = [0, 0], radius = tubeOR + 0.010)
+  |> extrude(length = 0.30)
+
+nut818 = subtract([nutBody], tools = [nutBore, nutTubeHole])
+
+// ==================================================================
+// 3 · CRIMPED HOSE SOCKET (hex-drive ferrule)
+// ==================================================================
+socket = startSketchOn(offsetPlane(XY, offset = 0.86))
+  |> polygon(radius = 0.300, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.28)
+
+socketBore = startSketchOn(offsetPlane(XY, offset = 0.81))
+  |> circle(center = [0, 0], radius = hoseOR - 0.02)
+  |> extrude(length = 0.40)
+
+hoseSocket = subtract([socket], tools = [socketBore])
+
+// ==================================================================
+// 4 · -4 FLEXIBLE HOSE  (swept, with a real bore)
+//     routed with a generous radius — AC 43.13-1B requires 5-8% slack
+// ==================================================================
+hosePath = startSketchOn(XZ)
+  |> startProfile(at = [0, zHose])
+  |> line(end = [0, 0.55])
+  |> tangentialArc(angle = -90, radius = 0.85)
+  |> line(end = [1.45, 0])
+
+hoseOuter = startSketchOn(offsetPlane(XY, offset = zHose))
+  |> circle(center = [0, 0], radius = hoseOR)
+  |> sweep(path = hosePath)
+
+hoseInner = startSketchOn(offsetPlane(XY, offset = zHose))
+  |> circle(center = [0, 0], radius = hoseIR)
+  |> sweep(path = hosePath)
+
+hose = subtract([hoseOuter], tools = [hoseInner])
+
+// NOTE: no final union — engine rejects unions of this many bodies,
+// and will not union a loft/sweep result with an extrude at all.

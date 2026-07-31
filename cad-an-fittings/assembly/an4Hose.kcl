@@ -1,0 +1,54 @@
+// -4 FLEXIBLE HOSE + CRIMPED SOCKET — modelled at LOCAL ORIGIN
+//
+// LOCAL FRAME: socket base at [0,0,0]. Hose leaves along +Z from the top of
+// the socket, bends 90°, and runs +X. main.kcl places the whole part.
+//
+// [C] hose installed with 5-8% slack; never stretched taut
+// [C] straight for >= 2 hose diameters from the fitting before any bend/clamp
+//
+// PATH — these are the ONLY definitions of the centreline. parameters.kcl
+// derives clamp placement from the same values, so the clamp follows the hose.
+//   straight    hoseStraight   = 0.550
+//   quarter bend hoseBendR     = 0.850   arc length = 1.335
+//   horizontal  hoseHorizLen   = 1.450
+//
+// ENGINE NOTE: tangentialArc must be EXACTLY ±90° before an axis-aligned line
+// or the sweep is rejected for G1 discontinuity. Sign is CCW-positive:
+// heading +Z, use -90 to exit toward +X.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export hoseStartDir = [0, 0, 1]
+export hoseEndDir = [1, 0, 0]
+
+// ---------- crimped socket ----------
+socketBody = startSketchOn(XY)
+  |> polygon(radius = socketR, numSides = 6, center = [0, 0])
+  |> extrude(length = socketH)
+
+socketBore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = hoseOR - 0.020)
+  |> extrude(length = socketH + 0.10)
+
+export hoseSocket = subtract([socketBody], tools = [socketBore])
+  |> appearance(color = colSteel, metalness = 80, roughness = 35)
+
+// ---------- hose ----------
+hosePath = startSketchOn(XZ)
+  |> startProfile(at = [0, socketH])
+  |> line(end = [0, hoseStraight])
+  |> tangentialArc(angle = -90, radius = hoseBendR)
+  |> line(end = [hoseHorizLen, 0])
+
+hoseOuter = startSketchOn(offsetPlane(XY, offset = socketH))
+  |> circle(center = [0, 0], radius = hoseOR)
+  |> sweep(path = hosePath)
+
+hoseInner = startSketchOn(offsetPlane(XY, offset = socketH))
+  |> circle(center = [0, 0], radius = hoseIR)
+  |> sweep(path = hosePath)
+
+export an4Hose = subtract([hoseOuter], tools = [hoseInner])
+  |> appearance(color = colHose, metalness = 5, roughness = 85)

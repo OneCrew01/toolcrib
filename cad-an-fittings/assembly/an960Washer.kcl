@@ -1,0 +1,27 @@
+// AN960 WASHER — a single purchased part, modelled at LOCAL ORIGIN
+//
+// LOCAL FRAME
+//   axis        = local origin, direction +Y
+//   front face  = local y = 0        (bears on the bracket back face)
+//   back face   = local y = washerT  (bears on the nut)
+//
+// [A] dimensions — not present in the FAA sources consulted
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export washerAxisDir = [0, 1, 0]
+export washerFrontFaceLocalY = 0
+export washerBackFaceLocalY = washerT
+
+plate = startSketchOn(XZ)
+  |> circle(center = [0, 0], radius = washerOR)
+  |> extrude(length = -washerT)
+
+hole = startSketchOn(offsetPlane(XZ, offset = 0.02))
+  |> circle(center = [0, 0], radius = boltR + 0.004)
+  |> extrude(length = -(washerT + 0.04))
+
+export an960Washer = subtract([plate], tools = [hole])
+  |> appearance(color = colSteel, metalness = 90, roughness = 25)

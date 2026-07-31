@@ -1,0 +1,162 @@
+// AN-6 37° FLARED TUBE JOINT — ToolCRIB CAD reference
+// AN815-6 union · AN819-6 sleeve · 3/8" tube with 37° flare · AN818-6 coupling nut
+//
+// ============================ PROVENANCE ============================
+// CONFIRMED — AC 43.13-1B Ch.9 / FAA AMT Handbook, via NotebookLM:
+//   dash number = tube OD in sixteenths, so AN-6 = 3/8" OD  [confirmed]
+//   flare angle = 37° for aviation; 45° automotive tools PROHIBITED  [confirmed]
+//   double flare mandatory on soft aluminium alloy tube 3/8" OD and under  [confirmed]
+//   joint = AN818 (MS20818) nut + AN819 (MS20819) sleeve  [confirmed]
+//   AN815 = male union  [confirmed]
+//   torque AN-6: aluminium 110–130 in-lb · steel 270–300 in-lb  [confirmed]
+//   min bend radius AN-6: aluminium 15/16" · steel 1-5/16"  [confirmed]
+//
+// UNVERIFIED — my own general knowledge, explicitly NOT found in the sources.
+// Both notebooks stated these are absent. Treat as provisional:
+//   thread 9/16-18 UNF mapped to AN-6      [ASSUMPTION]
+//   hex across flats 11/16"                [ASSUMPTION]
+//   all nut/union lengths and wall thicknesses [ASSUMPTION]
+// ====================================================================
+
+@settings(defaultLengthUnit = in)
+
+// ---- explode distance: 0.0 = assembled, 0.9 = exploded ----
+e = 0.9
+
+// ---- thread (ASSUMPTION: 9/16-18 UNF) ----
+pitch = 0.055556
+majorR = 0.28125 // 9/16 major dia / 2
+minorR = 0.2450
+thLen = 0.50
+thRevs = 9
+
+// ---- confirmed geometry ----
+tubeOR = 0.1875 // 3/8" OD tube  [confirmed]
+tubeIR = 0.1525
+flareRise = 0.13 // 37° flare: dr = rise * tan(37°) = 0.0980
+
+// ---- hex (ASSUMPTION: 11/16 across flats) ----
+hexAF = 0.6875
+hexCirc = 0.3969 // circumradius = AF / 2 / cos(30°)
+
+// ==================================================================
+// 1 · AN815-6 MALE UNION
+// ==================================================================
+unionHex = startSketchOn(XY)
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.35)
+
+unionShank = startSketchOn(offsetPlane(XY, offset = 0.34))
+  |> circle(center = [0, 0], radius = minorR)
+  |> extrude(length = thLen + 0.01)
+
+unionHelix = helix(angleStart = 0, ccw = true, revolutions = thRevs, length = thLen, radius = majorR, axis = Z)
+
+unionThread = startSketchOn(XZ)
+  |> startProfile(at = [minorR, 0.348])
+  |> line(end = [majorR - minorR, 0.026])
+  |> line(end = [-(majorR - minorR), 0.026])
+  |> close()
+  |> sweep(path = unionHelix)
+
+// 37° flare seat — the cone the tube flare is clamped against
+seatLo = startSketchOn(offsetPlane(XY, offset = 0.70))
+  |> circle(center = [0, 0], radius = 0.190)
+seatHi = startSketchOn(offsetPlane(XY, offset = 0.83))
+  |> circle(center = [0, 0], radius = 0.288)
+unionSeat = loft([seatLo, seatHi])
+
+unionBore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 1.0)
+
+unionSolid = union([unionHex, unionShank])
+union815 = subtract([unionSolid], tools = [unionBore])
+
+// ==================================================================
+// 2 · AN819-6 SLEEVE  (37° cone, sits behind the flare)
+// ==================================================================
+zS = 1.15 + e
+slvLo = startSketchOn(offsetPlane(XY, offset = zS))
+  |> circle(center = [0, 0], radius = 0.205)
+slvHi = startSketchOn(offsetPlane(XY, offset = zS + 0.13))
+  |> circle(center = [0, 0], radius = 0.300)
+sleeveCone = loft([slvLo, slvHi])
+
+sleeveBody = startSketchOn(offsetPlane(XY, offset = zS + 0.12))
+  |> circle(center = [0, 0], radius = 0.300)
+  |> extrude(length = 0.10)
+
+// NOTE: a loft result cannot be unioned with an extrude — engine rejects it.
+// Each solid is bored separately with its own cutter instead.
+sleeveBoreA = startSketchOn(offsetPlane(XY, offset = zS - 0.05))
+  |> circle(center = [0, 0], radius = tubeOR + 0.004)
+  |> extrude(length = 0.40)
+sleeveBoreB = startSketchOn(offsetPlane(XY, offset = zS - 0.05))
+  |> circle(center = [0, 0], radius = tubeOR + 0.004)
+  |> extrude(length = 0.40)
+
+sleeve819cone = subtract([sleeveCone], tools = [sleeveBoreA])
+sleeve819ring = subtract([sleeveBody], tools = [sleeveBoreB])
+
+// ==================================================================
+// 3 · 3/8" TUBE WITH 37° FLARE  [confirmed OD + angle]
+// ==================================================================
+zT = 1.75 + (e * 2)
+flrLo = startSketchOn(offsetPlane(XY, offset = zT))
+  |> circle(center = [0, 0], radius = tubeOR)
+flrHi = startSketchOn(offsetPlane(XY, offset = zT - flareRise))
+  |> circle(center = [0, 0], radius = tubeOR + 0.098)
+tubeFlare = loft([flrLo, flrHi])
+
+tubeShaft = startSketchOn(offsetPlane(XY, offset = zT))
+  |> circle(center = [0, 0], radius = tubeOR)
+  |> extrude(length = 1.05)
+
+tubeBoreA = startSketchOn(offsetPlane(XY, offset = zT - flareRise - 0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 1.40)
+tubeBoreB = startSketchOn(offsetPlane(XY, offset = zT - flareRise - 0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = 1.40)
+
+tubeFlareFinal = subtract([tubeFlare], tools = [tubeBoreA])
+tubeShaftFinal = subtract([tubeShaft], tools = [tubeBoreB])
+
+// ==================================================================
+// 4 · AN818-6 COUPLING NUT  (internal 9/16-18)
+// ==================================================================
+zN = 3.10 + (e * 3)
+
+nutHex = startSketchOn(offsetPlane(XY, offset = zN))
+  |> polygon(radius = hexCirc, numSides = 6, center = [0, 0])
+  |> extrude(length = 0.34)
+
+nutCollar = startSketchOn(offsetPlane(XY, offset = zN + 0.33))
+  |> circle(center = [0, 0], radius = 0.235)
+  |> extrude(length = 0.26)
+
+nutBody = union([nutHex, nutCollar])
+
+// female thread bore
+nutBore = startSketchOn(offsetPlane(XY, offset = zN - 0.05))
+  |> circle(center = [0, 0], radius = minorR + 0.006)
+  |> extrude(length = 0.42)
+
+// tube clearance through the collar
+nutTubeHole = startSketchOn(offsetPlane(XY, offset = zN + 0.30))
+  |> circle(center = [0, 0], radius = tubeOR + 0.012)
+  |> extrude(length = 0.35)
+
+nutHelix = helix(angleStart = 0, ccw = true, revolutions = 6, length = 0.34, radius = majorR, axis = Z)
+
+nutThreadCut = startSketchOn(XZ)
+  |> startProfile(at = [minorR, zN - 0.026])
+  |> line(end = [majorR - minorR, 0.026])
+  |> line(end = [-(majorR - minorR), 0.026])
+  |> close()
+  |> sweep(path = nutHelix)
+
+nut818 = subtract([nutBody], tools = [nutBore, nutTubeHole])
+
+// NOTE: no final union — the Zoo engine rejects unions of this many bodies.

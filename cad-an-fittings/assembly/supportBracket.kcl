@@ -1,0 +1,38 @@
+// SUPPORT BRACKET — genuinely assembly-independent
+//
+// CORRECTION (review #3): this part previously built its body at
+// `bracketFaceY`, which is derived from earGap / clampEarT / supportGap —
+// so the bracket knew about the clamp stack. It no longer does.
+//
+// LOCAL FRAME
+//   hole axis     = local origin, direction +Y
+//   mounting face = local y = 0
+//   back face     = local y = bracketT
+// The bracket knows only its own thickness. main-rev2.kcl positions the
+// mounting face at the assembly's bracketFaceY.
+//
+// [C] back of the line support clamp should rest against a structural member
+// [C] metallic fluid lines bonded at EVERY clamp point, <= 1 ohm to structure
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export bracketHoleAxisDir = [0, 1, 0]
+export bracketMountFaceLocalY = 0
+export bracketBackFaceLocalY = bracketT
+
+plate = startSketchOn(XZ)
+  |> startProfile(at = [-bracketW / 2, -bracketH * 0.62])
+  |> line(end = [bracketW, 0])
+  |> line(end = [0, bracketH])
+  |> line(end = [-bracketW, 0])
+  |> close()
+  |> extrude(length = -bracketT)
+
+plateHole = startSketchOn(offsetPlane(XZ, offset = 0.03))
+  |> circle(center = [0, 0], radius = boltHoleR)
+  |> extrude(length = -(bracketT + 0.06))
+
+export supportBracket = subtract([plate], tools = [plateHole])
+  |> appearance(color = colBracket, metalness = 60, roughness = 45)

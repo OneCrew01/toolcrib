@@ -1,0 +1,101 @@
+// MS21919 CUSHIONED (ADEL) CLAMP — modelled at LOCAL ORIGIN
+//
+// LOCAL FRAME: bore axis is +X through [0,0,0]. Loop lies in the YZ plane.
+// Split plane is y = 0. Ears rise along +Z. This part knows nothing about
+// where it sits on the hose — main.kcl places it.
+//
+// [C] cushioned clamp required wherever vibration exists; plain only where none
+// [C] bonded cushioned clamps MANDATORY on metal fluid lines; unbonded = wiring only
+// [C] attachment hardware ABOVE the clamp wherever practicable
+// [C] mounting bolt angular offset max 45° from loop axis
+// [C] Teflon cushion required in Skydrol/fuel zones but damps worse than rubber
+//
+// LOCAL DATUMS
+//   boreAxis      origin [0,0,0], dir [1,0,0]
+//   boreRadius    clampBoreR  (= hoseOR + clampCushionClearance, DERIVED)
+//   splitPlane    y = 0, normal [0,1,0]
+//   earAOuterFace y = earAOuterY   — bolt head bears here
+//   earBOuterFace y = earBOuterY   — support bracket seats here
+//   boltAxis      origin [0,0,clampBoltLocalZ], dir [0,1,0]
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export clampBoreAxisDir = [1, 0, 0]
+export clampSplitPlaneY = 0
+export clampBoltAxisDir = [0, 1, 0]
+
+xStart = -clampBandW / 2
+
+// ---------- cushion ----------
+cushOuter = startSketchOn(offsetPlane(YZ, offset = xStart))
+  |> circle(center = [0, 0], radius = clampCushOR)
+  |> extrude(length = clampBandW)
+
+cushCut = startSketchOn(offsetPlane(YZ, offset = xStart - 0.05))
+  |> circle(center = [0, 0], radius = clampBoreR)
+  |> extrude(length = clampBandW + 0.10)
+
+cushSplit = startSketchOn(offsetPlane(YZ, offset = xStart - 0.05))
+  |> startProfile(at = [-clampSplitW / 2, clampCushOR - 0.10])
+  |> line(end = [clampSplitW, 0])
+  |> line(end = [0, 0.40])
+  |> line(end = [-clampSplitW, 0])
+  |> close()
+  |> extrude(length = clampBandW + 0.10)
+
+export adelCushion = subtract([cushOuter], tools = [cushCut, cushSplit])
+  |> appearance(color = colCushion, metalness = 0, roughness = 95)
+
+// ---------- metal band ----------
+bandOuter = startSketchOn(offsetPlane(YZ, offset = xStart + 0.03))
+  |> circle(center = [0, 0], radius = clampBandOR)
+  |> extrude(length = clampBandW - 0.06)
+
+bandCut = startSketchOn(offsetPlane(YZ, offset = xStart - 0.02))
+  |> circle(center = [0, 0], radius = clampCushOR)
+  |> extrude(length = clampBandW + 0.10)
+
+bandSplit = startSketchOn(offsetPlane(YZ, offset = xStart - 0.02))
+  |> startProfile(at = [-clampSplitW / 2, clampCushOR - 0.10])
+  |> line(end = [clampSplitW, 0])
+  |> line(end = [0, 0.40])
+  |> line(end = [-clampSplitW, 0])
+  |> close()
+  |> extrude(length = clampBandW + 0.10)
+
+export adelBand = subtract([bandOuter], tools = [bandCut, bandSplit])
+  |> appearance(color = colSteel, metalness = 85, roughness = 30)
+
+// ---------- ear A (bolt-head side) ----------
+earAPlate = startSketchOn(offsetPlane(XZ, offset = -earAOuterY))
+  |> startProfile(at = [-clampEarW / 2, clampEarBaseZ])
+  |> line(end = [clampEarW, 0])
+  |> line(end = [0, clampEarH])
+  |> line(end = [-clampEarW, 0])
+  |> close()
+  |> extrude(length = -clampEarT)
+
+earAHole = startSketchOn(offsetPlane(XZ, offset = -(earAOuterY - 0.03)))
+  |> circle(center = [0, clampBoltLocalZ], radius = boltHoleR)
+  |> extrude(length = -(clampEarT + 0.06))
+
+export adelEarA = subtract([earAPlate], tools = [earAHole])
+  |> appearance(color = colSteel, metalness = 85, roughness = 30)
+
+// ---------- ear B (bracket side) ----------
+earBPlate = startSketchOn(offsetPlane(XZ, offset = -earBInnerY))
+  |> startProfile(at = [-clampEarW / 2, clampEarBaseZ])
+  |> line(end = [clampEarW, 0])
+  |> line(end = [0, clampEarH])
+  |> line(end = [-clampEarW, 0])
+  |> close()
+  |> extrude(length = -clampEarT)
+
+earBHole = startSketchOn(offsetPlane(XZ, offset = -(earBInnerY - 0.03)))
+  |> circle(center = [0, clampBoltLocalZ], radius = boltHoleR)
+  |> extrude(length = -(clampEarT + 0.06))
+
+export adelEarB = subtract([earBPlate], tools = [earBHole])
+  |> appearance(color = colSteel, metalness = 85, roughness = 30)

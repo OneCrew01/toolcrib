@@ -1,0 +1,71 @@
+// AN815-4 MALE UNION — modelled at LOCAL ORIGIN
+//
+// LOCAL FRAME: port face at z = 0, axis +Z. This part is the assembly datum.
+//
+// [C] AN815 = male union
+//
+// CORRECTION (review #3) — THE FLARE SEAT IS NOT MODELLED.
+//   Rev 2 exported `unionSeatZ = 0.830` and placed the hose socket there.
+//   That was wrong twice over: the rigid body ends at z = 0.720, so the
+//   datum floated 0.110 above any solid, and naming a coordinate does not
+//   create a face. The export has been REMOVED rather than renamed.
+//
+//   In a real AN joint the tube flare is clamped between the union's 37°
+//   cone and the AN818 nut — it does not bear on an exposed union face at
+//   all. The hose socket therefore now seats on the top of the nut collar,
+//   which IS real modelled geometry. See parameters.kcl `socketBaseZ`.
+//
+//   The 37° cone itself is still not modelled, because union([loft, extrude])
+//   is rejected by the engine (ENGINE-LIMITS.md §2). Its absence is stated
+//   here rather than papered over with a datum.
+//
+// COSMETIC THREAD NOTICE — verified against the live engine 2026-07-30.
+//   an815Thread is a swept helical ridge kept as a SEPARATE body because
+//   union([extrude, sweep]) is rejected. This is COSMETIC THREAD
+//   REPRESENTATION, not a validated threaded joint. No mesh or interference
+//   can be evaluated. Reproducer in ENGINE-LIMITS.md §1.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export unionAxisDir = [0, 0, 1]
+export unionPortFaceLocalZ = 0
+export unionHexTopLocalZ = unionHexH // real face — the nut seats here
+export unionThreadStartLocalZ = unionThreadStart
+export unionThreadEndLocalZ = unionThreadEnd
+
+hexBody = startSketchOn(XY)
+  |> polygon(radius = hexCircR, numSides = 6, center = [0, 0])
+  |> extrude(length = unionHexH)
+
+shank = startSketchOn(offsetPlane(XY, offset = unionThreadStart - bodyOverlap))
+  |> circle(center = [0, 0], radius = threadMinorR)
+  |> extrude(length = threadLen + bodyOverlap)
+
+bore = startSketchOn(offsetPlane(XY, offset = -0.05))
+  |> circle(center = [0, 0], radius = tubeIR)
+  |> extrude(length = unionThreadEnd + 0.10)
+
+solidBody = union([hexBody, shank])
+
+export an815Union = subtract([solidBody], tools = [bore])
+  |> appearance(color = colAlum, metalness = 75, roughness = 30)
+
+// --- cosmetic thread, separate body by engine necessity ---
+threadHelix = helix(
+  angleStart = 0,
+  ccw = true,
+  revolutions = threadRevs,
+  length = threadLen,
+  radius = threadMajorR,
+  axis = Z,
+)
+
+export an815Thread = startSketchOn(XZ)
+  |> startProfile(at = [threadMinorR, unionThreadStart + 0.008])
+  |> line(end = [threadMajorR - threadMinorR, 0.022])
+  |> line(end = [-(threadMajorR - threadMinorR), 0.022])
+  |> close()
+  |> sweep(path = threadHelix)
+  |> appearance(color = colAlum, metalness = 75, roughness = 30)

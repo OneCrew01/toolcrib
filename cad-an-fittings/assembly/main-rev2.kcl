@@ -1,0 +1,83 @@
+// AN-4 HOSE / ADEL CLAMP ASSEMBLY — ENTRYPOINT
+// ToolCRIB · assembly benchmark for Zoo · Rev 3, 2026-07-30
+//
+// FILENAME NOTE: named main-rev2.kcl, not main.kcl, because a 28-byte
+// project-level main.kcl shadowed the real entrypoint in the review sandbox.
+// There is deliberately no main.kcl in this package.
+//
+// This file is the assembly layer. Part files model at their own local origin
+// and contain NO assembly coordinates. Placement is derived in parameters.kcl
+// from the same values that generate the geometry.
+//
+// NO boolean union is performed across parts. Several parts are themselves
+// multi-body — see the terminology note in parameters.kcl.
+//
+// ASSEMBLY DATUM: AN815 union port face at world [0,0,0], axis +Z.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+import "an815Union.kcl" as unionPart
+import "an818Nut.kcl" as nutPart
+import "an4Hose.kcl" as hosePart
+import "adelClamp.kcl" as clampPart
+import "supportBracket.kcl" as bracketPart
+import "an3Bolt.kcl" as boltPart
+import "an960Washer.kcl" as washerPart
+import "an365Nut.kcl" as an365Part
+
+// ---------------------------------------------------------------
+// 1 · AN815-4 UNION — assembly datum, at the origin
+// ---------------------------------------------------------------
+union815 = unionPart::an815Union
+unionThread = unionPart::an815Thread // cosmetic — see part file
+
+// ---------------------------------------------------------------
+// 2 · AN818-4 NUT — bearing face seated on the union hex top (contact = 0)
+// ---------------------------------------------------------------
+nut818 = nutPart::an818Nut
+  |> translate(x = 0, y = 0, z = nutBaseZ)
+
+// ---------------------------------------------------------------
+// 3 · HOSE + SOCKET — socket base seated on the nut collar top, a REAL face
+// ---------------------------------------------------------------
+socket = hosePart::hoseSocket
+  |> translate(x = 0, y = 0, z = socketBaseZ)
+
+hose = hosePart::an4Hose
+  |> translate(x = 0, y = 0, z = socketBaseZ)
+
+// ---------------------------------------------------------------
+// 4 · ADEL CLAMP — concentric with the hose, positioned by clampSlide
+// ---------------------------------------------------------------
+cushion = clampPart::adelCushion
+  |> translate(x = clampWorldX, y = 0, z = clampWorldZ)
+
+band = clampPart::adelBand
+  |> translate(x = clampWorldX, y = 0, z = clampWorldZ)
+
+earA = clampPart::adelEarA
+  |> translate(x = clampWorldX, y = 0, z = clampWorldZ)
+
+earB = clampPart::adelEarB
+  |> translate(x = clampWorldX, y = 0, z = clampWorldZ)
+
+// ---------------------------------------------------------------
+// 5 · SUPPORT BRACKET — mounting face placed at bracketFaceY, seated on ear B
+//     The bracket itself is modelled with its face at local y = 0.
+// ---------------------------------------------------------------
+bracket = bracketPart::supportBracket
+  |> translate(x = clampWorldX, y = bracketFaceY, z = boltWorldZ)
+
+// ---------------------------------------------------------------
+// 6 · FASTENERS — three independent purchased parts, each placed here
+// ---------------------------------------------------------------
+bolt = boltPart::an3Bolt
+  |> translate(x = clampWorldX, y = earAOuterY, z = boltWorldZ)
+
+washer = washerPart::an960Washer
+  |> translate(x = clampWorldX, y = bracketBackY, z = boltWorldZ)
+
+lockNut = an365Part::an365Nut
+  |> translate(x = clampWorldX, y = washerBackY, z = boltWorldZ)
