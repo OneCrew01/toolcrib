@@ -836,6 +836,12 @@ Legend: ✅ verified · ◐ partial · ☐ not yet run · ➖ deliberately skipp
   assembly is reduced to cosmetic geometry plus a plain bore.
 - **Workaround:** keep the swept thread as a separate body and label it explicitly as
   cosmetic thread representation. Do not present it as a validated threaded joint.
+- **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1316 - carries both
+  this repro and the FN-037 loft variant, plus the topology-not-operand-count triage
+  table from FN-038 as context alongside the existing #1294.
+- **Zoo docs - fills a gap:** the [`union()` standard-library page](https://zoo.dev/docs/kcl-std/functions/std-solid-union)
+  documents the boolean with no stated limitation on operand kinds. A "known limitations"
+  note there would have saved the hunt, exactly as FN-024 argues for `subtract()`.
 
 ## FN-037 - union([loft, extrude]) is rejected, which blocks cones and transitions
 - **API:** KCL std - `union()` with a `loft()` operand
@@ -849,6 +855,10 @@ Legend: ✅ verified · ◐ partial · ☐ not yet run · ➖ deliberately skipp
   subtract its OWN cutter solid - cutters appear to be consumed by the operation.
 - **Consequence in practice:** a 37-degree flare cone could not be joined to its tube in
   this repo's AN fitting work, so the flare is documented as absent rather than faked.
+- **Filed upstream:** covered in https://github.com/KittyCAD/modeling-api/issues/1316
+  alongside FN-036. Symptom and error string are identical, so both operand cases were
+  reported together rather than split; the issue says so explicitly in case the root
+  causes turn out to differ.
 
 ## FN-038 - subtract() has the same limits as union(), and the trigger is TOPOLOGY, not operand count
 - **API:** KCL std - `subtract()`
