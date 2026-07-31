@@ -792,6 +792,227 @@ Legend: ✅ verified · ◐ partial · ☐ not yet run · ➖ deliberately skipp
 
 ---
 
+## FN-035 - union() is rejected when the two solids share an exact planar face
+- **API:** KCL std - `union()`
+- **Date:** 2026-07-30
+- **Type:** gotcha / doc-gap
+- **Expected:** stacking two extrudes so their faces touch is the obvious way to build a
+  multi-section part; a boolean union should accept it.
+- **Actual:** rejected. Two solids sharing an exact planar boundary fail. The working
+  pattern is to make them deliberately overlap.
+- **Repro:** extrude A from z=0 to 0.30; extrude B from z=0.30 to 0.60; `union([A, B])`.
+- **Workaround:** overlap by a small constant (0.020 in used throughout this repo).
+  Note this forces an uncomfortable split: the engine REQUIRES overlap to build one
+  part, while good assembly practice requires NO overlap between separate parts. Keep
+  the two rules explicitly separate or a reader will think the model advocates
+  interpenetrating components.
+- **Suggested doc edit:** state on the `union()` page that coincident faces are not
+  currently supported and that a small overlap is the expected authoring pattern.
+
+## FN-036 - union([extrude, sweep]) is rejected, which blocks every threaded fastener
+- **API:** KCL std - `union()` with a `sweep()` operand
+- **Date:** 2026-07-30
+- **Type:** bug / blocker
+- **Expected:** a helical thread swept along `helix()` can be unioned into the shank it
+  belongs to, producing one fastener body.
+- **Actual:** `engine: The Zoo engine cannot handle this 3D union yet. Please report
+  this as an issue`
+- **Repro (two bodies, smallest case found):**
+  ```kcl
+  @settings(defaultLengthUnit = in, kclVersion = 2.0)
+  shank = startSketchOn(XY) |> circle(center = [0,0], radius = 0.1875) |> extrude(length = 0.44)
+  th    = helix(angleStart = 0, ccw = true, revolutions = 8, length = 0.43, radius = 0.21875, axis = Z)
+  ridge = startSketchOn(XZ)
+    |> startProfile(at = [0.1875, 0.005])
+    |> line(end = [0.03125, 0.022])
+    |> line(end = [-0.03125, 0.022])
+    |> close()
+    |> sweep(path = th)
+  threadedStud = union([shank, ridge])   // rejected
+  ```
+- **Impact:** this is the highest-consequence limit found. A thread cannot be part of
+  its own fastener. Downstream, a male thread cannot exist as one solid, so a
+  male/female pair cannot be evaluated for mesh or interference AT ALL - any threaded
+  assembly is reduced to cosmetic geometry plus a plain bore.
+- **Workaround:** keep the swept thread as a separate body and label it explicitly as
+  cosmetic thread representation. Do not present it as a validated threaded joint.
+- **Filed upstream:** https://github.com/KittyCAD/modeling-api/issues/1316 - carries both
+  this repro and the FN-037 loft variant, plus the topology-not-operand-count triage
+  table from FN-038 as context alongside the existing #1294.
+- **Zoo docs - fills a gap:** the [`union()` standard-library page](https://zoo.dev/docs/kcl-std/functions/std-solid-union)
+  documents the boolean with no stated limitation on operand kinds. A "known limitations"
+  note there would have saved the hunt, exactly as FN-024 argues for `subtract()`.
+
+## FN-037 - union([loft, extrude]) is rejected, which blocks cones and transitions
+- **API:** KCL std - `union()` with a `loft()` operand
+- **Date:** 2026-07-30
+- **Type:** bug
+- **Expected:** a lofted cone (for example a 37-degree flare seat, a chamfer transition,
+  or a backshell taper) can be unioned to the prismatic body it adjoins.
+- **Actual:** same rejection text as FN-036.
+- **Repro:** `loft([circleAtZ0, circleAtZ1])` then `union([thatLoft, anExtrude])`.
+- **Workaround:** never union a loft. Subtract from each solid separately, and give each
+  subtract its OWN cutter solid - cutters appear to be consumed by the operation.
+- **Consequence in practice:** a 37-degree flare cone could not be joined to its tube in
+  this repo's AN fitting work, so the flare is documented as absent rather than faked.
+- **Filed upstream:** covered in https://github.com/KittyCAD/modeling-api/issues/1316
+  alongside FN-036. Symptom and error string are identical, so both operand cases were
+  reported together rather than split; the issue says so explicitly in case the root
+  causes turn out to differ.
+
+## FN-038 - subtract() has the same limits as union(), and the trigger is TOPOLOGY, not operand count
+- **API:** KCL std - `subtract()`
+- **Date:** 2026-07-30 / 2026-07-31
+- **Type:** bug / refines FN-024
+- **Expected:** subtraction scales with the number of cutters.
+- **Actual:** operand count is not the variable at all. Measured:
+
+  | Case | Cutters | Result |
+  |---|---|---|
+  | 78 cavity bores from one connector insulator | 78 | works |
+  | 2 jackscrew holes from a flange ear | 2 | works |
+  | 2 holes whose diameter EXCEEDS the bar's thickness | 2 | rejected |
+  | 2 holes + 1 window cutter that would make the plate a frame | 3 | rejected |
+
+- **Rule of thumb that held every time:** if the cut would DISCONNECT the body (split it
+  into pieces) or FRAME it (turn a plate into a closed loop), expect rejection. Cutter
+  count is irrelevant - 78 in a single call is fine.
+- **Error:** `engine: The Zoo engine cannot handle this 3D subtraction yet.`
+- **Diagnosable repro:** make a bar 0.090 in thick and subtract a 0.100 in diameter hole
+  through it. The hole is wider than the bar, so the cut severs it into three pieces and
+  the operation is refused. Widen the bar to 0.130 and the same two cutters succeed.
+- **Suggested doc edit:** FN-024 already reports cut-crossing failure. This adds the
+  general rule and a deterministic minimal repro; the `subtract()` page should state the
+  disconnect/frame limitation rather than leaving it to be discovered geometrically.
+
+## FN-039 - mock_execute_kcl passes topology the real engine then refuses
+- **API:** zoo-mcp - `mock_execute_kcl` vs `execute_kcl` / `snapshot_of_kcl`
+- **Date:** 2026-07-30
+- **Type:** gotcha - highest workflow impact of anything in this batch
+- **Expected:** mock execution is the cheap pre-flight check before spending engine time.
+- **Actual:** mock returned success for FN-036, FN-037 and FN-040 - all three were then
+  rejected by the engine. Mock validates syntax and semantics; it does NOT validate that
+  the engine can build the requested topology.
+- **Consequence:** **a green mock is not evidence that a model builds.** This inverts the
+  usual cheap-check-first instinct and was the single largest consumer of iterations in
+  this work. After adopting "a render is the real test", the next build rendered clean on
+  the first attempt.
+- **Suggested fix:** either exercise the same topology paths in mock, or label mock
+  success explicitly as syntax-only so it is not read as a build guarantee.
+
+## FN-040 - sweep() requires exact G1 continuity, and the arc-sign rule is unstated
+- **API:** KCL std - `sweep()` with a `tangentialArc()` path
+- **Date:** 2026-07-30
+- **Type:** doc-gap (the rejection itself is geometrically correct)
+- **Expected:** a path of `line -> tangentialArc -> line` sweeps.
+- **Actual:** `engine: Trajectory curve must be G1 continuous (with continuous tangents)`
+  unless the arc turns EXACTLY +/-90 degrees before an axis-aligned line. 85 and 88
+  degrees both fail.
+- **Honest classification:** the engine is RIGHT to refuse. An 85-degree arc followed by
+  an axis-aligned line genuinely is not tangent. This is not an engine defect. The real
+  complaints are ergonomic:
+  1. there is no way to say "continue along the arc's exit tangent for distance d" - the
+     author must compute the exit direction by hand;
+  2. the diagnostic names the `sweep()` call, not the offending segment junction, so on a
+     multi-segment path you bisect manually.
+- **Undocumented sign rule, established by measurement:** angle is CCW-positive, and the
+  axis names are SKETCH-LOCAL. A path heading along the sketch's +vertical exits along
+  -horizontal for `angle = +90`. To exit +horizontal use `-90`. This holds on XY
+  (heading +Y exits -X) and on XZ (heading +Z exits -X) alike.
+- **Suggested doc edit:** put the sign rule and a worked two-bend example on the
+  `sweep()` page, and name the failing junction in the diagnostic.
+
+## FN-041 - revolve() axis must lie in the sketch plane and is named in the sketch-local frame
+- **API:** KCL std - `revolve()`
+- **Date:** 2026-07-30
+- **Type:** gotcha / doc-gap
+- **Expected:** revolving a profile drawn on `XZ` about the world Z axis is `axis = Z`.
+- **Actual:** `engine: Invalid axis of revolution. Axis of revolution must lie in the
+  plane`. The correct call is `axis = Y`, because the axis names refer to the SKETCH's
+  local frame, not world axes. On an `XZ` sketch, local Y is world Z.
+- **Repro:** draw a half-section on `XZ`, call `revolve(axis = Z)` -> error;
+  `revolve(axis = Y)` -> correct solid of revolution.
+- **Why it matters:** `revolve()` is the only practical way to get a real crimp-contact or
+  fastener profile (chamfered lead-in, shoulders, barrel) as ONE body. Stacked cylinders
+  are the alternative and they look it.
+- **Suggested doc edit:** state on the `revolve()` page that the axis is sketch-local, and
+  give the XZ example explicitly since it is the common case for a turned part.
+
+## FN-042 - importing a module renders ALL of its geometry
+- **API:** KCL - `import "part.kcl" as p`
+- **Date:** 2026-07-30
+- **Type:** gotcha / doc-gap
+- **Expected:** importing a module and referencing two of its exports renders those two.
+- **Actual:** importing executes the module and renders EVERYTHING in it. A view file
+  written to show only a connector's hardware still drew the wires, because the wires
+  exist in the imported module.
+- **Consequence:** you cannot compose a partial view by importing and cherry-picking. A
+  trimmed view must be self-contained, or the source module must be split so the unwanted
+  geometry lives elsewhere. This is a real architectural constraint on how a parametric
+  library is organised, not a cosmetic quirk.
+- **Suggested doc edit:** say so on the modules/import page. It changes file layout
+  decisions.
+
+## FN-043 - definition-order errors are reported at the importing file, not the source line
+- **API:** KCL - `import * from "parameters.kcl"`
+- **Date:** 2026-07-30
+- **Type:** diagnostic quality
+- **Expected:** a value used before declaration names the offending line.
+- **Actual:**
+  ```
+  semantic: Error loading imported file (...parameters.kcl). Open it to view more details.
+    `washerT` is not defined
+     -[19:1]
+  19 | import * from "parameters.kcl"
+  ```
+  The caret points at the `import` line in the CONSUMING file. The message does name the
+  file to open, but gives no line number within it. Hit twice in one session on a
+  parameters module where a derived export referenced a constant declared later in the
+  SAME file.
+- **Suggested fix:** report the line in the source file where the undefined symbol is
+  referenced.
+
+## FN-044 - fillet() survives a later subtract()
+- **API:** KCL std - `fillet()` then `subtract()`
+- **Date:** 2026-07-31
+- **Type:** pleasant-surprise
+- **Expected:** given how fragile the booleans are (FN-035 to FN-038), filleting before
+  cutting seemed likely to fail.
+- **Actual:** works. A connector insulator was filleted on all four vertical corners and
+  then had 78 cavity bores subtracted from it in a single call. Accepted.
+- **Why it is worth recording:** the safe-looking alternative (subtract first, fillet
+  after) needs edge tags that survive the boolean, which is harder to reason about. The
+  ordering that works is the simpler one.
+- **Pattern:** tag each profile line, then
+  `fillet(radius = r, tags = [getNextAdjacentEdge(tagA), ...])` on the extrude, then
+  subtract.
+
+## FN-045 - snapshot camera: zoom silently overrides a custom vantage
+- **API:** zoo-mcp - `snapshot_of_kcl(camera_view = {up, vantage, center}, zoom)`
+- **Date:** 2026-07-30
+- **Type:** tooling ergonomics
+- **Expected:** supplying an explicit `vantage` positions the camera there.
+- **Actual:** `zoom` defaults to true, which re-fits the whole model and silently
+  discards the vantage distance. Setting `zoom = false` honours it, but the camera then
+  works in MODEL UNITS - so a vantage chosen while zoom-to-fit was on lands inside the
+  geometry and renders a blank or flat-colour frame.
+- **Net effect:** custom camera distance and zoom-to-fit are mutually exclusive, and
+  there is no feedback when zoom wins. Getting a close-up of one feature of a large
+  assembly is fiddly; the reliable workaround is a separate, smaller view file so
+  zoom-to-fit frames what you want.
+
+## FN-046 - /org/* endpoints return 403 on an otherwise healthy token
+- **API:** platform - `GET https://api.zoo.dev/org/skills` (via `list_org_skills`)
+- **Date:** 2026-07-30
+- **Type:** access / not a geometry issue
+- **Actual:** `HTTP 403 Forbidden`. The same credentials drive the geometry engine, the
+  KCL sample index and the docs endpoints normally.
+- **Assessment:** almost certainly an org-membership permission rather than a fault.
+  Recorded only so a future reader does not mistake it for an engine problem while
+  debugging geometry.
+
+---
+
 ## Zoo documentation cross-reference
 
 Every finding above that touches a documented Zoo surface is mapped here to the exact doc
@@ -815,10 +1036,26 @@ documentation only.
 | FN-033 | `getOppositeEdge()` | [`getOppositeEdge()` standard library](https://zoo.dev/docs/kcl-std/functions/std-sketch-getOppositeEdge) | confirms — takes a `TaggedEdge`, which is exactly why the inner-loop route in FN-034 is refused |
 | FN-009 · FN-013 · FN-014 · FN-015 · FN-022 · FN-023 · FN-032 | Modeling command websocket / engine geometry queries | [Engine API](https://zoo.dev/docs/developer-tools/engine-api) | fills — post-upgrade auth frame + protocol not in the overview; nothing states that the bounding box of a boolean result is not the bounding box of the part |
 | FN-025 · FN-026 · FN-027 · FN-028 | Copilot websocket / agent client | [Agent API](https://zoo.dev/docs/developer-tools/agent-api) | fills — copilot ws lifecycle + encodings undocumented |
+| FN-035 · FN-036 · FN-037 | KCL boolean `union()` | [`union()` standard library](https://zoo.dev/docs/kcl-std/functions/std-solid-union) | fills — coincident faces refused; `union([extrude, sweep])` and `union([loft, extrude])` both rejected outright, which blocks threaded fasteners and lofted transitions |
+| FN-038 | KCL boolean `subtract()` | [`subtract()` standard library](https://zoo.dev/docs/kcl-std/functions/std-solid-subtract) | fills — refines FN-024: the trigger is resulting TOPOLOGY, not operand count. 78 cutters succeed in one call; 2 cutters fail when the cut would split or frame the body |
+| FN-040 | KCL `sweep()` trajectory continuity | [`sweep()` standard library](https://zoo.dev/docs/kcl-std/functions/std-sketch-sweep) | fills — the G1 rejection is geometrically correct, but the CCW-positive sketch-local arc-sign rule is unstated and the diagnostic does not name the failing junction |
+| FN-041 | KCL `revolve()` axis selection | [`revolve()` standard library](https://zoo.dev/docs/kcl-std/functions/std-sketch-revolve) | fills — the axis is SKETCH-LOCAL, so an `XZ` profile revolves about world Z via `axis = Y`; the page does not say this |
+| FN-044 | KCL `fillet()` ordering | [`fillet()` standard library](https://zoo.dev/docs/kcl-std/functions/std-solid-fillet) | confirms — a fillet survives a later `subtract()`; 78 bores cut into a pre-filleted body |
+| FN-042 · FN-043 | KCL modules and imports | [Modules and imports](https://zoo.dev/docs/kcl-lang/modules) | fills — an import renders ALL of the module's geometry, so partial views must be self-contained; definition-order errors are reported at the importing file with no source line |
+| FN-039 · FN-045 | zoo-mcp tooling (`mock_execute_kcl`, `snapshot_of_kcl`) | n/a — MCP server surface, not a documented Zoo API page | fills — mock passes topology the engine refuses, so a green mock is not a build guarantee; `zoom` silently overrides a custom camera vantage |
+| FN-046 | `GET /org/*` | [API reference overview](https://zoo.dev/docs/developer-tools/api) | fills — `/org/skills` returns 403 on a token that drives the engine and samples normally |
 
 *Method note: doc pages were verified by fetching each URL; two candidate deep-links
 (`/api/executor/get-an-async-operation`, `/api/file/get-mass`) returned 404 during
 verification and were replaced with the correct paths above rather than cited blind.
 The two kcl-std pages added on 2026-07-28 (`std-solid-chamfer`, `std-sketch-getOppositeEdge`)
 were fetched the same day; the experimental-selector warning quoted in FN-034 was read off the
-chamfer page rather than paraphrased from memory.*
+chamfer page rather than paraphrased from memory.
+
+The six pages added on 2026-07-31 for FN-035..FN-046 (`std-solid-union`, `std-solid-subtract`,
+`std-sketch-sweep`, `std-sketch-revolve`, `std-solid-fillet`, `kcl-lang/modules`) were resolved
+against the live documentation index via the `search_kcl_docs` tool, which returns the canonical
+doc path for each function; every path above came back as an exact hit. `kcl-lang/modules` is
+titled "Projects and modules" upstream. FN-039 and FN-045 concern the zoo-mcp server surface
+rather than a published Zoo API page, and are marked n/a rather than pointed at an
+approximate URL.*
