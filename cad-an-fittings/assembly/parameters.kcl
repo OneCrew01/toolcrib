@@ -44,11 +44,20 @@ export tubeOR = 0.125 // [C] AN-4 = 1/4" OD, dash no. = sixteenths
 export tubeOD = 2.0 * tubeOR
 export tubeIR = 0.095
 
-export threadMajorR = 0.21875 // [A] 7/16-20 UNF
-export threadMinorR = 0.1875 // [A]
+// THREAD SIZE RESOLVED 2026-07-31 - was [A], now [CD].
+// AN-4 = 7/16-20, corroborated by two independent industry sources. It remains
+// genuinely absent from AC 43.13-1B and FAA-H-8083-30A, which is why an outside
+// source was needed. Governing standards: originally MIL-F-5509, now SAE
+// AS4841 / AS4842 / AS4843 / AS4875; the 37 degree flare form is SAE J514.
+// CAVEAT: the SIZE is confirmed, the SERIES is not. Neither source states
+// whether the military UNJF (controlled root radius) variant applies to a
+// given part number, so do not assert UNF vs UNJF from this file.
+// Full table: data/an-hardware.json -> fluidFittings.threadTable
+export threadMajorR = 0.21875 // [CD] 7/16-20 major dia / 2
+export threadMinorR = 0.1875 // [A] derived; minor dia not sourced
 export threadLen = 0.430 // [A]
 export threadRevs = 8
-export hexCircR = 0.3248 // [A] 9/16" across flats
+export hexCircR = 0.3248 // [A] 9/16" across flats - STILL unsourced
 
 export unionHexH = 0.300
 export unionThreadStart = 0.290

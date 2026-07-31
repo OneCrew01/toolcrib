@@ -29,8 +29,27 @@ An "AN-4 bolt" and an "AN-4 fitting" share a name, a numbering convention, and
 nothing else. **Torque tables for one must never be applied to the other.**
 
 A secondary trap: the FAA sources list 7/16-20 and 9/16-18 in generic thread
-tables but **never map them to fitting sizes.** That mapping is flagged `A`
-throughout and needs SAE AS50881, AS4841 or MIL-F-5509 to confirm.
+tables but **never map them to fitting sizes.** That gap is real and still true
+of those documents — **but the mapping is now resolved** from industry sources
+(2026-07-31) and carried in `fluidFittings.threadTable`:
+
+| Dash | Tube OD | Male thread |
+|---|---|---|
+| -3 | 3/16" | 3/8-24 |
+| **-4** | **1/4"** | **7/16-20** |
+| -6 | 3/8" | 9/16-18 |
+| -8 | 1/2" | 3/4-16 |
+| -10 | 5/8" | 7/8-14 |
+| -12 | 3/4" | 1-1/16-12 |
+| -16 | 1" | 1-5/16-12 |
+
+**Governing standards:** originally **MIL-F-5509**; now **SAE AS4841, AS4842,
+AS4843 and AS4875**. The 37° flare form itself is **SAE J514**. Installation
+practice is **SAE AS50881**.
+
+**Residual gap:** the *size* is confirmed, the *series* is not. Neither source
+states whether the military **UNJF** (controlled root radius) variant applies to
+a given part number, so this dataset does not assert UNF vs UNJF.
 
 ---
 

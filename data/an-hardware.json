@@ -26,11 +26,12 @@
       "consequence": "An 'AN-4' bolt and an 'AN-4' fitting do not share a thread and are not interchangeable in any sense. Torque tables for one must never be applied to the other."
     },
     {
-      "id": "FITTING-THREAD-UNVERIFIED",
-      "severity": "medium",
-      "provenance": "A",
-      "title": "Fluid fitting thread sizes are not mapped in the FAA sources",
-      "detail": "AC 43.13-1B and FAA-H-8083-30A list 7/16-20 and 9/16-18 in generic thread tables but never map them to AN-4 or AN-6 fittings. The mapping used elsewhere in this repo is an assumption pending SAE AS50881, AS4841 or MIL-F-5509."
+      "id": "FITTING-THREAD-RESOLVED",
+      "severity": "info",
+      "provenance": "CD",
+      "title": "Fluid fitting thread sizes are absent from the FAA sources, but are now resolved externally",
+      "detail": "AC 43.13-1B and FAA-H-8083-30A list 7/16-20 and 9/16-18 in generic thread tables but never map them to AN-4 or AN-6 fittings. That gap is real and still true of those documents. The mapping has since been resolved against two independent industry sources and is recorded in fluidFittings.threadTable; the governing standards are named in fluidFittings.standards. Supersedes the earlier FITTING-THREAD-UNVERIFIED warning.",
+      "resolvedOn": "2026-07-31"
     }
   ],
 
@@ -226,6 +227,31 @@
     "note": "See criticalWarnings.AN-DASH-COLLISION before using anything in this section alongside the bolt data.",
     "sizing": { "rule": "dash number = tube OUTSIDE DIAMETER in sixteenths of an inch", "provenance": "C" },
     "flareAngleDeg": { "value": 37, "provenance": "C", "warning": "45 degree automotive flaring tools are PROHIBITED - they cause misfit, stress and system failure" },
+
+    "standards": {
+      "provenance": "CD",
+      "note": "AN fittings were originally built to MIL-F-5509. They are now controlled under SAE Aerospace Standards. The 37 degree flare form itself is SAE J514.",
+      "superseded": ["MIL-F-5509"],
+      "current": ["SAE AS4841", "SAE AS4842", "SAE AS4843", "SAE AS4875"],
+      "flareForm": "SAE J514",
+      "installationPractice": "SAE AS50881"
+    },
+
+    "threadTable": {
+      "provenance": "CD",
+      "note": "Dash size to male thread. Corroborated by two independent sources on 2026-07-31 (Pegasus Auto Racing AN reference and the AN thread standards summary). These threads are NOT in AC 43.13-1B or FAA-H-8083-30A, which is why this table exists. See criticalWarnings.AN-DASH-COLLISION before using alongside the bolt table - an AN-4 BOLT is 1/4-28, an AN-4 FITTING is 7/16-20.",
+      "threadSeriesCaveat": "Listed as SAE/UNF sizes. Neither consulted source states whether the military UNJF variant (controlled root radius) applies to a given part number; treat the series designation as unconfirmed even though the size is confirmed.",
+      "rows": [
+        { "dash": 3, "tubeOD": 0.1875, "thread": "3/8-24" },
+        { "dash": 4, "tubeOD": 0.25, "thread": "7/16-20" },
+        { "dash": 6, "tubeOD": 0.375, "thread": "9/16-18" },
+        { "dash": 8, "tubeOD": 0.5, "thread": "3/4-16" },
+        { "dash": 10, "tubeOD": 0.625, "thread": "7/8-14" },
+        { "dash": 12, "tubeOD": 0.75, "thread": "1-1/16-12" },
+        { "dash": 16, "tubeOD": 1.0, "thread": "1-5/16-12" }
+      ]
+    },
+
     "doubleFlareRule": { "rule": "Double flare mandatory on soft aluminium alloy tubing 3/8 inch OD and under", "provenance": "C" },
     "components": [
       { "designation": "AN815", "name": "male union", "provenance": "C" },
@@ -356,7 +382,8 @@
     { "item": "Safety wire twist rate, wire gauge, max run length, direction of pull", "status": "NOT present - refer to AMM/SRM" },
     { "item": "MS24665 cotter pin dash-number to dimension table", "status": "NOT present" },
     { "item": "AN960 / AN970 washer physical dimensions (ID, OD, thickness)", "status": "NOT present" },
-    { "item": "AN fluid fitting thread sizes mapped to dash number", "status": "NOT present - see criticalWarnings.FITTING-THREAD-UNVERIFIED" },
+    { "item": "AN fluid fitting thread sizes mapped to dash number", "status": "RESOLVED 2026-07-31 - still absent from the FAA sources, but supplied externally in fluidFittings.threadTable" },
+    { "item": "Thread series (UNF vs military UNJF) for AN fluid fittings", "status": "NOT resolved - size is confirmed, series is not. See fluidFittings.threadTable.threadSeriesCaveat" },
     { "item": "AN737 dimensional specifications", "status": "NOT present - see clamps AN737 conflictNote" },
     { "item": "Flare nut hex across-flats dimensions", "status": "NOT present" },
     { "item": "AC 43.13-1B Table 7-2 (prevailing torque, reused self-locking nuts)", "status": "Listed in contents but table body absent from one source; values recovered from another - cross-check before use" }

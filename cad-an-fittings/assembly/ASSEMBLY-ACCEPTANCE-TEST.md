@@ -133,7 +133,14 @@ the violation cannot silently recur.
 - **No 37° flare geometry.** Blocked by ENGINE-LIMITS §2.
 - **Range check is documentation, not an assert.** `clampSlideValid` is a flag
   a human must maintain.
-- **Thread specs unverified.** 7/16-20 for AN-4 is an `[A]` assumption; the FAA
+- ~~**Thread specs unverified.**~~ **RESOLVED 2026-07-31.** 7/16-20 for AN-4 and
+  9/16-18 for AN-6 are corroborated by two independent industry sources and are
+  now `[CD]`. Governing standards identified: originally MIL-F-5509, now
+  SAE AS4841/4842/4843/4875, flare form SAE J514. **Residual gap:** the thread
+  SERIES (UNF vs military UNJF) is still unconfirmed - the size is right, the
+  series designation is not asserted. Full table in
+  `data/an-hardware.json` -> `fluidFittings.threadTable`.
+  Original wording follows for the record: 7/16-20 for AN-4 was an `[A]` assumption; the FAA
   sources consulted never map thread size to AN fitting size.
 
 ---
