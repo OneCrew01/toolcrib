@@ -1,0 +1,151 @@
+// HARNESS RUN — two 78-way HD connectors joined by a wire bundle
+// ToolCRIB · Zoo wiring benchmark · 2026-07-31
+//
+// Connector A on the left, connector B on the right, both facing down as if
+// panel-mounted, with the loom rising from A, crossing over, and dropping
+// into B. This is the shape a real airframe run takes between two LRUs.
+//
+// DRIVEN BY THE ROUTE TABLE. Each route puts a contact at hd78X(from) on A
+// and at hd78X(to) on B. The same conductor lands on DIFFERENT cavity numbers
+// at each end, which is the whole point of a route table. Delete a route and
+// both contacts vanish together.
+//
+// Corners are filleted throughout — the standard for this family from here on.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "parameters-hd78.kcl"
+import * from "harness-route-data.kcl"
+import * from "harness-78-data.kcl"
+
+// ---- layout ----
+export connAX = -2.600
+export connBX = 2.600
+bundleR = 0.165
+riseZ = 1.150 // top of the wire stubs, where the bundle starts
+crossZ = 2.350 // height of the horizontal run
+bendR = 0.480
+
+// ===================================================================
+// CONNECTOR BODIES — built twice, once per end
+// ===================================================================
+mkInsulator = fn(@xOff) {
+  return startSketchOn(XY)
+    |> startProfile(at = [xOff - hd78BotW / 2, -hd78H / 2])
+    |> line(end = [hd78BotW, 0], tag = $b)
+    |> line(end = [hd78TaperInset, hd78H], tag = $r)
+    |> line(end = [-hd78TopW, 0], tag = $t)
+    |> close(tag = $l)
+    |> extrude(length = hd78Thk)
+    |> fillet(radius = insulCornerR, tags = [
+         getNextAdjacentEdge(b),
+         getNextAdjacentEdge(r),
+         getNextAdjacentEdge(t),
+         getNextAdjacentEdge(l)
+       ])
+}
+
+cavA = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [connAX + hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+cavB = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [connBX + hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+export insulatorA = subtract([mkInsulator(connAX)], tools = cavA)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+export insulatorB = subtract([mkInsulator(connBX)], tools = cavB)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+// ===================================================================
+// CONTACTS — from the route table, per end
+// ===================================================================
+export contactsA = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [connAX + hd78X(r.from), hd78Y(r.from)], radius = hd78PinR)
+    |> extrude(length = 0.420)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+export contactsB = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [connBX + hd78X(r.to), hd78Y(r.to)], radius = hd78PinR)
+    |> extrude(length = 0.420)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+// ===================================================================
+// WIRE STUBS — from each contact up to the breakout, coloured per route
+// ===================================================================
+// Stubs stop below the breakout so the individual conductors stay VISIBLE.
+// Above them the boot gathers everything into the loom.
+breakoutZ = 0.760
+
+export wiresA = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = 0.290))
+    |> circle(center = [connAX + hd78X(r.from), hd78Y(r.from)], radius = insulR(r.awg))
+    |> extrude(length = breakoutZ - 0.250)
+    |> appearance(color = r.colour, metalness = 0, roughness = 85)
+})
+
+export wiresB = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = 0.290))
+    |> circle(center = [connBX + hd78X(r.to), hd78Y(r.to)], radius = insulR(r.awg))
+    |> extrude(length = breakoutZ - 0.250)
+    |> appearance(color = r.colour, metalness = 0, roughness = 85)
+})
+
+// ===================================================================
+// BUNDLE — swept from A, over, and down into B
+// ENGINE NOTE: tangentialArc must be exactly +/-90 before an axis-aligned
+// line. Sign is CCW-positive: heading +Z, use -90 to exit toward +X;
+// then heading +X, -90 again to exit toward -Z.
+// ===================================================================
+bundlePath = startSketchOn(XZ)
+  |> startProfile(at = [connAX, riseZ])
+  |> line(end = [0, crossZ - riseZ - bendR])
+  |> tangentialArc(angle = -90, radius = bendR)
+  |> line(end = [(connBX - connAX) - 2 * bendR, 0])
+  |> tangentialArc(angle = -90, radius = bendR)
+  |> line(end = [0, -(crossZ - riseZ - bendR)])
+
+export harnessBundle = startSketchOn(offsetPlane(XY, offset = riseZ))
+  |> circle(center = [connAX, 0], radius = bundleR)
+  |> sweep(path = bundlePath)
+  |> appearance(color = "#2b2b2b", metalness = 10, roughness = 80)
+
+// ===================================================================
+// BREAKOUT BOOTS — where the loose wires enter the bundle at each end
+// ===================================================================
+// Lofted transition: wide enough at the bottom to cover the contact field,
+// necking to the bundle diameter at the top. This is what actually gathers
+// the conductors — previously they just stopped in mid-air.
+mkBoot = fn(@xOff) {
+  return loft([
+    startSketchOn(offsetPlane(XY, offset = breakoutZ - 0.060))
+      |> startProfile(at = [xOff - 0.980, -0.230])
+      |> line(end = [1.960, 0])
+      |> line(end = [0, 0.460])
+      |> line(end = [-1.960, 0])
+      |> close(),
+    startSketchOn(offsetPlane(XY, offset = riseZ))
+      |> startProfile(at = [xOff - bundleR, -bundleR])
+      |> line(end = [2 * bundleR, 0])
+      |> line(end = [0, 2 * bundleR])
+      |> line(end = [-2 * bundleR, 0])
+      |> close()
+  ])
+}
+
+export bootA = mkBoot(connAX)
+  |> appearance(color = "#1a1a1a", metalness = 5, roughness = 90)
+
+export bootB = mkBoot(connBX)
+  |> appearance(color = "#1a1a1a", metalness = 5, roughness = 90)

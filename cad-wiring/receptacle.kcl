@@ -1,0 +1,108 @@
+// RECEPTACLE — equipment side. Socket contacts, flange ears, pigtails.
+// Modelled at LOCAL ORIGIN in the MATED orientation: mating face at z = 0,
+// body extends -Z.
+//
+// [C] Gender is set by the LRU chassis, not by convention. Unit-side male
+//     means the harness carries sockets (GDU, GI 275, GAD 43). Unit-side
+//     female means the harness carries pins (GCU 485, GDC 72, GSU 75,
+//     GRS 79, GEA 110, GTN, GNC 215). No global rule about which side is hot.
+//     Here: harness = PINS, equipment = SOCKETS.
+//
+// ⚠ NUMBERING MIRRORS BETWEEN HALVES. Viewed from its own mating face a
+//   receptacle's numbering runs OPPOSITE to the plug's — that mirror is what
+//   makes pin N meet socket N. This file is built directly in the mated
+//   orientation, so cavX(n) here means WORLD X of cavity n, not position on
+//   the receptacle's own face.
+//
+// SOCKET PROFILE: revolved body, then bored to accept the plug pin, with a
+// funnel lead-in at the mouth.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "harness-data.kcl"
+
+recepBlock = startSketchOn(XY)
+  |> startProfile(at = [-insulBotW / 2, -insulH / 2])
+  |> line(end = [insulBotW, 0])
+  |> line(end = [shellTaperInset, insulH])
+  |> line(end = [-insulTopW, 0])
+  |> close()
+  |> extrude(length = -insulThk)
+
+recepCav = map(allCavities, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = 0.05))
+    |> circle(center = [cavX(n), cavY(n)], radius = cavityR)
+    |> extrude(length = -(insulThk + 0.10))
+})
+
+export receptacleInsulator = subtract([recepBlock], tools = recepCav)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+// ---- flange ears, mirrored in Z so they meet the plug's ears at z = 0 ----
+earRunW = flangeW / 2 - insulTopW / 2 - 0.006
+
+leftEarPlate = startSketchOn(XY)
+  |> startProfile(at = [-flangeW / 2, -flangeH / 2])
+  |> line(end = [earRunW, 0])
+  |> line(end = [0, flangeH])
+  |> line(end = [-earRunW, 0])
+  |> close()
+  |> extrude(length = -flangeThk)
+
+leftEarHole = startSketchOn(offsetPlane(XY, offset = 0.03))
+  |> circle(center = [-jackScrewX, 0], radius = jackScrewR)
+  |> extrude(length = -(flangeThk + 0.06))
+
+export recepEarLeft = subtract([leftEarPlate], tools = [leftEarHole])
+  |> appearance(color = colShell, metalness = 80, roughness = 30)
+
+rightEarPlate = startSketchOn(XY)
+  |> startProfile(at = [insulTopW / 2 + 0.006, -flangeH / 2])
+  |> line(end = [earRunW, 0])
+  |> line(end = [0, flangeH])
+  |> line(end = [-earRunW, 0])
+  |> close()
+  |> extrude(length = -flangeThk)
+
+rightEarHole = startSketchOn(offsetPlane(XY, offset = 0.03))
+  |> circle(center = [jackScrewX, 0], radius = jackScrewR)
+  |> extrude(length = -(flangeThk + 0.06))
+
+export recepEarRight = subtract([rightEarPlate], tools = [rightEarHole])
+  |> appearance(color = colShell, metalness = 80, roughness = 30)
+
+// ---- SOCKET CONTACTS — revolved body, bored to accept the pin ----
+export recepContacts = map(wireList, f = fn(@w) {
+  return startSketchOn(XZ)
+    |> startProfile(at = [0, 0])
+    |> line(end = [0.023, 0])
+    |> line(end = [0, -0.290]) // body through the insulator
+    |> line(end = [0.007, -0.012]) // step out behind the insulator
+    |> line(end = [0, -0.148]) // crimp barrel
+    |> line(end = [-0.030, 0])
+    |> close()
+    |> revolve(axis = Y)
+    |> subtract(tools = [
+         startSketchOn(offsetPlane(XY, offset = 0.010))
+           |> circle(center = [0, 0], radius = contactPinR + 0.0025)
+           |> extrude(length = -0.210)
+       ])
+    |> translate(x = cavX(w.cav), y = cavY(w.cav), z = 0)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+// ---- equipment-side pigtails, SAME COLOUR per cavity as the harness ----
+export recepConductors = map(wireList, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = -0.440))
+    |> circle(center = [cavX(w.cav), cavY(w.cav)], radius = condR(w.awg))
+    |> extrude(length = -stripLen)
+    |> appearance(color = colConductor, metalness = 85, roughness = 35)
+})
+
+export recepWires = map(wireList, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = -0.440 - stripLen))
+    |> circle(center = [cavX(w.cav), cavY(w.cav)], radius = insulR(w.awg))
+    |> extrude(length = -0.850)
+    |> appearance(color = w.colour, metalness = 0, roughness = 85)
+})

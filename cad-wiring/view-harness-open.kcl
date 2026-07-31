@@ -1,0 +1,109 @@
+// HARNESS RUN — OPEN VIEW. Boots omitted so every conductor stays visible.
+//
+// WHY THIS IS A SEPARATE FILE, NOT A FLAG
+//   Importing a module renders ALL of its geometry, so a view cannot import
+//   main-harness-run.kcl and suppress the boots. A trimmed view has to be
+//   self-contained. Only the parameter and route modules are imported here,
+//   and those carry no geometry.
+//
+// WHAT THIS SHOWS
+//   Contacts and full-length conductors at both ends, plus the bundle, with
+//   nothing covering the transition. You can trace every route from its pin
+//   at one end to its pin at the other.
+//
+// WHAT IT HONESTLY SHOWS TOO
+//   The conductors fan across the connector's 1.9 in width while the bundle
+//   is 0.33 in across, so the outer wires do not physically reach it. That
+//   gap is exactly why a breakout boot exists on a real harness. This view
+//   is for reading the wiring, not for representing the built article — use
+//   main-harness-run.kcl for that.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "parameters-hd78.kcl"
+import * from "harness-route-data.kcl"
+import * from "harness-78-data.kcl"
+
+connAX = -2.600
+connBX = 2.600
+bundleR = 0.165
+riseZ = 1.150
+crossZ = 2.350
+bendR = 0.480
+
+mkInsulator = fn(@xOff) {
+  return startSketchOn(XY)
+    |> startProfile(at = [xOff - hd78BotW / 2, -hd78H / 2])
+    |> line(end = [hd78BotW, 0], tag = $b)
+    |> line(end = [hd78TaperInset, hd78H], tag = $r)
+    |> line(end = [-hd78TopW, 0], tag = $t)
+    |> close(tag = $l)
+    |> extrude(length = hd78Thk)
+    |> fillet(radius = insulCornerR, tags = [
+         getNextAdjacentEdge(b),
+         getNextAdjacentEdge(r),
+         getNextAdjacentEdge(t),
+         getNextAdjacentEdge(l)
+       ])
+}
+
+cavA = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [connAX + hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+cavB = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [connBX + hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+export insulatorA = subtract([mkInsulator(connAX)], tools = cavA)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+export insulatorB = subtract([mkInsulator(connBX)], tools = cavB)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+export contactsA = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [connAX + hd78X(r.from), hd78Y(r.from)], radius = hd78PinR)
+    |> extrude(length = 0.420)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+export contactsB = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [connBX + hd78X(r.to), hd78Y(r.to)], radius = hd78PinR)
+    |> extrude(length = 0.420)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+// full-length conductors — nothing covering them
+export wiresA = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = 0.290))
+    |> circle(center = [connAX + hd78X(r.from), hd78Y(r.from)], radius = insulR(r.awg))
+    |> extrude(length = riseZ - 0.290)
+    |> appearance(color = r.colour, metalness = 0, roughness = 85)
+})
+
+export wiresB = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = 0.290))
+    |> circle(center = [connBX + hd78X(r.to), hd78Y(r.to)], radius = insulR(r.awg))
+    |> extrude(length = riseZ - 0.290)
+    |> appearance(color = r.colour, metalness = 0, roughness = 85)
+})
+
+bundlePath = startSketchOn(XZ)
+  |> startProfile(at = [connAX, riseZ])
+  |> line(end = [0, crossZ - riseZ - bendR])
+  |> tangentialArc(angle = -90, radius = bendR)
+  |> line(end = [(connBX - connAX) - 2 * bendR, 0])
+  |> tangentialArc(angle = -90, radius = bendR)
+  |> line(end = [0, -(crossZ - riseZ - bendR)])
+
+export harnessBundle = startSketchOn(offsetPlane(XY, offset = riseZ))
+  |> circle(center = [connAX, 0], radius = bundleR)
+  |> sweep(path = bundlePath)
+  |> appearance(color = "#2b2b2b", metalness = 10, roughness = 80)

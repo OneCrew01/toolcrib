@@ -1,0 +1,50 @@
+// 78-WAY HD HARNESS DATA — the wire list. EDIT THIS FILE.
+//
+// Same rule as the 9-way: a contact exists only where a wire is listed.
+// With 78 cavities and 22 wires, the unpopulated majority is the point —
+// a real GI 275 or GDU connector is rarely fully loaded.
+//
+// [C] Approved wire: MIL-W-22759/16, /18, /34; shielded MIL-C-27500.
+// [C] MIL-W-22759/18 is RECOMMENDED for high-density connectors — thinner
+//     insulation is far more compatible with HD contact spacing. Every
+//     22 AWG entry below assumes /18.
+// [C] Signal min 24 AWG; load-carrying min 22 AWG (GFC 500 rule).
+// [C] Config module wiring always 28 AWG.
+// [C] Size 22D contacts (M39029/58-360) accept 22-28 AWG — correct for HD.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+export wireList78 = [
+  { cav = 1, awg = 22, colour = "#c62828", sig = "AIRCRAFT PWR 1" },
+  { cav = 2, awg = 22, colour = "#c62828", sig = "AIRCRAFT PWR 2" },
+  { cav = 3, awg = 22, colour = "#212121", sig = "PWR GND 1" },
+  { cav = 4, awg = 22, colour = "#212121", sig = "PWR GND 2" },
+  { cav = 9, awg = 24, colour = "#1565c0", sig = "RS-232 TX 1" },
+  { cav = 10, awg = 24, colour = "#f9f9f9", sig = "RS-232 RX 1" },
+  { cav = 11, awg = 24, colour = "#1565c0", sig = "RS-232 TX 2" },
+  { cav = 12, awg = 24, colour = "#f9f9f9", sig = "RS-232 RX 2" },
+  { cav = 18, awg = 24, colour = "#2e7d32", sig = "ARINC 429 IN 1A" },
+  { cav = 19, awg = 24, colour = "#f9a825", sig = "ARINC 429 IN 1B" },
+  { cav = 26, awg = 24, colour = "#6a1b9a", sig = "DISCRETE IN 1" },
+  { cav = 30, awg = 24, colour = "#2e7d32", sig = "ARINC 429 OUT A" },
+  { cav = 31, awg = 24, colour = "#f9a825", sig = "ARINC 429 OUT B" },
+  { cav = 36, awg = 28, colour = "#00838f", sig = "CONFIG MOD DATA" },
+  { cav = 37, awg = 28, colour = "#4e342e", sig = "CONFIG MOD CLK" },
+  { cav = 44, awg = 24, colour = "#6a1b9a", sig = "DISCRETE IN 2" },
+  { cav = 52, awg = 24, colour = "#f9f9f9", sig = "LIGHTING HI" },
+  { cav = 55, awg = 22, colour = "#212121", sig = "SIGNAL GND" },
+  { cav = 60, awg = 24, colour = "#1565c0", sig = "ETHERNET TX+" },
+  { cav = 61, awg = 24, colour = "#f9f9f9", sig = "ETHERNET TX-" },
+  { cav = 70, awg = 24, colour = "#1565c0", sig = "ETHERNET RX+" },
+  { cav = 71, awg = 24, colour = "#f9f9f9", sig = "ETHERNET RX-" }
+]
+
+// all 78 cavities exist as bores whether or not a wire is present
+export allCav78 = [
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+  14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+  27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+  40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52,
+  53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+  66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78
+]

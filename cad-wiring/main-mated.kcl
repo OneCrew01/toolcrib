@@ -1,0 +1,68 @@
+// MATED PAIR — plug + receptacle, fastened with 4-40 jackscrews
+// ToolCRIB · Zoo wiring benchmark · 2026-07-30
+//
+// UPGRADES over the first build:
+//   1. Flange ears with verified .984-spaced, .125 dia jackscrew holes on
+//      BOTH halves.
+//   2. Real 4-40 jackscrews passing through both ears — the joint is now
+//      fastened hardware, not two bodies placed near each other.
+//   3. Contacts are REVOLVED profiles: chamfered lead-in, mating pin section,
+//      retention shoulder, crimp barrel. Sockets are bored to accept the pin.
+//
+// MATED POSITION IS NOT A FREE PARAMETER.
+//   Both halves are modelled with their flange face at local z = 0, so mating
+//   is the geometric consequence of placing the receptacle at z = 0. There is
+//   no "matingGap" to get wrong. `separation` exists ONLY to draw the halves
+//   apart for inspection and defaults to 0.
+//
+// Still no mate solver — the Zoo MCP exposes none. The constraint is expressed
+// as shared derived geometry plus a screw that visibly occupies both holes.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "harness-data.kcl"
+
+import "plug.kcl" as plug
+import "receptacle.kcl" as recep
+import "jackscrew.kcl" as hw
+
+// 0 = fastened. Positive draws the receptacle away for inspection.
+export separation = 0.0
+
+// ===================================================================
+// PLUG — the assembly datum, at the origin
+// ===================================================================
+export plugInsulator = plug::plugInsulator
+export plugEarLeft = plug::plugEarLeft
+export plugEarRight = plug::plugEarRight
+export plugContacts = plug::plugContacts
+export plugConductors = plug::plugConductors
+export plugWires = plug::plugWires
+
+// ===================================================================
+// RECEPTACLE — flange face meets the plug's at z = 0
+// ===================================================================
+export receptacleInsulator = recep::receptacleInsulator
+  |> translate(x = 0, y = 0, z = -separation)
+export recepEarLeft = recep::recepEarLeft
+  |> translate(x = 0, y = 0, z = -separation)
+export recepEarRight = recep::recepEarRight
+  |> translate(x = 0, y = 0, z = -separation)
+export recepContacts = recep::recepContacts
+  |> translate(x = 0, y = 0, z = -separation)
+export recepConductors = recep::recepConductors
+  |> translate(x = 0, y = 0, z = -separation)
+export recepWires = recep::recepWires
+  |> translate(x = 0, y = 0, z = -separation)
+
+// ===================================================================
+// JACKSCREWS — head bears on the plug ear, shank through BOTH ears.
+// Positions derive from jackScrewX, the same value that cut both holes,
+// so a screw cannot land anywhere but in its hole.
+// ===================================================================
+export jackscrewLeft = hw::jackscrew
+  |> translate(x = -jackScrewX, y = 0, z = flangeThk)
+
+export jackscrewRight = hw::jackscrew
+  |> translate(x = jackScrewX, y = 0, z = flangeThk)

@@ -1,0 +1,100 @@
+// PLUG — harness side. Pin contacts, flange ears, wires.
+// Modelled at LOCAL ORIGIN: mating face at z = 0, body extends +Z,
+// pins protrude to -Z.
+//
+// CONTACT PROFILE (upgrade): contacts are now REVOLVED from a half-section,
+// giving one body with a chamfered lead-in, a mating pin section, a retention
+// shoulder and a crimp barrel. Previously they were stacked cylinders.
+// Radii are stepped so the retention body clears the cavity bore and the
+// crimp barrel — which sits behind the insulator — can be larger.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "harness-data.kcl"
+
+// ---- insulator, verified D-profile ----
+plugBlock = startSketchOn(XY)
+  |> startProfile(at = [-insulBotW / 2, -insulH / 2])
+  |> line(end = [insulBotW, 0])
+  |> line(end = [shellTaperInset, insulH])
+  |> line(end = [-insulTopW, 0])
+  |> close()
+  |> extrude(length = insulThk)
+
+plugCav = map(allCavities, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [cavX(n), cavY(n)], radius = cavityR)
+    |> extrude(length = insulThk + 0.10)
+})
+
+export plugInsulator = subtract([plugBlock], tools = plugCav)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+// ---- flange ears, one each side, with the verified jackscrew hole ----
+// [CD] jackscrew centres .984 apart, hole dia .125
+earLx0 = -flangeW / 2
+earRx0 = insulTopW / 2 + 0.006
+
+leftEarPlate = startSketchOn(XY)
+  |> startProfile(at = [earLx0, -flangeH / 2])
+  |> line(end = [flangeW / 2 - insulTopW / 2 - 0.006, 0])
+  |> line(end = [0, flangeH])
+  |> line(end = [-(flangeW / 2 - insulTopW / 2 - 0.006), 0])
+  |> close()
+  |> extrude(length = flangeThk)
+
+leftEarHole = startSketchOn(offsetPlane(XY, offset = -0.03))
+  |> circle(center = [-jackScrewX, 0], radius = jackScrewR)
+  |> extrude(length = flangeThk + 0.06)
+
+export plugEarLeft = subtract([leftEarPlate], tools = [leftEarHole])
+  |> appearance(color = colShell, metalness = 80, roughness = 30)
+
+rightEarPlate = startSketchOn(XY)
+  |> startProfile(at = [earRx0, -flangeH / 2])
+  |> line(end = [flangeW / 2 - insulTopW / 2 - 0.006, 0])
+  |> line(end = [0, flangeH])
+  |> line(end = [-(flangeW / 2 - insulTopW / 2 - 0.006), 0])
+  |> close()
+  |> extrude(length = flangeThk)
+
+rightEarHole = startSketchOn(offsetPlane(XY, offset = -0.03))
+  |> circle(center = [jackScrewX, 0], radius = jackScrewR)
+  |> extrude(length = flangeThk + 0.06)
+
+export plugEarRight = subtract([rightEarPlate], tools = [rightEarHole])
+  |> appearance(color = colShell, metalness = 80, roughness = 30)
+
+// ---- PIN CONTACTS — revolved profile, only where a wire exists ----
+export plugContacts = map(wireList, f = fn(@w) {
+  return startSketchOn(XZ)
+    |> startProfile(at = [0, -contactTipLen])
+    |> line(end = [0.012, 0]) // blunt tip
+    |> line(end = [0.008, 0.016]) // chamfered lead-in
+    |> line(end = [0, 0.194]) // mating pin section, r = .020
+    |> line(end = [0.003, 0.012]) // step to retention body
+    |> line(end = [0, 0.218]) // retention body, clears the bore
+    |> line(end = [0.007, 0.012]) // step out behind the insulator
+    |> line(end = [0, 0.148]) // crimp barrel
+    |> line(end = [-0.030, 0])
+    |> close()
+    |> revolve(axis = Y)
+    |> translate(x = cavX(w.cav), y = cavY(w.cav), z = 0)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+// ---- wire: exposed conductor then insulation ----
+export plugConductors = map(wireList, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = 0.590))
+    |> circle(center = [cavX(w.cav), cavY(w.cav)], radius = condR(w.awg))
+    |> extrude(length = stripLen)
+    |> appearance(color = colConductor, metalness = 85, roughness = 35)
+})
+
+export plugWires = map(wireList, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = 0.590 + stripLen))
+    |> circle(center = [cavX(w.cav), cavY(w.cav)], radius = insulR(w.awg))
+    |> extrude(length = wireFreeLen)
+    |> appearance(color = w.colour, metalness = 0, roughness = 85)
+})
