@@ -2,6 +2,10 @@
 
 **Say the joint. Get the joint.**
 
+The *joint* here is the fastening interface — the hole, the countersink, the
+flush-mount fit where two parts meet — not an assembly mate. Nothing in this
+repo does kinematics.
+
 ToolCRIB is an open-source **trust layer for AI-generated CAD**, built on the
 [Zoo.dev](https://zoo.dev) APIs for the Zoo API Makeathon (July 22 – August 5, 2026).
 
