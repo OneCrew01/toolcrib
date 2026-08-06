@@ -138,6 +138,8 @@ in `samples/flush-mount/coupons/`. (A **coupon** is a machinist's word for a sma
 test piece you make to check one thing before committing to the real part — nothing
 to do with discounts. Print the set, try the fits, keep the one that felt right.)
 
+![The rect pair's panel, rendered by Zoo's engine: the opening carries its 45° lead-in chamfer](samples/flush-mount/pair-rect-c0.15/panel-preview.png)
+
 Why deterministic generation instead of prompting? Campaign C003 (FN-020): text-to-cad
 *can* build this pair — when the prompt pre-chews the engineering. Phrase it like a
 machinist ("0.3 mm total clearance") and it fails outright; phrase it casually and you
@@ -225,6 +227,22 @@ status field cannot see: **completed_invalid**, where Zoo said done but the geom
 is wrong. Add your own experiment by copying
 [`server/harness/campaigns/_template.mjs`](server/harness/campaigns/_template.mjs);
 the runner, budget cap, and stats come free.
+
+## The joint, taken literally
+
+The tagline names a promise, so the repo carries a real one: an **AN-6 37°
+flared tube joint** — nut, sleeve, tube, union, with real helical threads —
+and an **AN-4 hose run** clamped to a support bracket, both modelled
+parametrically in KCL as a stress test of how far the engine can be pushed
+past plates and holes. The parts, the renders, and a build report that says
+plainly which numbers are provisional (the proportions) and which are cited
+(the standards and part numbers) live in
+[`cad-an-fittings/`](cad-an-fittings/), report at
+[`cad-an-fittings/reports/2026-07-30-an6-build-report.md`](cad-an-fittings/reports/2026-07-30-an6-build-report.md).
+
+![The four parts of an AN-6 flared tube joint, exploded: nut, tube, sleeve, union](cad-an-fittings/renders/an6-exploded.jpg)
+
+![An AN-4 hose assembly: 90° bend, adel clamp, support bracket](cad-an-fittings/renders/assembly-main.jpg)
 
 ## Status
 
