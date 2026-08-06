@@ -81,3 +81,21 @@ washer = washerPart::an960Washer
 
 lockNut = an365Part::an365Nut
   |> translate(x = clampWorldX, y = washerBackY, z = boltWorldZ)
+
+// ---------------------------------------------------------------
+// 7 · FREE-END FITTING — socket + AN818 nut on the outboard hose end,
+//     mirroring the union-end stack. Rotated about Y so local +Z lies
+//     along world -X: the hex faces outboard, ready to thread onto the
+//     next port. That port is deliberately not modelled — where this
+//     hose goes next is the aircraft's business, not this assembly's.
+// ---------------------------------------------------------------
+// global = true on BOTH transforms: after the rotation the parts' local
+// axes no longer match world axes, and a default (local-frame) translate
+// would move along the rotated axes — see TOOLING-NOTES.md §5.
+endSocket = clone(hosePart::hoseSocket)
+  |> rotate(axis = [0, 1, 0], angle = -90deg, global = true)
+  |> translate(x = endSocketX, y = 0, z = hoseEndZ, global = true)
+
+endNut = clone(nutPart::an818Nut)
+  |> rotate(axis = [0, 1, 0], angle = -90deg, global = true)
+  |> translate(x = endNutX, y = 0, z = hoseEndZ, global = true)

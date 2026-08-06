@@ -210,6 +210,15 @@ export clampWorldX = clampLocalX
 export clampWorldZ = hoseStartZ + clampLocalZ
 export boltWorldZ = clampWorldZ + clampBoltLocalZ
 
+// FREE-END FITTING — the outboard end of the horizontal run carries the same
+// crimped socket + AN818 nut as the union end; a hose assembly is fitted at
+// BOTH ends. Parts rotate so local +Z lies along world -X (hex outboard);
+// depths along the axis mirror the union-end stack exactly.
+export hoseEndX = hoseHorizX0 + hoseHorizLen // 2.300, end of the horizontal run
+export hoseEndZ = hoseStartZ + hoseHorizZ // horizontal-run centreline, = clampWorldZ
+export endSocketX = hoseEndX + socketH // socket origin; its top face meets the hose end
+export endNutX = endSocketX + nutH // nut origin; collar top seats on the socket base
+
 // ===================================================================
 // COLOURS — [C] AN material colour code:
 //   aluminium = BLUE anodised · steel = BLACK · alu-bronze = cad/natural

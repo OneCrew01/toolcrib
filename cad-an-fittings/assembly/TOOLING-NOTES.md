@@ -83,3 +83,26 @@ a blank or solid-colour frame.
 
 Not a bug, but worth documenting: **custom camera distance and zoom-to-fit are
 mutually exclusive**, and there is no feedback when zoom silently wins.
+
+---
+
+## 5. `translate` after `rotate` composes in the rotated local frame by default
+
+**Class:** language ergonomics. **Severity: medium — parts land far from where
+the numbers say, with no error.**
+
+Both `rotate` and `translate` default to `global = false`. The natural assembly
+idiom — rotate a part to orientation, then translate it into place with world
+coordinates in hand — silently breaks: after the rotation, a default translate
+moves along the part's *rotated* local axes. `translate(x = 2.58, z = 3.05)` on
+a part just rotated −90° about Y displaces it to world (−3.05, 0, 2.58). The
+free-end fitting in this assembly rendered ~3 in away from the hose end on the
+first attempt because of exactly this.
+
+The fix is `global = true` on **both** transforms (section 7 of
+`main-rev2.kcl`). Nothing errors and nothing warns; the only symptom is
+geometry somewhere it should not be, and the render is what catches it.
+
+**Suggested fix:** say in the `rotate`/`translate` docs that the two compose in
+the local frame by default, or lint a default-frame translate that follows a
+`global = true` rotate in the same pipe.
