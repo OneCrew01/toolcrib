@@ -1,0 +1,170 @@
+// BACKSHELL for the 78-way HD D-sub — rebuilt after a rejected first attempt.
+//
+// WHY v1 WAS WRONG
+//   v1 lofted 2.370 x 0.760 down to 0.760 x 0.420 over 1.150. Tapering width
+//   AND height together produced a pyramid — it read as a tent sitting on the
+//   connector, and being opaque it hid the contacts entirely.
+//
+//   The taper ANGLE was not the fault. A 2.5 in connector genuinely necks down
+//   to a ~0.9 in cable; on a real DB-size hood that is roughly 32 degrees.
+//   The fault was tapering in both axes at once, and doing it over too short
+//   a length.
+//
+// WHAT CHANGED IN v2
+//   1. Height is held nearly constant (0.620 -> 0.560). Only the WIDTH tapers.
+//      Result is a wedge, which is what a real hood looks like.
+//   2. A straight collar section at the connector end before the taper starts,
+//      so it does not spring straight into a cone off the flange.
+//   3. Longer overall (1.900 vs 1.150) so the transition is gradual.
+//   4. Shield block sits ON the top face as a proportioned boss, not as a bar
+//      floating off the front.
+//   5. Lives in its own file so it never hides the connector by default.
+//
+// CONFIRMED RULES [C] — Garmin STC/TSO manuals via NotebookLM
+//   CAUTION: the SMOOTH / CONVEX side of the strain relief goes across the
+//     harness. The grooved / concave side WILL damage wires.
+//   Wrap silicone fusion tape A-A-59163 where the clamp meets the housing.
+//   Shield drain pigtail <= 3.0 in. Unshielded length at the backshell <= 2.5 in.
+//   Ring terminal stack: 8-32 screw, split lock washer, flat washer, ring
+//     terminal(s). Max 2 terminals per tapped hole; max 2 wires per terminal
+//     (3 if space-constrained).
+//   Garmin uses proprietary shield-ground-adapter backshells. MS3057 and
+//     MIL-C-85049 are NOT referenced in these manuals.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "parameters-hd78.kcl"
+
+// ---- v2 proportions [A] ----
+// v3 — v2 was still wrong. Holding the height fixed the pyramid, but I left
+// it 1.900 long on a 2.500 wide connector, so it still read as a tent.
+// A real D-sub hood is SQUAT: overall length is well under half its width.
+// v3 cuts total length to 1.100 and opens the cable exit, which is realistic
+// anyway — a 78-way harness bundle is fat.
+bsBaseW = 2.500
+bsBaseH = 0.620
+bsExitW2 = 1.150
+bsExitH2 = 0.580 // height barely tapers
+bsCollarLen = 0.240
+bsTaperLen = 0.860 // total hood length 1.100 vs 1.900 in v2
+bsWall = 0.070
+
+bsZ0 = hd78Thk + 0.010
+bsCollarTop = bsZ0 + bsCollarLen
+bsTop = bsCollarTop + bsTaperLen
+
+// ---- 1 · straight collar off the connector ----
+collarOuter = startSketchOn(offsetPlane(XY, offset = bsZ0))
+  |> startProfile(at = [-bsBaseW / 2, -bsBaseH / 2])
+  |> line(end = [bsBaseW, 0], tag = $cB)
+  |> line(end = [0, bsBaseH], tag = $cR)
+  |> line(end = [-bsBaseW, 0], tag = $cT)
+  |> close(tag = $cL)
+  |> extrude(length = bsCollarLen)
+  |> fillet(radius = hoodCornerR, tags = [
+       getNextAdjacentEdge(cB),
+       getNextAdjacentEdge(cR),
+       getNextAdjacentEdge(cT),
+       getNextAdjacentEdge(cL)
+     ])
+
+collarBore = startSketchOn(offsetPlane(XY, offset = bsZ0 - 0.05))
+  |> startProfile(at = [-(bsBaseW / 2 - bsWall), -(bsBaseH / 2 - bsWall)])
+  |> line(end = [bsBaseW - 2 * bsWall, 0])
+  |> line(end = [0, bsBaseH - 2 * bsWall])
+  |> line(end = [-(bsBaseW - 2 * bsWall), 0])
+  |> close()
+  |> extrude(length = bsCollarLen + 0.10)
+
+export bsCollar = subtract([collarOuter], tools = [collarBore])
+  |> appearance(color = colBackshell, metalness = 70, roughness = 40)
+
+// ---- 2 · tapered section: width necks down, height nearly holds ----
+taperLo = startSketchOn(offsetPlane(XY, offset = bsCollarTop))
+  |> startProfile(at = [-bsBaseW / 2, -bsBaseH / 2])
+  |> line(end = [bsBaseW, 0])
+  |> line(end = [0, bsBaseH])
+  |> line(end = [-bsBaseW, 0])
+  |> close()
+
+taperHi = startSketchOn(offsetPlane(XY, offset = bsTop))
+  |> startProfile(at = [-bsExitW2 / 2, -bsExitH2 / 2])
+  |> line(end = [bsExitW2, 0])
+  |> line(end = [0, bsExitH2])
+  |> line(end = [-bsExitW2, 0])
+  |> close()
+
+taperSolid = loft([taperLo, taperHi])
+
+taperBoreLo = startSketchOn(offsetPlane(XY, offset = bsCollarTop - 0.05))
+  |> startProfile(at = [-(bsBaseW / 2 - bsWall), -(bsBaseH / 2 - bsWall)])
+  |> line(end = [bsBaseW - 2 * bsWall, 0])
+  |> line(end = [0, bsBaseH - 2 * bsWall])
+  |> line(end = [-(bsBaseW - 2 * bsWall), 0])
+  |> close()
+
+taperBoreHi = startSketchOn(offsetPlane(XY, offset = bsTop + 0.05))
+  |> startProfile(at = [-(bsExitW2 / 2 - bsWall), -(bsExitH2 / 2 - bsWall)])
+  |> line(end = [bsExitW2 - 2 * bsWall, 0])
+  |> line(end = [0, bsExitH2 - 2 * bsWall])
+  |> line(end = [-(bsExitW2 - 2 * bsWall), 0])
+  |> close()
+
+taperBore = loft([taperBoreLo, taperBoreHi])
+
+// NOTE: collar and taper stay separate bodies — the engine rejects
+// union([loft, extrude]). They abut at bsCollarTop.
+export bsTaper = subtract([taperSolid], tools = [taperBore])
+  |> appearance(color = colBackshell, metalness = 70, roughness = 40)
+
+// ---- 3 · SHIELD GROUND BLOCK — REMOVED ----
+// It was modelled as a boss hanging off the outside face, which is the wrong
+// place. On a Garmin shield-ground-adapter backshell the block sits INSIDE
+// the hood, immediately behind the connector, where the drain wires are cut
+// short and land on it. Mounting it externally misrepresents both the
+// location and the 3.0 in pigtail rule that depends on it being close in.
+//
+// Not re-modelled here rather than modelled wrongly. The confirmed rules are
+// preserved in the header above so nothing is lost:
+//   8-32 screw, split lock washer, flat washer, ring terminal(s)
+//   max 2 ring terminals per tapped hole; 2 wires per terminal, 3 if tight
+//   shield drain pigtail <= 3.0 in
+//   unshielded length at the backshell <= 2.5 in
+
+// ---- 4 · strain relief clamp at the cable exit ----
+// [C] smooth face toward the harness — modelled smooth-side-in
+srZ2 = bsTop - 0.230
+srBarT = 0.130 // MUST exceed 2 x srScrewR or the hole splits the bar
+srBarW = 0.820
+
+srBar = startSketchOn(offsetPlane(XY, offset = srZ2))
+  |> startProfile(at = [-srBarW / 2, -bsExitH2 / 2 - 0.080])
+  |> line(end = [srBarW, 0], tag = $sB)
+  |> line(end = [0, srBarT], tag = $sR)
+  |> line(end = [-srBarW, 0], tag = $sT)
+  |> close(tag = $sL)
+  |> extrude(length = 0.240)
+  |> fillet(radius = barCornerR, tags = [
+       getNextAdjacentEdge(sR),
+       getNextAdjacentEdge(sL)
+     ])
+
+srHoleY = -bsExitH2 / 2 - 0.080 + srBarT / 2
+
+srHoleL = startSketchOn(offsetPlane(XY, offset = srZ2 - 0.03))
+  |> circle(center = [-0.330, srHoleY], radius = srScrewR)
+  |> extrude(length = 0.300)
+
+srHoleR = startSketchOn(offsetPlane(XY, offset = srZ2 - 0.03))
+  |> circle(center = [0.330, srHoleY], radius = srScrewR)
+  |> extrude(length = 0.300)
+
+export strainReliefClamp = subtract([srBar], tools = [srHoleL, srHoleR])
+  |> appearance(color = colBackshell, metalness = 70, roughness = 40)
+
+// ---- 5 · harness bundle leaving the strain relief ----
+export harnessBundle = startSketchOn(offsetPlane(XY, offset = bsTop - 0.320))
+  |> circle(center = [0, 0], radius = 0.185)
+  |> extrude(length = 1.050)
+  |> appearance(color = "#2b2b2b", metalness = 10, roughness = 80)

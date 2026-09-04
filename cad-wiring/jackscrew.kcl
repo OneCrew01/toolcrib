@@ -1,0 +1,36 @@
+// 4-40 JACKSCREW — the hardware that actually holds a D-sub pair mated.
+//
+// [CD] D-sub screw locks are UNC 4-40 (Amphenol / NorComp product data).
+//      Clearance hole dia .125 (3.18) per the Spectrum Control cutout table.
+// [A]  head diameter, head thickness and thread length.
+//
+// LOCAL FRAME: shank axis +Z through the origin. Head underside at z = 0,
+// head above, shank running -Z through both flange ears.
+//
+// This is what turns "mated" from a positional claim into a fastened joint:
+// the shank physically occupies both flange holes. The Zoo MCP exposes no
+// mate solver, so the constraint is expressed as shared derived geometry
+// rather than as a solver constraint — but the screw either passes through
+// both ears or it visibly does not.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+
+export jackThreadMajorR = 0.112 / 2 // [CD] 4-40 major dia .112
+export jackHeadR = 0.110 // [A]
+export jackHeadT = 0.085 // [A]
+jackOverlap = 0.010 // intra-part boolean overlap, never between parts
+
+// knurled thumb head
+head = startSketchOn(XY)
+  |> circle(center = [0, 0], radius = jackHeadR)
+  |> extrude(length = jackHeadT)
+
+// shank spans both flange ears: +flangeThk above z=0 down through -flangeThk
+shank = startSketchOn(offsetPlane(XY, offset = jackOverlap))
+  |> circle(center = [0, 0], radius = jackThreadMajorR)
+  |> extrude(length = -(2 * flangeThk + jackOverlap + 0.030))
+
+export jackscrew = union([head, shank])
+  |> appearance(color = colShell, metalness = 92, roughness = 22)

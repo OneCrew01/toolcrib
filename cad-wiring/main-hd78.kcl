@@ -1,0 +1,130 @@
+// 78-WAY HIGH-DENSITY D-SUB — connector only
+// ToolCRIB · Zoo wiring benchmark · 2026-07-30
+//
+// The connector on the GI 275 (J2751) and GDU P4. [C]
+// 78 cavities, 22 populated — the sparse case a real installation actually
+// has. Contacts exist ONLY where harness-78-data.kcl lists a wire.
+//
+// THE BACKSHELL LIVES IN ITS OWN FILE ON PURPOSE.
+//   A first version bolted the backshell onto this model and it was a clear
+//   regression: an opaque hood hid the contacts, the cavities and the
+//   populated/empty distinction — i.e. everything this model exists to show.
+//
+//   RULE ADOPTED: a reference model must not hide its own subject. Detail
+//   parts go in separate files and are combined only in an explicit assembly
+//   view. See backshell-hd78.kcl and main-hd78-assembled.kcl.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "parameters-hd78.kcl"
+import * from "harness-78-data.kcl"
+
+// ===================================================================
+// 1 · INSULATOR — D-profile, shell size 4, all 78 bores
+// ===================================================================
+// Corners rounded. Real mouldings and castings are never knife-edged, and
+// the sharp version read as a paper cut-out.
+hdBlock = startSketchOn(XY)
+  |> startProfile(at = [-hd78BotW / 2, -hd78H / 2])
+  |> line(end = [hd78BotW, 0], tag = $iBot)
+  |> line(end = [hd78TaperInset, hd78H], tag = $iRgt)
+  |> line(end = [-hd78TopW, 0], tag = $iTop)
+  |> close(tag = $iLft)
+  |> extrude(length = hd78Thk)
+  |> fillet(radius = insulCornerR, tags = [
+       getNextAdjacentEdge(iBot),
+       getNextAdjacentEdge(iRgt),
+       getNextAdjacentEdge(iTop),
+       getNextAdjacentEdge(iLft)
+     ])
+
+hdCavities = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+export hd78Insulator = subtract([hdBlock], tools = hdCavities)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+// ===================================================================
+// 2 · CONTACTS — revolved, only where a wire exists
+// ===================================================================
+export hd78Contacts = map(wireList78, f = fn(@w) {
+  return startSketchOn(XZ)
+    |> startProfile(at = [0, -0.130])
+    |> line(end = [0.010, 0])
+    |> line(end = [0.008, 0.014])
+    |> line(end = [0, 0.176])
+    |> line(end = [0.0025, 0.010])
+    |> line(end = [0, 0.220])
+    |> line(end = [0.006, 0.010])
+    |> line(end = [0, 0.130])
+    |> line(end = [-0.0265, 0])
+    |> close()
+    |> revolve(axis = Y)
+    |> translate(x = hd78X(w.cav), y = hd78Y(w.cav), z = 0)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+// ===================================================================
+// 3 · WIRES — /18 thin-wall, colour per record
+// ===================================================================
+// Individual wires stay INSIDE the backshell — they gather into the bundle
+// rather than passing through the housing wall.
+export hd78Wires = map(wireList78, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = 0.560))
+    |> circle(center = [hd78X(w.cav), hd78Y(w.cav)], radius = insulR(w.awg))
+    |> extrude(length = 0.240)
+    |> appearance(color = w.colour, metalness = 0, roughness = 85)
+})
+
+// The gathered bundle belongs with the backshell, not here — it only exists
+// once the wires are enclosed. See backshell-hd78.kcl.
+
+// ===================================================================
+// 4 · FLANGE EARS with verified 2.406 jackscrew spacing
+// ===================================================================
+earRun = hd78FlangeW / 2 - hd78TopW / 2 - 0.006
+
+leftEar = startSketchOn(XY)
+  |> startProfile(at = [-hd78FlangeW / 2, -hd78FlangeH / 2])
+  |> line(end = [earRun, 0], tag = $lB)
+  |> line(end = [0, hd78FlangeH], tag = $lR)
+  |> line(end = [-earRun, 0], tag = $lT)
+  |> close(tag = $lL)
+  |> extrude(length = hd78FlangeThk)
+  |> fillet(radius = earCornerR, tags = [
+       getNextAdjacentEdge(lB),
+       getNextAdjacentEdge(lT)
+     ])
+
+leftEarHole = startSketchOn(offsetPlane(XY, offset = -0.03))
+  |> circle(center = [-hd78JackX, 0], radius = hd78JackHoleR)
+  |> extrude(length = hd78FlangeThk + 0.06)
+
+export hd78EarLeft = subtract([leftEar], tools = [leftEarHole])
+  |> appearance(color = colShell, metalness = 80, roughness = 30)
+
+rightEar = startSketchOn(XY)
+  |> startProfile(at = [hd78TopW / 2 + 0.006, -hd78FlangeH / 2])
+  |> line(end = [earRun, 0], tag = $rB)
+  |> line(end = [0, hd78FlangeH], tag = $rR)
+  |> line(end = [-earRun, 0], tag = $rT)
+  |> close(tag = $rL)
+  |> extrude(length = hd78FlangeThk)
+  |> fillet(radius = earCornerR, tags = [
+       getNextAdjacentEdge(rB),
+       getNextAdjacentEdge(rR)
+     ])
+
+rightEarHole = startSketchOn(offsetPlane(XY, offset = -0.03))
+  |> circle(center = [hd78JackX, 0], radius = hd78JackHoleR)
+  |> extrude(length = hd78FlangeThk + 0.06)
+
+export hd78EarRight = subtract([rightEar], tools = [rightEarHole])
+  |> appearance(color = colShell, metalness = 80, roughness = 30)
+
+// Backshell, shield block and strain relief are deliberately NOT here.
+// See backshell-hd78.kcl.

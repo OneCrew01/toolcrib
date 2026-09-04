@@ -1,0 +1,33 @@
+// HARNESS DATA — the wire list. THIS IS THE FILE YOU EDIT.
+//
+// Each record populates one cavity of the connector. A contact is generated
+// ONLY for cavities that appear here. Any cavity not listed stays an empty
+// hole in the insulator with no contact in it.
+//
+// Add a record  -> a contact and wire appear in that cavity.
+// Delete one    -> the contact disappears and the cavity is left open.
+//
+// Fields
+//   cav    cavity number, 1..9 for this 9-way D-sub
+//   awg    conductor gauge — drives conductor and insulation diameter
+//   colour insulation colour (display only)
+//   sig    signal name, for the report and future netlist export
+//
+// [C] GFC 500 rule: signal wire min 24 AWG, load-carrying min 22 AWG
+// [C] Power/ground: 20 AWG on 28 V, 18 AWG on 14 V
+// [C] Config module wiring is always 28 AWG
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+export wireList = [
+  { cav = 1, awg = 20, colour = "#c62828", sig = "28V PWR IN" },
+  { cav = 2, awg = 20, colour = "#212121", sig = "PWR GND" },
+  { cav = 4, awg = 24, colour = "#1565c0", sig = "RS-232 TX" },
+  { cav = 5, awg = 24, colour = "#f9f9f9", sig = "RS-232 RX" },
+  { cav = 7, awg = 22, colour = "#2e7d32", sig = "DISCRETE IN 1" },
+  { cav = 9, awg = 22, colour = "#f9a825", sig = "SHIELD DRAIN" }
+]
+
+// Cavities 3, 6 and 8 are deliberately absent — they must render as open
+// holes with NO contact. That is the behaviour this model exists to prove.
+export allCavities = [1, 2, 3, 4, 5, 6, 7, 8, 9]

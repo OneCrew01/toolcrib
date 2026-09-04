@@ -1,0 +1,126 @@
+// LOOSE HARNESS — every conductor is its OWN run. No bundle.
+// ToolCRIB · Zoo wiring benchmark · 2026-07-31
+//
+// THIS IS THE PRIMARY REPRESENTATION.
+//
+//   Earlier versions treated the bundle as the thing and the wires as its
+//   contents. That is backwards. A conductor is an individual run; bundling
+//   is an operation applied to a set of conductors LATER, and only sometimes.
+//   On the bench — which is where a harness is actually built and tested —
+//   wires are loose.
+//
+//   So: each route is swept as its own path, in its own routing lane, at its
+//   own height. Nothing is merged. main-harness-run.kcl shows the same routes
+//   gathered into a bundle; that is the DERIVED view, not the base one.
+//
+// Each wire: contact -> rise -> 90 deg bend -> its own lane across -> 90 deg
+// bend -> drop -> contact at the far end.
+//
+// KNOWN SIMPLIFICATION, stated rather than hidden:
+//   A sweep path in KCL must be planar, so each conductor is routed in the
+//   vertical plane of its ORIGIN row. Where a route crosses rows, the lateral
+//   step to the destination row is not modelled. Row spacing is 0.082, and
+//   the largest possible step is 3 rows = 0.246 in on a 5.2 in run. Real
+//   conductors drift laterally anyway, but this is an approximation, not an
+//   exact path.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "parameters-hd78.kcl"
+import * from "harness-route-data.kcl"
+import * from "harness-78-data.kcl"
+
+export connAX = -2.600
+export connBX = 2.600
+
+wireStartZ = 0.560 // top of the contact crimp
+laneBase = 1.150 // lowest routing lane
+laneStep = 0.062 // vertical separation between lanes
+laneBendR = 0.240
+
+// ===================================================================
+// CONNECTOR BODIES
+// ===================================================================
+mkInsulator = fn(@xOff) {
+  return startSketchOn(XY)
+    |> startProfile(at = [xOff - hd78BotW / 2, -hd78H / 2])
+    |> line(end = [hd78BotW, 0], tag = $b)
+    |> line(end = [hd78TaperInset, hd78H], tag = $r)
+    |> line(end = [-hd78TopW, 0], tag = $t)
+    |> close(tag = $l)
+    |> extrude(length = hd78Thk)
+    |> fillet(radius = insulCornerR, tags = [
+         getNextAdjacentEdge(b),
+         getNextAdjacentEdge(r),
+         getNextAdjacentEdge(t),
+         getNextAdjacentEdge(l)
+       ])
+}
+
+cavA = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [connAX + hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+cavB = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [connBX + hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+export insulatorA = subtract([mkInsulator(connAX)], tools = cavA)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+export insulatorB = subtract([mkInsulator(connBX)], tools = cavB)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+// ===================================================================
+// CONTACTS — per end, from the route table
+// ===================================================================
+export contactsA = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [connAX + hd78X(r.from), hd78Y(r.from)], radius = hd78PinR)
+    |> extrude(length = 0.700)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+export contactsB = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [connBX + hd78X(r.to), hd78Y(r.to)], radius = hd78PinR)
+    |> extrude(length = 0.700)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})
+
+// ===================================================================
+// CONDUCTORS — one independent swept run per route
+//
+// ENGINE NOTE: tangentialArc must be exactly +/-90 before an axis-aligned
+// line, and the sign is CCW-positive. Heading +Z, use -90 to exit toward +X;
+// then heading +X, -90 again to exit toward -Z.
+// ===================================================================
+export conductors = map(routes, f = fn(@r) {
+  return startSketchOn(offsetPlane(XY, offset = wireStartZ))
+    |> circle(
+         center = [connAX + hd78X(r.from), hd78Y(r.from)],
+         radius = insulR(r.awg),
+       )
+    |> sweep(path = startSketchOn(offsetPlane(XZ, offset = -hd78Y(r.from)))
+         |> startProfile(at = [connAX + hd78X(r.from), wireStartZ])
+         |> line(end = [
+              0,
+              laneBase + r.lane * laneStep - wireStartZ - laneBendR
+            ])
+         |> tangentialArc(angle = -90, radius = laneBendR)
+         |> line(end = [
+              (connBX + hd78X(r.to)) - (connAX + hd78X(r.from)) - 2 * laneBendR,
+              0
+            ])
+         |> tangentialArc(angle = -90, radius = laneBendR)
+         |> line(end = [
+              0,
+              -(laneBase + r.lane * laneStep - wireStartZ - laneBendR)
+            ]))
+    |> appearance(color = r.colour, metalness = 0, roughness = 85)
+})

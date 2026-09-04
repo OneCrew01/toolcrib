@@ -1,0 +1,137 @@
+// 78-WAY HIGH-DENSITY D-SUB — parameters
+// This is the connector on the GI 275 (J2751) and the GDU P4. [C]
+//
+// PROVENANCE
+//   [C]  Garmin STC/TSO manuals via NotebookLM
+//   [CD] Spectrum Control "D-Sub Board & Panel Cutouts" + Amphenol LTW
+//   [A]  assumption
+//
+// ⚠ ROW LAYOUT — CORRECTED TWICE. Read this before changing anything.
+//
+//   ATTEMPT 1: pitch .095, 3 rows of 26.
+//     Span 25 x .095 = 2.375 > 2.190 cutout. Impossible. Rejected.
+//
+//   ATTEMPT 2: pitch .082, 3 rows of 26, middle row staggered half a pitch.
+//     Span 25 x .082 = 2.050, so it "fit" — but only just. The insulator is a
+//     10-degree D-trapezoid, so its half-width at the MIDDLE row (y = 0) is
+//     only 1.0562. A staggered cavity 52 reaches 1.0875. THE CAVITY FELL
+//     OUTSIDE THE BODY and the contact was sliced in half.
+//     Removing the stagger leaves 0.010 margin — no room to stagger at all,
+//     which is itself proof the 26-per-row reading was wrong.
+//
+//   ATTEMPT 3 (current): pitch .095, FOUR rows, 20/19/20/19 = 78.
+//     Matches the Amphenol product listing: "4 rows, pin distance 2.41mm"
+//     (2.41 mm = .095). Row spacing .082.
+//     20-row span 19 x .095 = 1.805 -> half-width 0.9025, + cavity 0.0215
+//     = 0.924. Narrowest insulator half-width at the lowest row is 1.0345.
+//     Fits with 0.11 to spare on every row.
+//     The stagger is FREE: alternating 20 and 19 counts offsets the 19-rows
+//     by exactly half a pitch with no explicit offset term.
+//
+//   Lesson: the contact field must be checked against the D-TAPER at each
+//   row's own height, not against the widest edge of the shell.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+// ---- contact field ----
+export hd78Count = 78
+export hd78Pitch = 0.095 // [CD] .095 (2.41) X pitch within a row
+export hd78RowGap = 0.082 // [CD] .082 (2.08) row centre-to-centre
+export hd78RowA = 20 // rows 1 and 3
+export hd78RowB = 19 // rows 2 and 4, naturally half-pitch staggered
+export hd78HoleD = 0.040 // [CD] .040 (1.02) HD contact hole dia
+export hd78CavR = hd78HoleD / 2 + 0.0015 // [A] small clearance
+export hd78PinR = 0.0180 // [A] HD contact mating dia
+
+// ---- shell size 4, shared with the 50-way standard density ----
+export hd78MountSpan = 2.406 // [CD] dim A, jackscrew centres
+export hd78JackX = hd78MountSpan / 2
+export hd78CutoutW = 2.190 // [CD] cutout dim C
+export hd78CutoutH = 0.440 // [CD] cutout dim E
+export hd78TaperInset = hd78CutoutH * 0.17633 // [CD] 10 deg D-taper
+export hd78TopW = hd78CutoutW
+export hd78BotW = hd78CutoutW - 2 * hd78TaperInset
+export hd78H = hd78CutoutH
+export hd78Thk = 0.290 // [A]
+
+export hd78FlangeW = 2.635 // [A] outer flange envelope
+export hd78FlangeH = 0.494 // [A]
+export hd78FlangeThk = 0.055 // [A]
+export hd78JackHoleR = 0.125 / 2 // [CD] dim H
+
+// ---- cavity position: FOUR rows, top to bottom ----
+//   row 1  cav  1-20   20 contacts   y = +1.5 * rowGap
+//   row 2  cav 21-39   19 contacts   y = +0.5 * rowGap
+//   row 3  cav 40-59   20 contacts   y = -0.5 * rowGap
+//   row 4  cav 60-78   19 contacts   y = -1.5 * rowGap
+//
+// Each row is centred on x = 0. Because 20-rows and 19-rows are both centred,
+// the 19-rows land exactly half a pitch off the 20-rows — the stagger comes
+// out of the counts, not from an added offset term.
+export hd78X = fn(@n) {
+  return if n <= 20 {
+    (n - 1 - 9.5) * hd78Pitch
+  } else {
+    if n <= 39 {
+      (n - 21 - 9) * hd78Pitch
+    } else {
+      if n <= 59 {
+        (n - 40 - 9.5) * hd78Pitch
+      } else {
+        (n - 60 - 9) * hd78Pitch
+      }
+    }
+  }
+}
+
+export hd78Y = fn(@n) {
+  return if n <= 20 {
+    1.5 * hd78RowGap
+  } else {
+    if n <= 39 {
+      0.5 * hd78RowGap
+    } else {
+      if n <= 59 { -0.5 * hd78RowGap } else { -1.5 * hd78RowGap }
+    }
+  }
+}
+
+// ===================================================================
+// BACKSHELL — all [C] rules, [A] dimensions
+// [C] Garmin uses proprietary shield-ground adapter backshells. MS3057 and
+//     MIL-C-85049 are NOT referenced in these manuals.
+// [C] CAUTION: place the SMOOTH / CONVEX side of the strain relief across the
+//     harness. The grooved / concave side WILL damage wires.
+// [C] Wrap silicone fusion tape A-A-59163 where the strain relief meets the
+//     cast housing.
+// [C] Shield drain pigtails must never exceed 3.0 in.
+// [C] Unshielded wire exiting the shield at the backshell must be <= 2.5 in.
+// [C] Ring terminal stack-up: 8-32 screw, split lock washer, flat washer,
+//     first ring terminal, second ring terminal. Max 2 per tapped hole,
+//     preferably max 2 wires per terminal, 3 if space-constrained.
+// ===================================================================
+export bsWallT = 0.070 // [A]
+export bsLen = 1.150 // [A] housing length behind the flange
+export bsThroatW = hd78CutoutW + 0.180 // [A]
+export bsThroatH = hd78CutoutH + 0.320 // [A]
+export bsExitW = 0.760 // [A] cable exit throat width
+export bsExitH = 0.420 // [A]
+
+export shieldScrewR = 0.164 / 2 // [A] 8-32 tapped hole, .164 major dia
+export shieldHoleCount = 4
+export shieldHolePitch = 0.400 // [A]
+
+export srClampT = 0.130 // [A] clamp bar thickness. MUST exceed 2 x srScrewR
+export srClampW = 0.700 // [A]
+export srScrewR = 0.030 // [A] a hole wider than the bar splits it and the
+                        //     engine then rejects the subtraction outright
+export srScrewX = 0.290 // [A]
+
+// ---- corner radii [A] — nothing in this family is knife-edged ----
+export insulCornerR = 0.030 // insulator D-profile vertical corners
+export earCornerR = 0.045 // flange ear outer corners
+export hoodCornerR = 0.060 // backshell collar corners
+export barCornerR = 0.035 // strain relief bar ends
+
+export colBackshell = "#7f858c"
+export colShieldBlk = "#b08d57"

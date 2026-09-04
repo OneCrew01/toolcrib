@@ -1,0 +1,39 @@
+// QA VIEW — mating face only. Insulator + contacts, no wires, no flange.
+//
+// Purpose: read off WHICH CAVITIES ARE POPULATED at a glance. With the long
+// wire runs omitted, zoom-to-fit frames the connector face tightly.
+//
+// Expected with the current harness-data.kcl:
+//   populated  1, 2, 4, 5, 7, 9   -> pin visible
+//   empty      3, 6, 8            -> open hole, no pin
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "harness-data.kcl"
+
+// true D-profile, per the manufacturer cutout table + 10 degree taper
+insulBlock = startSketchOn(XY)
+  |> startProfile(at = [-insulBotW / 2, -insulH / 2])
+  |> line(end = [insulBotW, 0])
+  |> line(end = [shellTaperInset, insulH])
+  |> line(end = [-insulTopW, 0])
+  |> close()
+  |> extrude(length = insulThk)
+
+cavityCutters = map(allCavities, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [cavX(n), cavY(n)], radius = cavityR)
+    |> extrude(length = insulThk + 0.10)
+})
+
+export insulator = subtract([insulBlock], tools = cavityCutters)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+// contacts only where a wire exists
+export pins = map(wireList, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = contactTipZ))
+    |> circle(center = [cavX(w.cav), cavY(w.cav)], radius = contactPinR)
+    |> extrude(length = contactTipLen + 0.020)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})

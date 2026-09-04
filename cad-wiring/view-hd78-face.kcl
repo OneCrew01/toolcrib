@@ -1,0 +1,39 @@
+// QA VIEW — 78-way HD mating face. Insulator + contacts only.
+//
+// Self-contained by necessity: importing a geometry module renders ALL of its
+// bodies, so a trimmed view cannot be built by importing main-hd78.kcl and
+// cherry-picking. Only the parameter and data modules are imported, and those
+// contain no geometry.
+//
+// Expected: 78 bores, 22 populated per harness-78-data.kcl. Everything else
+// is an open cavity with no contact.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import * from "parameters.kcl"
+import * from "parameters-hd78.kcl"
+import * from "harness-78-data.kcl"
+
+hdBlock = startSketchOn(XY)
+  |> startProfile(at = [-hd78BotW / 2, -hd78H / 2])
+  |> line(end = [hd78BotW, 0])
+  |> line(end = [hd78TaperInset, hd78H])
+  |> line(end = [-hd78TopW, 0])
+  |> close()
+  |> extrude(length = hd78Thk)
+
+hdCavities = map(allCav78, f = fn(@n) {
+  return startSketchOn(offsetPlane(XY, offset = -0.05))
+    |> circle(center = [hd78X(n), hd78Y(n)], radius = hd78CavR)
+    |> extrude(length = hd78Thk + 0.10)
+})
+
+export hd78Insulator = subtract([hdBlock], tools = hdCavities)
+  |> appearance(color = colInsulator, metalness = 5, roughness = 90)
+
+export hd78Pins = map(wireList78, f = fn(@w) {
+  return startSketchOn(offsetPlane(XY, offset = -0.130))
+    |> circle(center = [hd78X(w.cav), hd78Y(w.cav)], radius = hd78PinR)
+    |> extrude(length = 0.150)
+    |> appearance(color = colContact, metalness = 90, roughness = 20)
+})

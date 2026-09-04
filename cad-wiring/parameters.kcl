@@ -1,0 +1,159 @@
+// WIRING HARNESS — shared parameters
+// ToolCRIB · end-to-end wire → contact → connector model
+// 2026-07-30
+//
+// GOAL: a data-driven harness where a CONTACT EXISTS ONLY WHERE A WIRE EXISTS.
+// Edit harness-data.kcl and the populated cavities change. Empty cavities
+// remain as open holes in the insulator, with no contact in them.
+//
+// PROVENANCE KEY
+//   [C]  CONFIRMED — Garmin STC/TSO installation manuals + AC 43.13-1B,
+//                    retrieved via NotebookLM cross-notebook query
+//   [CD] CONFIRMED FROM MANUFACTURER DATASHEET — Spectrum Control
+//                    "D-Sub Board & Panel Cutouts", dimensions in inches (mm)
+//   [A]  ASSUMPTION — general knowledge, not found in any consulted source
+//
+// The Garmin manuals state that contact pitch and shell dimensions are NOT
+// documented. Those were originally [A]. They have since been resolved
+// against a manufacturer datasheet and are now [CD] — see below. The
+// originally assumed pitch (.109) and row spacing (.112) were CORRECT.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+// ===================================================================
+// CONNECTOR SELECTION — [C] 9-pin standard-density D-sub is real hardware
+// in this ecosystem: GEA 24(B) uses J241 (9-pin), J242 (25), J243 (37),
+// J244 (50). High-density variants in use are 26 / 44 / 62 / 78 pin.
+// ===================================================================
+export cavityCount = 9
+export topRowCount = 5
+export botRowCount = 4
+
+// ---- geometry: now resolved against the Spectrum Control datasheet ----
+// Standard density, all shell sizes share E, F, H, I, J:
+export pitch = 0.109 // [CD] dim E, contact pitch in a row, .109 (2.77)
+export rowGap = 0.112 // [CD] dim F, row centre-to-centre, .112 (2.84)
+export contactHoleD = 0.045 // [CD] dim I, contact hole dia, .045 (1.14)
+export cavityR = contactHoleD / 2 + 0.002 // small clearance  [A]
+
+// Shell size 9 (0), from the board-layout and panel-cutout tables:
+export mountHoleSpan = 0.984 // [CD] dim A, jackscrew c-c, .984 (25.00)
+export jackScrewX = mountHoleSpan / 2 // [CD] derived, .492
+export jackScrewR = 0.125 / 2 // [CD] dim H, .125 (3.18) dia
+export topRowSpan = 0.436 // [CD] dim B, = 4 x .109
+export botRowSpan = 0.327 // [CD] dim C, = 3 x .109
+
+// Panel cutout for shell 9 — this is the shell body envelope:
+export cutoutW = 0.777 // [CD] cutout dim C, .777 (19.74)
+export cutoutH = 0.440 // [CD] cutout dim E, .440 (11.18)
+export cutoutTaperDeg = 10 // [CD] D-shell side taper, 10 degrees
+
+// D-shell profile derived from the cutout + taper. tan(10 deg) = 0.17633
+export shellTaperInset = cutoutH * 0.17633
+export insulTopW = cutoutW
+export insulBotW = cutoutW - 2 * shellTaperInset
+export insulH = cutoutH
+export insulThk = 0.290 // [A] not in the cutout datasheet
+
+export flangeW = 1.213 // [A] overall flange length
+export flangeH = 0.494 // [A] overall flange height
+export flangeThk = 0.055 // [A] flange plate thickness
+
+// ---- HIGH DENSITY, for later builds ----
+// [CD] 15/26/44 HD: pitch .090 (2.29), row offset .078 (1.98)
+// [CD] 62/78 HD:    pitch .095 (2.41), row offset .078 (1.98)
+// [CD] HD contact hole dia .040 (1.02)
+export hdPitchSmall = 0.090
+export hdPitchLarge = 0.095
+export hdRowOffset = 0.078
+export hdContactHoleD = 0.040
+
+// ===================================================================
+// CRIMP CONTACTS
+// [C] Size 20 contacts accept 20–24 AWG. Garmin P/N 336-00024-00 (pin),
+//     336-00022-02 (socket).
+// [C] Size 22 contacts accept 20–24 AWG.
+// [C] Size 22D contacts accept 22–28 AWG (M39029/58-360).
+// [A] all dimensions below
+// ===================================================================
+export contactBodyR = 0.0295 // contact barrel radius          [A]
+export contactPinR = 0.0200 // engaging pin diameter/2        [A]
+export contactTipLen = 0.150 // pin protrusion past mating face[A]
+export contactBodyLen = 0.270 // barrel length inside insulator [A]
+export crimpBarrelR = 0.0330 // crimp barrel radius            [A]
+export crimpBarrelLen = 0.200 // crimp barrel length            [A]
+
+// ===================================================================
+// WIRE
+// [C] Approved: MIL-W-22759/16, /18, /34 unshielded; MIL-C-27500 shielded.
+// [C] MIL-W-22759/18 RECOMMENDED for high-density connectors — thinner
+//     insulation is far more compatible with HD contact spacing.
+// [C] GFC 500: signal wire min 24 AWG; load-carrying min 22 AWG.
+// [C] Power/ground: 20 AWG on 28 V systems, 18 AWG on 14 V.
+// [C] Configuration modules always 28 AWG.
+// [C] Runs over 20 ft must be sized per AC 43.13-1B Chapter 11.
+// [A] all conductor/insulation radii below
+// ===================================================================
+export stripLen = 0.180 // exposed conductor at the crimp  [A]
+export wireFreeLen = 1.250 // modelled free length            [A]
+
+// conductor radius by gauge  [A]
+export condR = fn(@awg) {
+  return if awg == 18 {
+    0.0240
+  } else {
+    if awg == 20 {
+      0.0190
+    } else {
+      if awg == 22 {
+        0.0150
+      } else {
+        if awg == 24 {
+          0.0120
+        } else {
+          0.0095 // 28 AWG, config modules
+        }
+      }
+    }
+  }
+}
+
+// insulation outer radius by gauge — /18 thin-wall assumed  [A]
+export insulR = fn(@awg) {
+  return condR(awg) + 0.0110
+}
+
+// ===================================================================
+// CAVITY POSITION — derived from cavity number, single source of truth
+// Numbering: 1–5 top row left→right, 6–9 bottom row left→right.
+// ===================================================================
+export cavX = fn(@n) {
+  return if n <= topRowCount {
+    (n - 3) * pitch
+  } else {
+    (n - 7.5) * pitch
+  }
+}
+
+export cavY = fn(@n) {
+  return if n <= topRowCount { rowGap / 2 } else { -rowGap / 2 }
+}
+
+// ===================================================================
+// AXIAL STACK along +Z. Mating face is z = 0; contacts protrude to -Z.
+// ===================================================================
+export matingFaceZ = 0
+export insulBackZ = insulThk // 0.290
+export contactTipZ = -contactTipLen // -0.150
+export crimpStartZ = insulBackZ - 0.020
+export crimpEndZ = crimpStartZ + crimpBarrelLen
+export conductorEndZ = crimpEndZ + stripLen
+export wireEndZ = conductorEndZ + wireFreeLen
+
+// ===================================================================
+// COLOURS
+// ===================================================================
+export colShell = "#9aa0a6"
+export colInsulator = "#1f1f22"
+export colContact = "#d9c07a"
+export colConductor = "#c8862f"

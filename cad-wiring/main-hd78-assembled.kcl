@@ -1,0 +1,10 @@
+// 78-WAY HD CONNECTOR + BACKSHELL — explicit assembly view
+//
+// The connector and the backshell are separate files. This is the only place
+// they are shown together, so the connector model itself never hides its own
+// contacts. See main-hd78.kcl for the connector alone.
+
+@settings(defaultLengthUnit = in, kclVersion = 2.0)
+
+import "main-hd78.kcl" as conn
+import "backshell-hd78.kcl" as bs
