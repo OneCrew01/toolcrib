@@ -351,7 +351,13 @@ function serveFile(ctx, jobId, relParts, res) {
     throw new HttpError(400, "bad path encoding");
   }
   if (rel.includes("\0")) throw new HttpError(400, "bad path");
-  const abs = resolve(bundleDir, rel);
+  // A backslash is a separator on Windows and an ordinary filename character
+  // on POSIX, so "..\..\secrets.txt" is a traversal on one platform and a
+  // missing leaf on the other — 400 there, 404 here, for the same request.
+  // Nothing in a bundle is named with a backslash, so read it as a separator
+  // everywhere: the verdict on an escape attempt then does not depend on the
+  // operating system the reviewer happens to be running.
+  const abs = resolve(bundleDir, rel.replace(/\\/g, "/"));
   if (abs !== bundleDir && !abs.startsWith(bundleDir + sep))
     throw new HttpError(400, "path escapes the job's bundle directory");
   if (!existsSync(bundleDir))

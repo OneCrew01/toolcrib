@@ -7,7 +7,7 @@ import assert from "node:assert";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { displayPath, scrubPaths, MACHINE_PATH, OUTSIDE_REPO } from "./repo-path.mjs";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
@@ -208,10 +208,24 @@ test("a path is still a path after a colon, a hyphen or a URL scheme", () => {
   assert.equal(scrubPaths(`file:${USERS}someone/secret.stl`), `file:${OUTSIDE_REPO}/secret.stl`);
   assert.equal(scrubPaths(`out-${HOME}someone/secret.stl`), `out-${OUTSIDE_REPO}/secret.stl`);
   // A file:// stack frame keeps its shape; the frame just becomes repo-relative.
+  // Built with pathToFileURL rather than "file:///" plus the path: the literal
+  // prefix is right for a drive path ("file:///C:/…") and wrong for a POSIX
+  // one, where it produces four slashes and a frame Node would never write.
+  // This fixture is the one that has to look exactly like a real frame on the
+  // platform it runs on, or it tests a shape that never reaches the scrubber.
   assert.equal(
-    scrubPaths(`    at runJob (file:///${join(REPO, "server", "pipeline", "run-job.mjs").split("\\").join("/")}:100:26)`),
+    scrubPaths(`    at runJob (${pathToFileURL(join(REPO, "server", "pipeline", "run-job.mjs")).href}:100:26)`),
     "    at runJob (file:///server/pipeline/run-job.mjs:100:26)",
   );
+  // The same frame with the prefix Node actually writes on POSIX, spelled out
+  // rather than derived, so the case is pinned on every platform: three
+  // slashes, then the home root. This was the measured leak.
+  assert.equal(
+    scrubPaths(`    at runJob (file://${HOME}someone/toolcrib/server/run-job.mjs:100:26)`),
+    `    at runJob (file:///${OUTSIDE_REPO}/run-job.mjs:100:26)`,
+  );
+  // A doubled slash with no scheme in front of it is still not a path.
+  assert.equal(scrubPaths(`see /${HOME}someone/notes`), `see /${HOME}someone/notes`);
   // Measured: Node percent-encodes the spaces in a stack frame, so a frame
   // from a spaced directory has no raw space and needs no quote to delimit it.
   // That is why the unquoted pass's one-token lookahead is enough for stacks.

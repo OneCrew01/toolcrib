@@ -106,7 +106,23 @@ const UNC_ROOT = String.raw`\\\\[^\\/\s"'\`<>|]+[\\/]`;
 // codebase uses constantly ("dataDir:" plus a home root) and a stack frame is
 // the "file:" scheme plus one, so suppressing after a colon was a hole, not a
 // feature.
-const POSIX_ROOT = String.raw`(?<![\w.\\/])\/(?:${POSIX_ROOTS})\/`;
+//
+// A preceding slash stops it too — with exactly one exception, and the
+// exception is the POSIX stack frame. Node writes a frame as "file://" plus
+// the absolute path, so on Linux and macOS the home root sits directly behind
+// a third slash: "file:///home/<user>/…". The drive rule above already lets
+// that shape through on Windows ("file:///<drive>:/…" — the char before the
+// drive letter is a slash, and the drive lookbehind does not care). This rule
+// did not, and the miss was measured on a Linux checkout, not reasoned about:
+// `npm test` there had the CLI's crash line printing the repo's absolute
+// location, the API's log sink doing the same, and this file's own fixture
+// walking through unscrubbed. Every suite on the Windows machine that wrote
+// the rule was green, which is the whole lesson — a scrubber tested only on
+// the platform it was written on is tested on half its input. So: a slash may
+// precede the root when, and only when, it is the second slash of "file://" —
+// the root's own leading slash is the third. A bare "//home/" with no scheme
+// is still refused, as it was.
+const POSIX_ROOT = String.raw`(?<![\w.\\])(?<!(?<!file:\/)\/)\/(?:${POSIX_ROOTS})\/`;
 
 const ROOTS = [DRIVE_ROOT, UNC_ROOT, POSIX_ROOT];
 const ANY_ROOT = ROOTS.join("|");
@@ -267,5 +283,17 @@ export function scrubPaths(text, opts = {}) {
   // and cannot re-enter what was already replaced.
   return s
     .replace(QUOTED_RUN, (_m, quote, inner) => `${quote}${render(inner)}${quote}`)
-    .replace(ABSOLUTE_RUN, render);
+    .replace(ABSOLUTE_RUN, (run, ...rest) => {
+      // The POSIX root's leading slash is both the path's first character and
+      // the third slash of a "file:///" frame. displayPath consumes it along
+      // with the rest of the chain, which would leave "file://server/…" — a
+      // URL with an authority and no path. Put the one slash back when the run
+      // is the path half of a file URL, so the frame keeps a shape Node would
+      // write: "file:///server/…" inside the repo, "file:///<outside-repo>/…"
+      // beyond it, exactly as the Windows frame already renders.
+      const offset = rest.at(-2);
+      const whole = rest.at(-1);
+      const inFileUrl = run.startsWith("/") && whole.slice(Math.max(0, offset - 7), offset) === "file://";
+      return (inFileUrl ? "/" : "") + render(run);
+    });
 }
