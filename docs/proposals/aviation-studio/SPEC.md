@@ -356,6 +356,89 @@ from the diff, never hand-placed.
 
 ---
 
+## Part E — the author's aviation data, mapped (2026-09-30)
+
+Source: an inventory of the author's holdings compiled 2026-09-29 by a Claude Code
+session inside HAS-FACTORY (28 collections, a schema summary, a doctrine list, and a
+list of what is out of reach). The inventory itself is not reproduced here; it lives
+with the author. This part records where each collection lands in Certificate Studio
+and what the inventory changes about the plan.
+
+### E1. The headline
+
+About half of Phases 0 and 1 already exists, in Python, for one fictional repair
+station: the **Part 145 Forge**. It holds a manual suite in markdown (18 documents,
+~25,900 lines), a paragraph-level regulatory canon as JSONL rows, a compliance matrix,
+twelve checkers, an audit layer of 511 criteria, and an append-only decision register
+(288 entries). It lacks exactly what this spec adds: a compiler that emits a paginated
+deliverable with a List of Effective Pages and revision bars, and a human gate. The
+inventory's own words: "no clean paginated deliverable exists" and "the working file
+IS the deliverable."
+
+### E2. Where each collection lands
+
+| Destination | Inventory collections | Note |
+|---|---|---|
+| Rule table (Phase 1) | 2 — Forge regulatory canon | Direct. 14 CFR 145/43/65/91 (and 1, 5, 120; 49 CFR 171/172) as `{citation, section, kind, heading, label, text}` rows; AC 145-9/9A; 8900.1 Vol 2 Ch 11 and Vol 3 Ch 18 Sec 10. Currency-checked with dated overlays. Tier-one source. |
+| Rule table, to unify | 8 — OneCrew CFR/AC packs; 9 — has-ia-tracker CFR corpus | Same regulations, two other schemas. Adopt the Forge canon row shape as canonical; regenerate the other two from it. |
+| Checker candidates | 3 — gauntlet criteria (`{gid, verdict, severity, finding}`); 18 — scorecard JSON schema | AI-written criteria are not tier one as they stand. Triage: any that reduces to "a section tagged to paragraph X exists and is non-empty" is tier one; the rest are advisory. Scorecard shape is a reference for checker output. |
+| Fixture manual (Phase 0) | 1 — Forge package | The compiler proves itself on it. Its recorded defects (14 unrepaired grader findings, two QCM internal seams, roster silent on 145.151(c)/145.153(a)/145.160, OpSpec D100 absent from RSM ch. 8) become the checker's golden test cases. |
+| Front-matter schema | Inventory §A; 17 — `.meta.yml` sidecar template; 20 — `has-faa-doc-numbering` skill | Citation carrier, `D-NNN` decision line, `HAS-<DOMAIN>-<TYPE>-<NNN>_Rev<N>` numbering, one status vocabulary (see E3.4). |
+| Phase 4 only (BYOD ingestion) | 4 — Library of Alexandria canon (17,426 OEM/AD rows, 33-field schema); 5; 19 | OEM data is bring-your-own by B8. The 33-field row schema is the reference for Phase 4's ingestion output. Not Phases 0–2. |
+| Not Certificate Studio | 6, 7, 10–16, 21–26 | Exam products, app database, knowledge pod, market data, audit chambers. Different product lines. |
+
+### E3. What the inventory changes about the plan
+
+1. **Customer Zero is not established.** Every Part 145 artifact is a fictional
+   template entity, never filed; shop records belong to a former employer. Part A and
+   B13 assumed the author's own manual through the author's own inspector. Phase 2's
+   "done when" needs a real certificate holder — the author, once certificated in their
+   own name, or a first customer who agrees to be first. **Open question for the
+   author; it changes the plan's shape.**
+2. **The Forge is unverified AI prose; Studio must not launder it.** Six AI graders
+   scored it 81/100; no human with shop or inspector experience has read it. Under the
+   author's own Spooner Protocol Law 2, everything is DRAFT until signed. The compiler
+   watermarks every page compiled from it; the lifecycle refuses to leave DRAFT
+   without a named human and evidence (B2, unchanged, now with a reason on record).
+3. **Studio's home is HAS-FACTORY.** Doctrine, canon, the Forge and the Certificate
+   Studio concept note (2026-09-26) all live there. This file is in ToolCRIB only
+   because it was the reachable repo. Copy it beside the concept note; leave a pointer
+   here. Second reason: the inventory flags ToolCRIB for a Zoo contest-terms check
+   (Exhibit A note N5), so the two products should not share a repository.
+4. **One status vocabulary and a data-classification field.** The estate runs six
+   status vocabularies and no `data_classification` field anywhere; front-matter
+   covers ~17% of files, so status is not inferable from names. Both are gaps the
+   author's own 2026-08-01 structure audit names. Studio's front-matter schema makes
+   `status` (one lifecycle, per B2) and `data_classification` required.
+5. **Acceptance versus approval is not yet a field.** The Forge matrix maps sections
+   to Part 145 paragraphs but does not record which regulatory verb applies to the
+   document. B2's distinction becomes a required front-matter field on each document.
+6. **Inline correction notes are the disease Phase 0 cures.** ~200+ dated correction
+   notes sit inside the QCM and RSM text — revision history living in the deliverable.
+   Git holds history; the compiler emits the redline; the notes leave the prose. This
+   migration is the first mechanical job on the fixture.
+7. **Doctrine already matches the spine.** Spooner Law 1 (fail-closed), Law 2 (wet-ink
+   authority), Law 3 (cite or do not claim), the Three Gates, and the D-121/D-131/D-139/
+   D-182 reading rules are the same discipline B asks for. Studio adopts them by
+   reference rather than restating them. `has-doctrine-currency` runs before any
+   Studio code is produced, per the author's standing rule.
+8. **Out of Studio's scope but at risk:** the semantic curriculum database is paused
+   with no known backup and three live products cannot rebuild without it. Recorded
+   here so it is not lost between sessions; it is not Studio's problem to solve.
+
+### E4. Revised Phase 0 first tasks
+
+1. Copy this spec into HAS-FACTORY beside the concept note. Run `has-doctrine-currency`.
+2. Define the front-matter schema (E3.4, E3.5) and apply it to the Forge fixture.
+3. Strip inline correction notes from the fixture into git history (E3.6).
+4. Compile the fixture with Typst via typst.js: PDF, LEP, revision bars (D8 method),
+   compliance matrix from front-matter. Watermark DRAFT — NOT VERIFIED on every page.
+5. Golden test: same commit twice, same sha256 after PDF normalisation (B12, D8).
+6. Checker tier one against the Forge canon; the recorded Forge defects are the
+   first test cases and must all be found.
+
+---
+
 ## Part C — the raw spec, verbatim
 
 Reproduced as received on 2026-09-27, unedited except for removing the Gemini
