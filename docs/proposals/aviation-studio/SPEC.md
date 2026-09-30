@@ -1,10 +1,12 @@
-# Aviation Studio — a compliance IDE for certificated aviation
+# Certificate Studio — a compliance IDE for certificated aviation
 
 **Status:** PARKED. Not a ToolCRIB feature. This is a sibling product filed here so
 the spec survives between sessions; it gets its own repository the day work starts.
-**Filed:** 2026-09-27
+**Filed:** 2026-09-27. Prior-art survey (Part D) added 2026-09-30.
+**Working name:** Certificate Studio (the author's). Earlier drafts and the directory
+name say "Aviation Studio"; they mean this.
 **Origin:** a raw spec developed in conversation with Gemini (reproduced verbatim in
-Part C), reviewed and completed by Claude in this session (Parts A and B).
+Part C), reviewed and completed by Claude in this session (Parts A, B and D).
 
 What it shares with ToolCRIB is the spine, not the code: every rule carries its
 citation, every check either passes or refuses, a named human sits at every gate that
@@ -242,8 +244,89 @@ Phases 0 through 2 are the product. Everything after is growth.
   enumerated required content and so the best test of B3.)
 - Does the shop hold an EASA supplement today? It changes the rule table early.
 - Is any customer data ITAR or export-controlled? Decides B10's LLM boundary.
-- Working name: "Aviation Studio" is fine to build under. Trademark check before
-  it appears anywhere public.
+- Working name: settled as "Certificate Studio". Trademark check before it appears
+  anywhere public.
+
+---
+
+## Part D — prior art survey (2026-09-30)
+
+Two rounds of web search for open-source work to build on. Round one covered the
+compiler, redline, compliance-matrix and aviation-specific ground; round two covered
+general software infrastructure only, aimed by what round one found. Licences are as
+read from each project's page on the day and must be re-checked before any dependency
+is taken. Verdicts: **base** = build on it; **reference** = read it, then write our own;
+**pass** = not for this.
+
+### D1. What the survey says as a whole
+
+Every layer of Phases 0 through 3 has a proven open-source base except the parts that
+are specific to certificated aviation: the List of Effective Pages, revision bars, the
+regulation-paragraph rule table, and the human acceptance gate. Those are ours to write
+and are the right place for the custom work to sit. Nothing in Phases 0 to 2 requires
+inventing infrastructure. No open-source repair station manual tooling exists on
+GitHub; the aviation ground is consultants selling templates, which matches B's read
+of the market.
+
+### D2. Compiler pipeline (Phase 0)
+
+| Project | What it is | Verdict |
+|---|---|---|
+| Typst | Single-binary typesetter: native page control, numbering, headers, margins; deterministic output. Apache-2.0. | **Base.** Output engine. Replaces B10's "zero dependencies" with "one pinned binary." Page-stable output is what the LEP depends on. |
+| Pandoc → Typst templates (andyburri, m-fr, jamie-reece, alexmodrono) | Working pipelines: many markdown chapters concatenated in order, front-matter applied, one `.typ`, one PDF. | **Base for the pipeline shape.** Four independent people have this working. Pandoc is a second pinned binary, or we write the small markdown→Typst transform ourselves and stay at one. Decide at Phase 0 start. |
+| WeasyPrint | HTML+CSS → PDF in Python, mature paged-media support. | Reference. Adds Python; CSS pagination is harder to make byte-stable. |
+| Paged.js | Browser polyfill for paged CSS. MIT. | Pass for the compiler; candidate for in-app preview in Phase 3. |
+| simple-git | Node wrapper over the system git binary. | **Base** for Phase 0 git reads (diff ranges for revision bars and highlights). The compiler already assumes git exists. |
+| isomorphic-git | Pure-JS git, no binary. | Fallback if the desktop app must run where git is not installed. |
+
+### D3. Redline (Phase 0)
+
+| Project | What it is | Verdict |
+|---|---|---|
+| houfu/redlines | Python: Word-style strike-through and underline from two strings; HTML or markdown out. | **Reference.** Small enough to reimplement in Node so the compiler stays dependency-light; match its behaviour. |
+| squirrelsoft-dev/markdiff | Tauri + Rust app comparing two markdown files, with a rendered redline overlay mode. | Reference for Phase 3: it is the in-app redline view, already built as a desktop app. |
+
+### D4. Checker (Phase 1)
+
+| Project | What it is | Verdict |
+|---|---|---|
+| remark-lint + remark-lint-frontmatter-validation | Lint markdown; validate each file's front-matter against a JSON schema. | **Base for tier one.** Each section's front-matter declares the regulation paragraphs it satisfies; the schema enforces the shape; the compliance matrix is a join over front-matter. |
+| Vale | Static-binary prose linter, YAML rules, markdown-aware, reads front-matter, non-zero exit on findings. | **Base for the deterministic half of the advisory tier**: house style, banned words, required phrases per section type. No LLM needed for this slice. |
+| usnistgov/OSCAL | NIST's data model for controls, implementations and assessments. | **Reference for the data shape.** Control→implementation mapping is exactly our paragraph→section matrix. Adopt the shape, not the schema. |
+| oscal-compass/compliance-trestle | Compliance artifacts in git, markdown authoring, checker in CI. Apache-2.0. | **Read before Phase 1.** Closest existing thing to Certificate Studio's Phase 1, built for cyber-security controls. Their design decisions are a free lesson. |
+| oscal-club/awesome-oscal | Curated OSCAL tooling index. | Index for a later round. |
+
+### D5. Lifecycle and ledger (Phase 2)
+
+| Project | What it is | Verdict |
+|---|---|---|
+| ToolCRIB `server/state/` | SYS/HUMAN actor model, hash-chained transition ledger, named-human gate. | **Base.** Already written, already tested, already the pattern B2 asks for. |
+| statelyai/xstate | Zero-dependency TypeScript state machines. | Reference only; ToolCRIB's machine is the one to reuse. |
+
+### D6. Desktop shell and editor (Phase 3)
+
+| Project | What it is | Verdict |
+|---|---|---|
+| SeanPedersen/Marko | Tauri v2 WYSIWYG markdown editor; folder tree in sidebar; basic git commit/revert/pull/push. | **Reference, closest starting shape.** Tree + editor + git is the left and center panes. Read for structure; likely do not fork. |
+| thejacedev/Noteriv | Tauri 2 markdown editor, CodeMirror, git via system binary, plugin API, graph view. | Reference for the plugin architecture and the dependency-graph view. |
+| Ferrite, MarkditorApp, Inkwell | Further Tauri markdown editors. | Confirms the path is well-trodden; low risk. |
+| ueberdosis/tiptap (on ProseMirror) | Headless rich-text editor, markdown input rules, extension-based. | **Base for the editor.** Nothing found doing inline lint markers out of the box; advisory-tier squiggles are a custom decoration extension, which ProseMirror decorations exist for. Bounded work. |
+| rust-lang/git2-rs | Rust bindings to libgit2, vendored. | The choice if the Tauri backend does git natively. |
+
+### D7. Aviation ground (reference material, not code)
+
+- ARSA model Repair Station and Quality Manual: a public PDF showing an accepted
+  structure. On the desk for Phase 0's fixture manual.
+- AC 145-9A: the FAA's own guide to developing and evaluating RSMs and QCMs. The
+  required-content list for tier one starts here and in the regulation itself.
+
+### D8. Changes to Part B that follow from this
+
+- B10: Phase 0 is "one pinned binary" (Typst), not zero dependencies. Pandoc as a
+  second binary is a Phase 0 start decision.
+- B3: tier one is front-matter schema + join, implementable on remark-lint; the
+  deterministic slice of the advisory tier is Vale rules.
+- B13: add "read compliance-trestle" as the first task of Phase 1.
 
 ---
 
