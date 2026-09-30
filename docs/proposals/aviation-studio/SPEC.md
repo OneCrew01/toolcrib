@@ -389,12 +389,19 @@ IS the deliverable."
 
 ### E3. What the inventory changes about the plan
 
-1. **Customer Zero is not established.** Every Part 145 artifact is a fictional
-   template entity, never filed; shop records belong to a former employer. Part A and
-   B13 assumed the author's own manual through the author's own inspector. Phase 2's
-   "done when" needs a real certificate holder — the author, once certificated in their
-   own name, or a first customer who agrees to be first. **Open question for the
-   author; it changes the plan's shape.**
+1. **Customer Zero is the author's own initial certification.** Answered 2026-09-30:
+   the author does not hold a Part 145 certificate; the one referenced in the skills is
+   a former employer's. The author intends to use Studio first for their own
+   application. So Phase 2's "done when" becomes: the author's own RSM and QCM, compiled
+   by Studio, accepted by an FSDO as part of a new repair station certificate
+   application. That is a stronger test than a revision to an existing manual — it
+   walks the full 8900.1 Vol 2 Ch 11 certification process, which the Forge canon
+   already captures. Its timing is the author's application timing, not a build
+   schedule. The Forge fixture is the seed of that real manual; every fictional fill
+   is replaced by a real value under a named signature, none carried over by default.
+   **Hygiene:** skills and templates that embed the former employer's certificate
+   number must be scrubbed before any Studio artifact is produced from them (the
+   author's public-identity rail already forbids shop history in public copies).
 2. **The Forge is unverified AI prose; Studio must not launder it.** Six AI graders
    scored it 81/100; no human with shop or inspector experience has read it. Under the
    author's own Spooner Protocol Law 2, everything is DRAFT until signed. The compiler
@@ -422,9 +429,10 @@ IS the deliverable."
    D-182 reading rules are the same discipline B asks for. Studio adopts them by
    reference rather than restating them. `has-doctrine-currency` runs before any
    Studio code is produced, per the author's standing rule.
-8. **Out of Studio's scope but at risk:** the semantic curriculum database is paused
-   with no known backup and three live products cannot rebuild without it. Recorded
-   here so it is not lost between sessions; it is not Studio's problem to solve.
+8. **Out of Studio's scope, was at risk, now resolved:** the semantic curriculum
+   database was paused with no known backup at inventory time. The author reports it
+   unpaused and backed up as of 2026-09-30. Kept on record because the inventory that
+   found it is otherwise accurate.
 
 ### E4. Revised Phase 0 first tasks
 
