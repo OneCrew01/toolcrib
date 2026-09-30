@@ -320,7 +320,7 @@ of the market.
 - AC 145-9A: the FAA's own guide to developing and evaluating RSMs and QCMs. The
   required-content list for tier one starts here and in the regulation itself.
 
-### D9. Round three — Phase 0 details and regulated-industry precedent
+### D8. Round three — Phase 0 details and regulated-industry precedent
 
 | Project | What it is | Verdict |
 |---|---|---|
@@ -342,17 +342,17 @@ needed. Prove this on the fixture manual first thing in Phase 0; if it fails, th
 fallback is a two-column grid per changed paragraph. Either way the bar is derived
 from the diff, never hand-placed.
 
-### D10. Changes to Part B that follow from this
+### D9. Changes to Part B that follow from this
 
 - B10: Phase 0 is "one pinned binary" (Typst), not zero dependencies. Pandoc as a
   second binary is a Phase 0 start decision.
 - B3: tier one is front-matter schema + join, implementable on remark-lint; the
   deterministic slice of the advisory tier is Vale rules.
 - B13: add "read compliance-trestle" as the first task of Phase 1.
-- B12: byte-stable PDF needs a normalisation step (D9); the golden test builds the
+- B12: byte-stable PDF needs a normalisation step (D8); the golden test builds the
   same commit twice and compares sha256.
 - B7: revision bars are paragraph blocks with a margin stroke, derived from the diff
-  (D9); prove on the fixture manual first thing in Phase 0.
+  (D8); prove on the fixture manual first thing in Phase 0.
 
 ---
 
