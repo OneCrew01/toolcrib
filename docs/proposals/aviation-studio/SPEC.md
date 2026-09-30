@@ -320,13 +320,39 @@ of the market.
 - AC 145-9A: the FAA's own guide to developing and evaluating RSMs and QCMs. The
   required-content list for tier one starts here and in the regulation itself.
 
-### D8. Changes to Part B that follow from this
+### D9. Round three — Phase 0 details and regulated-industry precedent
+
+| Project | What it is | Verdict |
+|---|---|---|
+| typst-community/typst.js (`typst` on npm) | Official JS wrapper: `typst.compile(in, out)` and `typst.query()` from Node. Ships the CLI. | **Base.** The compiler calls Typst from Node without shelling out by hand. Keeps "one pinned binary" true. |
+| Myriad-Dreamin/typst.ts | Typst compiled to WebAssembly; renders in a browser. | Phase 3: live preview inside the desktop app with no external process. |
+| ProseMirror official lint example | `Decoration.inline()` to mark a range, `Decoration.widget()` for the icon, the finding stored in the decoration spec; click selects, double-click applies the fix. | **Base for the advisory-tier markers.** This is the exact mechanism; a production version updates decorations incrementally rather than rebuilding on every keystroke. kofifus/prosemirror-spellchecker shows the same pattern shipped. |
+| SimonCropp/DeterministicPdf; qpdf `--deterministic-id`; reproducible-builds.org | Tools and guidance for byte-identical PDFs: strip creation dates, pin the trailer `/ID`, normalise before hashing. | **Required reading for B12.** PDF writers stamp a timestamp and a random ID on every render, so "same commit, same bytes" needs a normalisation step or Typst's own date pinning before the hash is taken. Test by building the same commit twice and comparing sha256. |
+| CAMRPC/qualitySystems; OpenRegulatory QMS-in-GitHub | ISO 9001 / ISO 13485 quality systems run as markdown in git: edits on branches, review as pull requests, a signing table at the foot of each document, releases as the record. | **Precedent, not code.** A regulated industry already runs manuals-in-git with human approval on the pull request. It confirms the model and shows the auditor-facing record can be git itself plus a signing table. Their gap is the same as ours: no page-level LEP or revision bars. |
+
+**Revision bars: the one Phase 0 detail with no ready answer.** Typst has no native
+change-bar feature. The forum's own solution is a `place()` hack keyed to source line
+positions that breaks on multi-line paragraphs and page breaks, and its author calls it
+extremely hacky. The route around it follows from B7's paragraph-granularity diff: the
+compiler already knows which *paragraphs* changed, so it emits each changed paragraph
+as a `block` with a left stroke pushed into the margin (`block(outset: (left: …),
+stroke: (left: …))`). Blocks break across pages and the stroke follows each fragment,
+so multi-line paragraphs and page breaks both work, and no source-line alignment is
+needed. Prove this on the fixture manual first thing in Phase 0; if it fails, the
+fallback is a two-column grid per changed paragraph. Either way the bar is derived
+from the diff, never hand-placed.
+
+### D10. Changes to Part B that follow from this
 
 - B10: Phase 0 is "one pinned binary" (Typst), not zero dependencies. Pandoc as a
   second binary is a Phase 0 start decision.
 - B3: tier one is front-matter schema + join, implementable on remark-lint; the
   deterministic slice of the advisory tier is Vale rules.
 - B13: add "read compliance-trestle" as the first task of Phase 1.
+- B12: byte-stable PDF needs a normalisation step (D9); the golden test builds the
+  same commit twice and compares sha256.
+- B7: revision bars are paragraph blocks with a margin stroke, derived from the diff
+  (D9); prove on the fixture manual first thing in Phase 0.
 
 ---
 
