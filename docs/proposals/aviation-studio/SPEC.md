@@ -342,7 +342,24 @@ needed. Prove this on the fixture manual first thing in Phase 0; if it fails, th
 fallback is a two-column grid per changed paragraph. Either way the bar is derived
 from the diff, never hand-placed.
 
-### D9. Changes to Part B that follow from this
+### D10. Round four — gaps the data inventory opened (2026-09-30)
+
+Aimed at what Part E revealed: the canon is captured and drift-checked by hand, the
+human gate needs a signature that counts as evidence, the Forge holds 16 forms, and
+the markdown→Typst transform was still an open choice.
+
+| Project | What it is | Verdict |
+|---|---|---|
+| eCFR Versioner API (`ecfr.gov/api/versioner/v1`), usgpo/bulk-data XML guide | Public, keyless REST API: any CFR part, section or appendix as XML *at a given date*, plus version history. GPO's bulk XML as the fallback. | **Base for B4's drift check and for regenerating the canon.** Replaces hand capture: fetch Part 145 at the capture date and today, diff, flag STALE rows. Point-in-time fetch also means a manual can cite the regulation *as of* its acceptance date. |
+| AlextheYounga/ecfr | The whole eCFR and its history since 2002 as a git repository. | Reference. Shows the regulation itself kept as versioned text, which is what the canon should be. |
+| sigstore/gitsign | Keyless git commit and tag signing: a short-lived certificate from an OIDC login, signature recorded in a public transparency log, verifiable to a named identity and issuer. | **Candidate for B2's human gate.** A signed tag on the accepted commit is machine-verifiable evidence of *who* and *when*, with no key to lose. Limits: needs network at signing time; GitHub's UI does not badge it. GPG-signed tags are the offline fallback. Neither replaces the FAA's letter as the evidence attachment; they prove the human act inside the repo. |
+| Mapaor/markdown2typst; sen-ltd/markdown-to-typst | Small JavaScript markdown→Typst converters (~500 lines; headings, emphasis, code, lists, quotes, tables, links, images). | **Settles B10's Pandoc question: write our own, in Node.** Two people did it in a few hundred lines. Ours is a remark/mdast walker so front-matter, section IDs and revision-bar blocks are first-class rather than bolted on. Pandoc is not needed. |
+| remarkjs/remark + syntax-tree/mdast | Markdown parser and AST utilities. | **Base** for the transform and for tier one (same AST the front-matter checker walks). |
+| carpe-diem/typst-fillable; typst/typst#1765 | Typst has no native PDF form fields (open issue). typst-fillable queries field positions out of a Typst template and overlays AcroForm fields with a second tool. | **Reference for the Forge's 16 forms.** Manual pages are static; forms that must be fillable get the overlay step. Python today; the same overlay is doable in Node with pdf-lib. |
+| Hopding/pdf-lib | Node: create, fill and flatten PDF form fields; no browser. | **Base** for the form overlay and for PDF normalisation (B12) if Typst's own date pinning is not enough. |
+| FAA DRS | No API, no scraper found. Documents are served by opaque IDs. | The author's existing DRS watchdog (inventory Collection 10, `job_runs`) is the only tooling there is. Drift for ACs and 8900.1 stays a fetch-and-diff of known document IDs. eCFR covers the regulation; DRS coverage stays bespoke. |
+
+### D11. Changes to Part B that follow from this
 
 - B10: Phase 0 is "one pinned binary" (Typst), not zero dependencies. Pandoc as a
   second binary is a Phase 0 start decision.
@@ -353,6 +370,11 @@ from the diff, never hand-placed.
   same commit twice and compares sha256.
 - B7: revision bars are paragraph blocks with a margin stroke, derived from the diff
   (D8); prove on the fixture manual first thing in Phase 0.
+- B10: no Pandoc; the markdown→Typst transform is our own remark walker (D10).
+- B4: the drift check runs on the eCFR Versioner API, point-in-time (D10); DRS
+  documents stay a bespoke fetch-and-diff.
+- B2: a signed tag (gitsign or GPG) on the accepted commit is the in-repo evidence
+  of the human act; the FAA letter stays the attachment (D10).
 
 ---
 
