@@ -469,6 +469,65 @@ IS the deliverable."
 
 ---
 
+## Part F — Phases 3 to 7, revised (2026-10-01)
+
+Source: a second Gemini layer ("Layer 1: Compliance Parser & Linter Engine") received
+2026-09-30, plus the unused remainder of Part C. Everything usable was taken; the
+rest was left. Phases 0 to 2 are unchanged except for F1. Where this part and B13
+disagree, this part wins for Phases 3 to 7.
+
+### F1. The one change to Phases 0–2: a reserved `asserts` field
+
+The front-matter schema (E3.4) gets one optional block, `asserts`, unused until
+Phase 6. A section that states a machine-checkable rule in its prose may also state
+it as data, with its citation:
+
+```yaml
+asserts:
+  - id: QCM-7.3-SDR-WINDOW
+    kind: time_window
+    hours: 96
+    from: discovery
+    to: sdr_submitted
+    basis: "14 CFR 145.221(a)"
+```
+
+Why now: adding a field to the schema is free; retrofitting one onto a hundred
+sections after acceptance is a revision. Why optional and unused: Phase 0's compiler
+ignores it, tier one ignores it, and the acceptance gate ignores it. It exists so that
+Phase 6 has a source of truth that was reviewed with the manual, by the same human,
+at the same signature. Nothing else in Phases 0–2 changes.
+
+### F2. What was taken, and where it went
+
+| Taken from Layer 1 | Where it lands | Changed how |
+|---|---|---|
+| Rules with `authority: SHOP_QCM` | Phase 6 | **The good idea.** A rule the shop wrote into its own accepted QCM is legitimately executable against the shop's own records. Rules with `authority: FAA` are not taken; the regulation is cited by the QCM rule (`basis`), never encoded directly. |
+| Three-pass pipeline: entity extraction → constraint evaluation → diagnostics | Phase 6 | Kept as the shape of the records-side rules engine. Entities come from the records system's structured fields (tool ID, tech ID, dates), never from parsing prose with regex. |
+| Severity tiers | Phases 3 and 6 | Renamed. ERROR / WARNING / INFO become **finding / caution / hint**. "Non-airworthy" and "non-compliant" are not labels software may apply. |
+| Approaching-deadline warnings | Phase 6 | Kept, as a caution from a QCM `time_window` assert. The shop's own window, the shop's own clock. |
+| Quick-fix suggestions of standard phrasing | Phase 3 | Kept, and sourced: the author's Logbook Phrase Book templates (inventory Collection 16, human-verified) become the hint library. A hint inserts a verified template; it never composes prose. |
+| "Form 337 may be required" reminder | Phase 6, as hint only | Major/minor classification is a Part 43 Appendix A judgment. Software may remind; it may not decide. |
+| Inline diagnostics in the editor (the "DOM view") | Phase 3 | Kept: ProseMirror decorations (D8). Advisory tier only in the editor. |
+| Blocking sign-off / return to service | **Not taken** | B5 stands. The records system may hold a sign-off pending a human decision where its own QCM rule says so; it never decides airworthiness, and every hold has a named override and a ledger row. |
+| Executable AST of 14 CFR | **Not taken** | Interpretation as code. Two of Layer 1's own examples carried errors a linter would then enforce (a rating that does not exist; return-to-service cited to 43.9). The canon stays text with citations; tier one checks presence, not meaning. |
+| Tauri + Rust + SQLite + vector DB ("Layer 2") | Phase 3 at the earliest | B10 unchanged. |
+
+### F3. Phases 3 to 7, restated
+
+| Phase | Deliverable | Done when |
+|---|---|---|
+| 3 | **Editor.** Tauri shell, tree with status badges, TipTap editor, diff/redline view, inline advisory markers, hint library from the Phrase Book. | The author drafts one real QCM revision in it end to end and prefers it to a text editor for a week. |
+| 4 | **BYOD ingestion**, local only (B8). OEM manuals in, 33-field rows out (E2), warnings kept with their steps. | One OEM manual ingested; a torque value found with its WARNING attached; nothing left the machine. |
+| 5 | **Dependency graph** across manuals; `@`-pinned context for the agent panel; advisory-tier LLM findings watermarked. | A QCM rule change highlights every dependent RSM and training section; the agent cites section and revision on every answer. |
+| 6 | **Rules export and records-side engine.** The compiler emits `rules.json` from every `asserts` block in the ACTIVE baseline, signed with the same tag as the manual. The records system runs the three-pass engine over its own structured records and emits findings, cautions and hints. Holds only where a QCM rule says so; human override; ledger row. | A QCM time-window rule produces a caution on a real record before the window closes; a stale-calibration finding names the QCM section and revision it comes from. |
+| 7 | **Drift report** (manual says / records show), the API contract with the records system (B9), and floor assistants that quote the ACTIVE baseline over voice. | A drift report runs against real records; an assistant answer cites section and revision. |
+
+Phases 0 to 2 remain the product. Phase 6 is the first phase that touches a shop
+record, and it does so only through rules the shop wrote and a human signed.
+
+---
+
 ## Part C — the raw spec, verbatim
 
 Reproduced as received on 2026-09-27, unedited except for removing the Gemini
