@@ -359,7 +359,34 @@ the markdown→Typst transform was still an open choice.
 | Hopding/pdf-lib | Node: create, fill and flatten PDF form fields; no browser. | **Base** for the form overlay and for PDF normalisation (B12) if Typst's own date pinning is not enough. |
 | FAA DRS | No API, no scraper found. Documents are served by opaque IDs. | The author's existing DRS watchdog (inventory Collection 10, `job_runs`) is the only tooling there is. Drift for ACs and 8900.1 stays a fetch-and-diff of known document IDs. eCFR covers the regulation; DRS coverage stays bespoke. |
 
-### D11. Changes to Part B that follow from this
+### D11. Jev (TypeSafe AI) — a tooling candidate, not a layer (2026-10-01)
+
+Jev is a "System One" model: given program state and a typed question with a fixed
+candidate list, it returns one candidate with a probability. No free text. Built for
+classification, routing, scoring and guardrails. Published limitation: it returns a
+number, not a rationale.
+
+**Not a layer.** Phases 0–2 stay model-free: the compiler is deterministic, tier one
+is a presence check, the gate is a human. It is not the advisory-tier reviewer either,
+because a score with no reason cannot be filed as a finding under Law 3 (cite or do
+not claim) and the advisory watermark. Phase 6's record checks are date and status
+comparisons and need no model.
+
+**One good fit: front-matter tag suggestion.** Every section must be tagged with the
+canon paragraph IDs it satisfies (E3.4, tier one's input). For the Forge fixture that
+is hundreds of sections against ~140 Part 145 paragraph IDs: a typed decision over a
+fixed candidate list, which is exactly Jev's shape. It proposes with a confidence; a
+human confirms or corrects; the confirmed tag enters the front-matter; the ledger
+records "model-suggested, human-confirmed". The same shape serves later for routing a
+reviewer's finding to finding/caution/hint and for pre-sorting which sections the
+advisory reviewer reads first.
+
+**Conditions.** Behind the model-boundary interface (B10) so it is swappable; a vendor
+model is never load-bearing. Suggestions only; nothing it returns enters a file
+without a human action. Manual text leaves the machine, so the `data_classification`
+field (E3.4) decides per document whether it may be used at all.
+
+### D12. Changes to Part B that follow from this
 
 - B10: Phase 0 is "one pinned binary" (Typst), not zero dependencies. Pandoc as a
   second binary is a Phase 0 start decision.
